@@ -1,6 +1,6 @@
 // API Configuration
 export const API_CONFIG = {
-  BASE_URL: import.meta.env.VITE_API_BASE_URL || 'http://TrieuMinh:3000',
+  BASE_URL: import.meta.env.VITE_API_BASE_URL || 'http://trieuminh:3000',
   TIMEOUT: 10000, // 10 seconds
   RETRY_ATTEMPTS: 3
 };
@@ -11,7 +11,11 @@ export const API_ENDPOINTS = {
   FLOOD_DATA_REALTIME: '/api/v1/flood-data/realtime',
   REPORT_FLOOD: '/api/report-flood',
   CROWD_REPORTS: '/api/crowd-reports',
-  CROWD_REPORTS_ALL: '/api/crowd-reports/all'
+  CROWD_REPORTS_ALL: '/api/crowd-reports/all',
+  AUTH_LOGIN: '/api/auth/login',
+  AUTH_REGISTER: '/api/auth/register',
+  AUTH_PROFILE: '/api/auth/profile',
+  AUTH_CHANGE_PASSWORD: '/api/auth/change-password'
 };
 
 // Polling intervals (milliseconds)

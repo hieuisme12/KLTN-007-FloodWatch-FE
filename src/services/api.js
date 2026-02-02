@@ -1,6 +1,42 @@
 import axios from 'axios';
 import { API_CONFIG, API_ENDPOINTS, DEFAULTS } from '../config/apiConfig';
 
+// Tạo axios instance với interceptor để tự động thêm token
+const apiClient = axios.create({
+  baseURL: API_CONFIG.BASE_URL
+});
+
+// Interceptor: Tự động thêm token vào header cho mọi request
+apiClient.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('authToken');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Interceptor: Xử lý lỗi 401 (token hết hạn) - tự động logout
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Token hết hạn hoặc không hợp lệ
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+      // Redirect to login nếu cần
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 // Chuẩn hóa dữ liệu từ API
 const normalizeFloodData = (data, isRealtimeEndpoint = false) => {
   return data.map(item => {
@@ -62,20 +98,16 @@ export const fetchFloodData = async (endpointRef) => {
           // Endpoint không tồn tại, fallback
           endpointRef.current = 'fallback';
           isRealtimeEndpoint = false;
-          console.log('⚠️ Endpoint realtime không tồn tại, sử dụng endpoint cũ');
           // Gọi endpoint cũ
           response = await axios.get(`${API_CONFIG.BASE_URL}${API_ENDPOINTS.FLOOD_DATA}?t=${Date.now()}`);
         } else if (response.status === 200) {
           // Endpoint tồn tại
           endpointRef.current = 'realtime';
           isRealtimeEndpoint = true;
-          console.log('✅ Sử dụng endpoint /api/v1/flood-data/realtime');
         }
-      } catch (realtimeError) {
-        // Nếu lỗi khác (network, 500, etc), fallback
+      } catch {
         endpointRef.current = 'fallback';
         isRealtimeEndpoint = false;
-        console.log('⚠️ Lỗi khi gọi endpoint mới, sử dụng endpoint cũ');
         // Gọi endpoint cũ
         response = await axios.get(`${API_CONFIG.BASE_URL}${API_ENDPOINTS.FLOOD_DATA}?t=${Date.now()}`);
       }
@@ -92,22 +124,11 @@ export const fetchFloodData = async (endpointRef) => {
     
     if (response.data && response.data.success && response.data.data) {
       const normalizedData = normalizeFloodData(response.data.data, isRealtimeEndpoint);
-      console.log(`Dữ liệu đã tải (${isRealtimeEndpoint ? 'realtime' : 'fallback'}):`, normalizedData);
       return { success: true, data: normalizedData };
     } else {
-      console.warn('Response không đúng định dạng:', response.data);
       return { success: false, data: [] };
     }
   } catch (error) {
-    console.error("Lỗi cập nhật:", error);
-    if (error.response) {
-      console.error("Status:", error.response.status);
-      console.error("Chi tiết lỗi:", error.response.data);
-    } else if (error.request) {
-      console.error("Không nhận được response từ server. Kiểm tra xem Backend đã chạy chưa?");
-    } else {
-      console.error("Lỗi:", error.message);
-    }
     return { success: false, data: null, error };
   }
 };
@@ -132,7 +153,6 @@ export const submitFloodReport = async (reportData) => {
       };
     }
   } catch (error) {
-    console.error("Lỗi gửi báo cáo:", error);
     if (error.response) {
       return { 
         success: false, 
@@ -169,7 +189,6 @@ export const fetchCrowdReports = async () => {
       };
     }
   } catch (error) {
-    console.error("Lỗi lấy danh sách báo cáo:", error);
     return { 
       success: false, 
       data: [], 
@@ -195,7 +214,6 @@ export const fetchAllCrowdReports = async (limit = 100) => {
       };
     }
   } catch (error) {
-    console.error("Lỗi lấy tất cả báo cáo:", error);
     return { 
       success: false, 
       data: [], 
@@ -203,3 +221,158 @@ export const fetchAllCrowdReports = async (limit = 100) => {
     };
   }
 };
+
+// Authentication APIs
+export const login = async (username, password) => {
+  try {
+    const response = await axios.post(`${API_CONFIG.BASE_URL}${API_ENDPOINTS.AUTH_LOGIN}`, {
+      username,
+      password
+    });
+    
+    if (response.data && response.data.success) {
+      // Lưu thông tin user và token vào localStorage
+      if (response.data.data.user) {
+        localStorage.setItem('user', JSON.stringify(response.data.data.user));
+      }
+      if (response.data.data.token) {
+        localStorage.setItem('authToken', response.data.data.token);
+      }
+      return { 
+        success: true, 
+        data: response.data.data 
+      };
+    } else {
+      return { 
+        success: false, 
+        error: response.data.error || 'Đăng nhập thất bại' 
+      };
+    }
+  } catch (error) {
+    return { 
+      success: false, 
+      error: error.response?.data?.error || error.message
+    };
+  }
+};
+
+export const register = async (userData) => {
+  try {
+    const response = await axios.post(`${API_CONFIG.BASE_URL}${API_ENDPOINTS.AUTH_REGISTER}`, userData);
+    
+    if (response.data && response.data.success) {
+      return { 
+        success: true, 
+        data: response.data.data 
+      };
+    } else {
+      return { 
+        success: false, 
+        error: response.data.error || 'Đăng ký thất bại' 
+      };
+    }
+  } catch (error) {
+    return { 
+      success: false, 
+      error: error.response?.data?.error || error.message
+    };
+  }
+};
+
+export const getProfile = async () => {
+  try {
+    const response = await apiClient.get(API_ENDPOINTS.AUTH_PROFILE);
+    
+    if (response.data && response.data.success) {
+      // Cập nhật thông tin user trong localStorage
+      if (response.data.data) {
+        localStorage.setItem('user', JSON.stringify(response.data.data));
+      }
+      return { 
+        success: true, 
+        data: response.data.data 
+      };
+    } else {
+      return { 
+        success: false, 
+        error: response.data.error || 'Không thể lấy thông tin người dùng' 
+      };
+    }
+  } catch (error) {
+    return { 
+      success: false, 
+      error: error.response?.data?.error || error.message
+    };
+  }
+};
+
+export const updateProfile = async (profileData) => {
+  try {
+    const response = await apiClient.put(API_ENDPOINTS.AUTH_PROFILE, profileData);
+    
+    if (response.data && response.data.success) {
+      // Cập nhật thông tin user trong localStorage
+      if (response.data.data) {
+        localStorage.setItem('user', JSON.stringify(response.data.data));
+      }
+      return { 
+        success: true, 
+        data: response.data.data,
+        message: response.data.message || 'Cập nhật profile thành công'
+      };
+    } else {
+      return { 
+        success: false, 
+        error: response.data.error || 'Cập nhật profile thất bại' 
+      };
+    }
+  } catch (error) {
+    return { 
+      success: false, 
+      error: error.response?.data?.error || error.message
+    };
+  }
+};
+
+export const changePassword = async (oldPassword, newPassword) => {
+  try {
+    const response = await apiClient.put(API_ENDPOINTS.AUTH_CHANGE_PASSWORD, {
+      old_password: oldPassword,
+      new_password: newPassword
+    });
+    
+    if (response.data && response.data.success) {
+      return { 
+        success: true, 
+        message: response.data.message || 'Đổi mật khẩu thành công'
+      };
+    } else {
+      return { 
+        success: false, 
+        error: response.data.error || 'Đổi mật khẩu thất bại' 
+      };
+    }
+  } catch (error) {
+    return { 
+      success: false, 
+      error: error.response?.data?.error || error.message
+    };
+  }
+};
+
+export const logout = () => {
+  // Xóa thông tin user và token khỏi localStorage
+  localStorage.removeItem('user');
+  localStorage.removeItem('authToken');
+};
+
+export const getCurrentUser = () => {
+  const userStr = localStorage.getItem('user');
+  return userStr ? JSON.parse(userStr) : null;
+};
+
+export const isAuthenticated = () => {
+  // Kiểm tra xem có thông tin user trong localStorage không
+  return !!localStorage.getItem('user');
+};
+

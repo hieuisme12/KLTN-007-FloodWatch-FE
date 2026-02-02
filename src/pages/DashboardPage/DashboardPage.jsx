@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { fetchFloodData, fetchCrowdReports } from '../../services/api';
+import { fetchFloodData, fetchCrowdReports, isAuthenticated } from '../../services/api';
 import { POLLING_INTERVALS } from '../../config/apiConfig';
 import { useNavigate } from 'react-router-dom';
 import SensorStats from '../../components/SensorStats';
@@ -7,6 +7,7 @@ import MapView from '../../components/MapView';
 import AlertPanel from '../../components/AlertPanel';
 import CrowdReportsList from '../../components/CrowdReportsList';
 import ChatBot from '../../components/ChatBot';
+import GuestLoginPrompt from '../../components/GuestLoginPrompt';
 import './DashboardPage.css';
 
 const DashboardPage = () => {
@@ -15,6 +16,7 @@ const DashboardPage = () => {
   const [crowdReports, setCrowdReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [crowdReportsLoading, setCrowdReportsLoading] = useState(true);
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const endpointRef = useRef(null);
 
   useEffect(() => {
@@ -67,16 +69,10 @@ const DashboardPage = () => {
         <div className="dashboard-sidebar">
           <div className="dashboard-tabs">
             <button
-              onClick={() => navigate('/')}
               className="dashboard-tab active"
+              style={{ cursor: 'default' }}
             >
               🚨 Cảnh báo
-            </button>
-            <button
-              onClick={() => navigate('/reports')}
-              className="dashboard-tab"
-            >
-              📱 Báo cáo
             </button>
           </div>
 
@@ -97,7 +93,13 @@ const DashboardPage = () => {
 
           <div className="dashboard-footer">
             <button
-              onClick={() => navigate('/report/new')}
+              onClick={() => {
+                if (!isAuthenticated()) {
+                  setShowLoginPrompt(true);
+                } else {
+                  navigate('/report/new');
+                }
+              }}
               className="dashboard-report-btn"
             >
               📝 Báo cáo ngập lụt
@@ -107,6 +109,13 @@ const DashboardPage = () => {
       </div>
 
       <ChatBot />
+      
+      {showLoginPrompt && (
+        <GuestLoginPrompt 
+          message="Vui lòng đăng nhập để báo cáo tình trạng ngập lụt. Thông tin của bạn giúp cộng đồng cập nhật tình hình thời tiết thực tế!"
+          onClose={() => setShowLoginPrompt(false)}
+        />
+      )}
     </div>
   );
 };

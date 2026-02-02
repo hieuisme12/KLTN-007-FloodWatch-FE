@@ -1,6 +1,12 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import UserDropdown from './UserDropdown';
+import { getCurrentUser } from '../services/api';
 
 const SensorStats = ({ floodData, loading }) => {
+  const navigate = useNavigate();
+  const currentUser = getCurrentUser();
+
   const stats = {
     total: floodData.length,
     normal: floodData.filter(item => item.status === 'normal').length,
@@ -13,18 +19,61 @@ const SensorStats = ({ floodData, loading }) => {
     <div style={{ 
       padding: '10px 20px', 
       background: '#2c3e50', 
-      color: 'white', 
-      textAlign: 'center',
+      color: 'white',
       boxSizing: 'border-box',
       overflow: 'visible',
       whiteSpace: 'normal',
       flexShrink: 0
     }}>
-      <h2 style={{ margin: '0 0 5px 0', fontSize: '1.2rem', fontWeight: 'bold' }}>
-        Hệ Thống Cảnh Báo Ngập Lụt TP.HCM - Real-time Dashboard
-      </h2>
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        marginBottom: '10px',
+        position: 'relative'
+      }}>
+        <div style={{ flex: 1 }}></div>
+        <h2 style={{ 
+          margin: '0', 
+          fontSize: '1.5rem', 
+          fontWeight: 'bold',
+          textAlign: 'center',
+          position: 'absolute',
+          left: '50%',
+          transform: 'translateX(-50%)'
+        }}>
+          Hệ Thống Cảnh Báo Ngập Lụt TP.HCM - Real-time Dashboard
+        </h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', zIndex: 10 }}>
+          {!currentUser && (
+            <button
+              onClick={() => navigate('/login')}
+              style={{
+                background: 'rgba(255,255,255,0.2)',
+                border: 'none',
+                color: 'white',
+                padding: '8px 16px',
+                borderRadius: '20px',
+                cursor: 'pointer',
+                fontSize: '0.9rem',
+                fontWeight: '500',
+                transition: 'all 0.3s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.background = 'rgba(255,255,255,0.3)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.background = 'rgba(255,255,255,0.2)';
+              }}
+            >
+              🔐 Đăng nhập
+            </button>
+          )}
+          {currentUser && <UserDropdown />}
+        </div>
+      </div>
       {loading ? (
-        <p style={{ margin: '0', fontSize: '0.9rem' }}>Đang tải dữ liệu...</p>
+        <p style={{ margin: '0', fontSize: '0.9rem', textAlign: 'center' }}>Đang tải dữ liệu...</p>
       ) : (
         <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', flexWrap: 'wrap', marginTop: '5px' }}>
           <span style={{ fontSize: '0.9rem' }}>
