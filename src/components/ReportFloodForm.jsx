@@ -25,7 +25,7 @@ const createLocationIcon = () => {
 };
 
 // Component để lắng nghe click trên map
-const MapClickHandler = ({ onLocationSelect, selectedLocation }) => {
+const MapClickHandler = ({ onLocationSelect  }) => {
   useMapEvents({
     click: (e) => {
       onLocationSelect(e.latlng.lng, e.latlng.lat);
