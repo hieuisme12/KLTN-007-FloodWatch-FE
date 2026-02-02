@@ -1,13 +1,12 @@
 import axios from 'axios';
-
-const BASE_URL = 'http://localhost:3000';
+import { API_CONFIG, API_ENDPOINTS, DEFAULTS } from '../config/apiConfig';
 
 // Chuẩn hóa dữ liệu từ API
 const normalizeFloodData = (data, isRealtimeEndpoint = false) => {
   return data.map(item => {
     const waterLevel = item.water_level || 0;
-    const warningThreshold = item.warning_threshold || 10;
-    const dangerThreshold = item.danger_threshold || 30;
+    const warningThreshold = item.warning_threshold || DEFAULTS.WARNING_THRESHOLD;
+    const dangerThreshold = item.danger_threshold || DEFAULTS.DANGER_THRESHOLD;
     
     // Tính toán status nếu endpoint cũ không có
     let status = item.status;
@@ -34,8 +33,8 @@ const normalizeFloodData = (data, isRealtimeEndpoint = false) => {
       water_level: waterLevel,
       velocity: velocity,
       status: status, // normal/warning/danger/offline
-      lng: item.lng || 106.701,
-      lat: item.lat || 10.776,
+      lng: item.lng || DEFAULTS.DEFAULT_LNG,
+      lat: item.lat || DEFAULTS.DEFAULT_LAT,
       warning_threshold: warningThreshold,
       danger_threshold: dangerThreshold,
       last_data_time: item.last_data_time || item.created_at,
@@ -54,7 +53,7 @@ export const fetchFloodData = async (endpointRef) => {
     if (endpointRef.current === null) {
       try {
         // Thử endpoint mới với validateStatus để không throw 404
-        response = await axios.get(`${BASE_URL}/api/v1/flood-data/realtime?t=${Date.now()}`, {
+        response = await axios.get(`${API_CONFIG.BASE_URL}${API_ENDPOINTS.FLOOD_DATA_REALTIME}?t=${Date.now()}`, {
           validateStatus: (status) => status < 500 // Chỉ throw nếu >= 500
         });
         
@@ -63,9 +62,9 @@ export const fetchFloodData = async (endpointRef) => {
           // Endpoint không tồn tại, fallback
           endpointRef.current = 'fallback';
           isRealtimeEndpoint = false;
-          console.log('⚠️ Endpoint /api/v1/flood-data/realtime không tồn tại, sử dụng endpoint cũ');
+          console.log('⚠️ Endpoint realtime không tồn tại, sử dụng endpoint cũ');
           // Gọi endpoint cũ
-          response = await axios.get(`${BASE_URL}/api/v1/flood-data?t=${Date.now()}`);
+          response = await axios.get(`${API_CONFIG.BASE_URL}${API_ENDPOINTS.FLOOD_DATA}?t=${Date.now()}`);
         } else if (response.status === 200) {
           // Endpoint tồn tại
           endpointRef.current = 'realtime';
@@ -78,15 +77,15 @@ export const fetchFloodData = async (endpointRef) => {
         isRealtimeEndpoint = false;
         console.log('⚠️ Lỗi khi gọi endpoint mới, sử dụng endpoint cũ');
         // Gọi endpoint cũ
-        response = await axios.get(`${BASE_URL}/api/v1/flood-data?t=${Date.now()}`);
+        response = await axios.get(`${API_CONFIG.BASE_URL}${API_ENDPOINTS.FLOOD_DATA}?t=${Date.now()}`);
       }
     } else {
       // Sử dụng endpoint đã xác định
       if (endpointRef.current === 'realtime') {
-        response = await axios.get(`${BASE_URL}/api/v1/flood-data/realtime?t=${Date.now()}`);
+        response = await axios.get(`${API_CONFIG.BASE_URL}${API_ENDPOINTS.FLOOD_DATA_REALTIME}?t=${Date.now()}`);
         isRealtimeEndpoint = true;
       } else {
-        response = await axios.get(`${BASE_URL}/api/v1/flood-data?t=${Date.now()}`);
+        response = await axios.get(`${API_CONFIG.BASE_URL}${API_ENDPOINTS.FLOOD_DATA}?t=${Date.now()}`);
         isRealtimeEndpoint = false;
       }
     }
@@ -118,7 +117,7 @@ export const fetchFloodData = async (endpointRef) => {
 // Gửi báo cáo ngập từ người dùng
 export const submitFloodReport = async (reportData) => {
   try {
-    const response = await axios.post(`${BASE_URL}/api/report-flood`, reportData);
+    const response = await axios.post(`${API_CONFIG.BASE_URL}${API_ENDPOINTS.REPORT_FLOOD}`, reportData);
     
     if (response.data && response.data.success) {
       return { 
@@ -156,7 +155,7 @@ export const submitFloodReport = async (reportData) => {
 // Lấy danh sách báo cáo từ người dân (24h qua)
 export const fetchCrowdReports = async () => {
   try {
-    const response = await axios.get(`${BASE_URL}/api/crowd-reports`);
+    const response = await axios.get(`${API_CONFIG.BASE_URL}${API_ENDPOINTS.CROWD_REPORTS}`);
     
     if (response.data && response.data.success) {
       return { 
@@ -182,7 +181,7 @@ export const fetchCrowdReports = async () => {
 // Lấy tất cả báo cáo (không giới hạn thời gian)
 export const fetchAllCrowdReports = async (limit = 100) => {
   try {
-    const response = await axios.get(`${BASE_URL}/api/crowd-reports/all?limit=${limit}`);
+    const response = await axios.get(`${API_CONFIG.BASE_URL}${API_ENDPOINTS.CROWD_REPORTS_ALL}?limit=${limit}`);
     
     if (response.data && response.data.success) {
       return { 

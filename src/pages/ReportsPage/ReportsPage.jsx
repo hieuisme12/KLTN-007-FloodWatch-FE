@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { fetchCrowdReports } from '../../services/api';
+import { POLLING_INTERVALS } from '../../config/apiConfig';
 import { useNavigate } from 'react-router-dom';
 import { statusColors } from '../../utils/constants';
 import './ReportsPage.css';
@@ -23,7 +24,7 @@ const ReportsPage = () => {
     };
 
     loadReports();
-    const interval = setInterval(loadReports, 30000);
+    const interval = setInterval(loadReports, POLLING_INTERVALS.CROWD_REPORTS);
     return () => clearInterval(interval);
   }, []);
 

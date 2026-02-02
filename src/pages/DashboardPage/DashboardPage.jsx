@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { fetchFloodData, fetchCrowdReports } from '../../services/api';
+import { POLLING_INTERVALS } from '../../config/apiConfig';
 import { useNavigate } from 'react-router-dom';
 import SensorStats from '../../components/SensorStats';
 import MapView from '../../components/MapView';
@@ -33,7 +34,7 @@ const DashboardPage = () => {
     };
 
     loadData();
-    const interval = setInterval(loadData, 5000);
+    const interval = setInterval(loadData, POLLING_INTERVALS.FLOOD_DATA);
     return () => clearInterval(interval);
   }, []);
 
@@ -50,7 +51,7 @@ const DashboardPage = () => {
     };
 
     loadCrowdReports();
-    const interval = setInterval(loadCrowdReports, 30000);
+    const interval = setInterval(loadCrowdReports, POLLING_INTERVALS.CROWD_REPORTS);
     return () => clearInterval(interval);
   }, []);
 
