@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { isAuthenticated, isModerator, getCurrentUser } from '../utils/auth';
+import { isAuthenticated, isModerator} from '../utils/auth';
 import { FaHouse, FaClipboardList, FaPlus, FaMagnifyingGlass, FaUser, FaLock, FaPenToSquare, FaWater } from 'react-icons/fa6';
 import UserDropdown from './UserDropdown';
 import './Navigation.css';
@@ -8,7 +8,6 @@ import './Navigation.css';
 const Navigation = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const currentUser = getCurrentUser();
   const authenticated = isAuthenticated();
   const moderator = isModerator();
 
