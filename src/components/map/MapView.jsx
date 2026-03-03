@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import { createCustomIcon, getStatusLabel, getVelocityLabel } from '../utils/markerUtils';
-import { statusColors, DEFAULT_CENTER, DEFAULT_ZOOM } from '../utils/constants';
+import { createCustomIcon, getStatusLabel, getVelocityLabel } from '../../utils/markerUtils';
+import { statusColors, DEFAULT_CENTER, DEFAULT_ZOOM } from '../../utils/constants';
 import { FaMobileScreen, FaCheck, FaXmark, FaClock, FaStar, FaCircle } from 'react-icons/fa6';
 import { WiFlood } from 'react-icons/wi';
 import { MdLocationOn } from 'react-icons/md';
 import axios from 'axios';
-import { API_CONFIG } from '../config/apiConfig';
+import { API_CONFIG } from '../../config/apiConfig';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 

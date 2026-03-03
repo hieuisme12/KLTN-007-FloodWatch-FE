@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { fetchFloodData, fetchCrowdReports } from '../../services/api';
 import { POLLING_INTERVALS } from '../../config/apiConfig';
-import MapHeader from '../../components/MapHeader';
-import MapView from '../../components/MapView';
+import MapHeader from '../../components/map/MapHeader';
+import MapView from '../../components/map/MapView';
 import './MapPage.css';
 
 const MapPage = () => {

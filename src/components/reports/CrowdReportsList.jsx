@@ -11,7 +11,7 @@ import {
 } from 'react-icons/fa6';
 import { WiFlood } from 'react-icons/wi';
 import { MdLocationOn } from 'react-icons/md';
-import { statusColors } from '../utils/constants';
+import { statusColors } from '../../utils/constants';
 
 const CrowdReportsList = ({ reports, loading }) => {
   // Hàm lấy status info - ưu tiên moderation_status theo logic đúng

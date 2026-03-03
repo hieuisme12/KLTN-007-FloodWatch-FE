@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { fetchWeatherApi } from 'openmeteo';
 import { WiDaySunnyOvercast, WiHumidity, WiStrongWind, WiDaySunny, WiCloudy, WiRain, WiDayRain, WiThunderstorm, WiFog } from 'react-icons/wi';
-import WaterLevelStatistics from './WaterLevelStatistics';
+import WaterLevelStatistics from '../stats/WaterLevelStatistics';
 import './WeatherNewsSection.css';
 
 const WeatherNewsSection = () => {

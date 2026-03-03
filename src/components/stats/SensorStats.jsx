@@ -1,8 +1,8 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaLock } from 'react-icons/fa6';
-import UserDropdown from './UserDropdown';
-import { getCurrentUser } from '../services/api';
+import UserDropdown from '../common/UserDropdown';
+import { getCurrentUser } from '../../services/api';
 
 const SensorStats = ({ floodData, loading }) => {
   const navigate = useNavigate();

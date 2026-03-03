@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaUser, FaRightFromBracket, FaCrown, FaChevronDown } from 'react-icons/fa6';
-import { logout, getCurrentUser } from '../services/api';
+import { logout, getCurrentUser } from '../../services/api';
 
 const UserDropdown = () => {
   const navigate = useNavigate();

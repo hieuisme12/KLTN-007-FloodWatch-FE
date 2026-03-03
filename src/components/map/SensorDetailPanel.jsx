@@ -1,8 +1,8 @@
 import React from 'react';
 import { FaCircle } from 'react-icons/fa6';
 import { WiFlood } from 'react-icons/wi';
-import { getStatusLabel, getVelocityLabel } from '../utils/markerUtils';
-import { statusColors } from '../utils/constants';
+import { getStatusLabel, getVelocityLabel } from '../../utils/markerUtils';
+import { statusColors } from '../../utils/constants';
 import './SensorDetailPanel.css';
 
 const SensorDetailPanel = ({ sensor }) => {

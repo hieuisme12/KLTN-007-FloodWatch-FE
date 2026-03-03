@@ -9,7 +9,7 @@ import ProfilePage from './pages/ProfilePage';
 import ModerationPage from './pages/ModerationPage';
 import NewsDetailPage from './pages/NewsDetailPage';
 import MapPage from './pages/MapPage';
-import Layout from './components/Layout';
+import Layout from './components/layout/Layout';
 import { isAuthenticated, isModerator } from './utils/auth';
 import './App.css';
 

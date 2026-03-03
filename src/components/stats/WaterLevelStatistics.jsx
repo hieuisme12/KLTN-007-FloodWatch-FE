@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { fetchFloodData } from '../services/api';
-import { POLLING_INTERVALS } from '../config/apiConfig';
+import { fetchFloodData } from '../../services/api';
+import { POLLING_INTERVALS } from '../../config/apiConfig';
 import { FaChartColumn } from 'react-icons/fa6';
 import './WaterLevelStatistics.css';
 

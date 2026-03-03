@@ -1,7 +1,7 @@
 import React from 'react';
 import { FaTriangleExclamation } from 'react-icons/fa6';
 import { WiFlood } from 'react-icons/wi';
-import { statusColors, statusLabels } from '../utils/constants';
+import { statusColors, statusLabels } from '../../utils/constants';
 
 const AlertPanel = ({ floodData }) => {
   // Lọc các cảnh báo (warning và danger), sắp xếp theo mức độ nguy hiểm

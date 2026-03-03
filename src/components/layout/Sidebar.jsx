@@ -1,8 +1,8 @@
 import React, { useState, useEffect, Fragment } from 'react';
 import { Transition } from '@headlessui/react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { isAuthenticated, isModerator, getCurrentUser } from '../utils/auth';
-import { logout } from '../services/api';
+import { isAuthenticated, isModerator, getCurrentUser } from '../../utils/auth';
+import { logout } from '../../services/api';
 import { 
   FaHouse, 
   FaClipboardList, 

@@ -4,8 +4,8 @@ import { CheckIcon } from '@heroicons/react/20/solid';
 import { ChevronUpDownIcon } from '@heroicons/react/20/solid';
 import { MapContainer, TileLayer, useMapEvents, Marker } from 'react-leaflet';
 import { FaPenToSquare, FaCheck, FaXmark, FaClock, FaPaperPlane, FaXmark as FaClose } from 'react-icons/fa6';
-import { submitFloodReport } from '../services/api';
-import { DEFAULT_CENTER, DEFAULT_ZOOM } from '../utils/constants';
+import { submitFloodReport } from '../../services/api';
+import { DEFAULT_CENTER, DEFAULT_ZOOM } from '../../utils/constants';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 

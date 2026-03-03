@@ -2,10 +2,10 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchFloodData, fetchCrowdReports } from '../../services/api';
 import { POLLING_INTERVALS } from '../../config/apiConfig';
-import MapView from '../../components/MapView';
-import ChatBot from '../../components/ChatBot';
-import SensorDetailPanel from '../../components/SensorDetailPanel';
-import WeatherNewsSection from '../../components/WeatherNewsSection';
+import MapView from '../../components/map/MapView';
+import ChatBot from '../../components/common/ChatBot';
+import SensorDetailPanel from '../../components/map/SensorDetailPanel';
+import WeatherNewsSection from '../../components/news/WeatherNewsSection';
 import { FaMap } from 'react-icons/fa6';
 import './DashboardPage.css';
 
