@@ -289,11 +289,18 @@ const ReportsPage = () => {
     
     // Nếu đã được moderator xử lý (approved hoặc rejected), ưu tiên hiển thị
     if (moderationStatus === 'approved' || moderationStatus === 'rejected') {
-      const statusConfig = {
-        approved: { text: 'Đã duyệt', color: '#28a745', icon: FaCheck },
-        rejected: { text: 'Đã từ chối', color: '#dc3545', icon: FaXmark }
+      if (moderationStatus === 'rejected') {
+        return { text: 'Đã từ chối', color: '#dc3545', icon: FaXmark };
+      }
+      // Đã duyệt: màu theo mức độ ngập (Nặng / Trung bình / Nhẹ)
+      const levelColors = {
+        'Nặng': '#dc3545',
+        'Trung bình': '#ffc107',
+        'Nhẹ': '#17a2b8'
       };
-      return statusConfig[moderationStatus];
+      const level = report.flood_level && levelColors[report.flood_level] ? report.flood_level : null;
+      const color = level ? levelColors[level] : '#28a745';
+      return { text: 'Đã duyệt', color, icon: FaCheck };
     }
     
     // Nếu moderation_status = 'pending' hoặc null, hiển thị validation_status
@@ -805,8 +812,12 @@ const ReportsPage = () => {
                       </div>
                       <span style={{
                         fontSize: '11px',
-                        background: 'rgba(0,0,0,0.1)',
-                        color: '#2c3e50',
+                        background: report.moderation_status === 'approved' || report.moderation_status === 'rejected'
+                          ? statusInfo.color
+                          : 'rgba(0,0,0,0.1)',
+                        color: report.moderation_status === 'approved' || report.moderation_status === 'rejected'
+                          ? '#fff'
+                          : '#2c3e50',
                         padding: '6px 12px',
                         borderRadius: '8px',
                         fontWeight: 'bold',

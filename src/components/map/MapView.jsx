@@ -23,7 +23,8 @@ const createCrowdReportIcon = (report) => {
   
   // Nếu đã được moderator xử lý (approved hoặc rejected)
   if (moderationStatus === 'approved') {
-    color = '#28a745';
+    const levelColors = { 'Nặng': '#dc3545', 'Trung bình': '#ffc107', 'Nhẹ': '#17a2b8' };
+    color = report.flood_level && levelColors[report.flood_level] ? levelColors[report.flood_level] : '#28a745';
     iconSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
   } else if (moderationStatus === 'rejected') {
     color = '#dc3545';
@@ -153,7 +154,9 @@ const MapView = ({ floodData, crowdReports = [], onSensorSelect }) => {
         
         // Nếu đã được moderator xử lý (approved hoặc rejected)
         if (moderationStatus === 'approved') {
-          statusInfo = { color: '#28a745', text: 'Đã duyệt' };
+          const levelColors = { 'Nặng': '#dc3545', 'Trung bình': '#ffc107', 'Nhẹ': '#17a2b8' };
+          const c = report.flood_level && levelColors[report.flood_level] ? levelColors[report.flood_level] : '#28a745';
+          statusInfo = { color: c, text: 'Đã duyệt' };
         } else if (moderationStatus === 'rejected') {
           statusInfo = { color: '#dc3545', text: 'Đã từ chối' };
         } 
