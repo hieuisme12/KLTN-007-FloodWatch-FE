@@ -23,11 +23,14 @@ const CrowdReportsList = ({ reports, loading }) => {
     
     // Nếu đã được moderator xử lý (approved hoặc rejected), ưu tiên hiển thị
     if (moderationStatus === 'approved' || moderationStatus === 'rejected') {
-      const statusConfig = {
-        approved: { text: 'Đã duyệt', color: '#28a745', icon: FaCheck },
-        rejected: { text: 'Đã từ chối', color: '#dc3545', icon: FaXmark }
-      };
-      return statusConfig[moderationStatus];
+      if (moderationStatus === 'rejected') {
+        return { text: 'Đã từ chối', color: '#dc3545', icon: FaXmark };
+      }
+      // Đã duyệt: màu theo mức độ ngập (Nặng / Trung bình / Nhẹ)
+      const levelColors = { 'Nặng': '#dc3545', 'Trung bình': '#ffc107', 'Nhẹ': '#17a2b8' };
+      const level = report.flood_level && levelColors[report.flood_level] ? report.flood_level : null;
+      const color = level ? levelColors[level] : '#28a745';
+      return { text: 'Đã duyệt', color, icon: FaCheck };
     }
     
     // Nếu moderation_status = 'pending' hoặc null, hiển thị validation_status
