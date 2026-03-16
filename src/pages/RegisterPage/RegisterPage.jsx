@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { FaWater } from 'react-icons/fa6';
 import { register } from '../../services/api';
+import ErrorToast from '../../components/common/ErrorToast';
 import './RegisterPage.css';
 
 const RegisterPage = () => {
@@ -61,15 +62,12 @@ const RegisterPage = () => {
 
   return (
     <div className="register-page">
+      {error && (
+        <ErrorToast message={error} onClose={() => setError('')} />
+      )}
       <div className="register-container">
         <form className="register-form" onSubmit={handleSubmit}>
           <h2 className="register-title">Đăng ký</h2>
-          
-          {error && (
-            <div className="error-message">
-              {error}
-            </div>
-          )}
 
           <div className="form-group">
             <label htmlFor="username">Tên đăng nhập *</label>

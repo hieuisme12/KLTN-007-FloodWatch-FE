@@ -1,37 +1,35 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { ReporterRankingProvider } from './context/ReporterRankingContext';
 import DashboardPage from './pages/DashboardPage';
 import ReportsPage from './pages/ReportsPage';
 import NewReportPage from './pages/NewReportPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ProfilePage from './pages/ProfilePage';
-import ModerationPage from './pages/ModerationPage';
 import NewsDetailPage from './pages/NewsDetailPage';
 import MapPage from './pages/MapPage';
+import ModerationPage from './pages/ModerationPage';
 import Layout from './components/layout/Layout';
 import { isAuthenticated, isModerator } from './utils/auth';
 import './App.css';
 
-// Protected Route Component - chỉ cho các trang yêu cầu đăng nhập bắt buộc
+// Protected Route – chỉ cần đăng nhập (bất kỳ role)
 const ProtectedRoute = ({ children }) => {
   return isAuthenticated() ? children : <Navigate to="/login" replace />;
 };
 
-// Moderator Route Component - chỉ cho moderator và admin
+// Moderator Route – CHỈ role moderator (Admin không được vào trang kiểm duyệt)
 const ModeratorRoute = ({ children }) => {
-  if (!isAuthenticated()) {
-    return <Navigate to="/login" replace />;
-  }
-  if (!isModerator()) {
-    return <Navigate to="/" replace />;
-  }
+  if (!isAuthenticated()) return <Navigate to="/login" replace />;
+  if (!isModerator()) return <Navigate to="/" replace />;
   return children;
 };
 
 function App() {
   return (
     <Router>
+      <ReporterRankingProvider>
       <Routes>
         {/* Login và Register không có Navigation */}
         <Route path="/login" element={<LoginPage />} />
@@ -82,15 +80,15 @@ function App() {
             </Layout>
           } 
         />
-        <Route 
-          path="/moderation" 
+        <Route
+          path="/moderation"
           element={
             <Layout>
               <ModeratorRoute>
                 <ModerationPage />
               </ModeratorRoute>
             </Layout>
-          } 
+          }
         />
         <Route 
           path="/news/:id" 
@@ -105,6 +103,7 @@ function App() {
           element={<MapPage />} 
         />
       </Routes>
+      </ReporterRankingProvider>
     </Router>
   );
 }

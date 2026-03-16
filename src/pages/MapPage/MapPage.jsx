@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { fetchFloodData, fetchCrowdReports } from '../../services/api';
-import { POLLING_INTERVALS } from '../../config/apiConfig';
+import { POLLING_INTERVALS, CROWD_REPORT_MAP_DISPLAY_HOURS } from '../../config/apiConfig';
+import { filterNonExpiredReports } from '../../utils/reportHelpers';
 import MapHeader from '../../components/map/MapHeader';
 import MapView from '../../components/map/MapView';
 import './MapPage.css';
@@ -9,7 +10,6 @@ const MapPage = () => {
   const [floodData, setFloodData] = useState([]);
   const [crowdReports, setCrowdReports] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedSensor, setSelectedSensor] = useState(null);
   const endpointRef = useRef(null);
 
   // Filter states
@@ -17,13 +17,6 @@ const MapPage = () => {
     sensors: true,           // Cảm biến đo mực nước
     crowdReports: true,      // Báo cáo từ người dân
   });
-
-  // Tự động chọn sensor đầu tiên khi có dữ liệu
-  useEffect(() => {
-    if (floodData.length > 0 && !selectedSensor) {
-      setSelectedSensor(floodData[0]);
-    }
-  }, [floodData, selectedSensor]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -47,8 +40,7 @@ const MapPage = () => {
 
   useEffect(() => {
     const loadCrowdReports = async () => {
-      const result = await fetchCrowdReports();
-      
+      const result = await fetchCrowdReports({ moderation_status: 'approved' });
       if (result.success && result.data) {
         setCrowdReports(result.data);
       }
@@ -56,17 +48,7 @@ const MapPage = () => {
 
     loadCrowdReports();
     const interval = setInterval(loadCrowdReports, POLLING_INTERVALS.CROWD_REPORTS);
-    
-    // Listen for refresh event từ ModerationPage
-    const handleReportsUpdated = () => {
-      loadCrowdReports();
-    };
-    window.addEventListener('reportsUpdated', handleReportsUpdated);
-    
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener('reportsUpdated', handleReportsUpdated);
-    };
+    return () => clearInterval(interval);
   }, []);
 
   const handleFilterChange = (filterKey) => {
@@ -76,9 +58,11 @@ const MapPage = () => {
     }));
   };
 
+  // Báo cáo chưa hết hạn (ẩn báo cáo đã hết hạn khỏi bản đồ)
+  const nonExpiredCrowdReports = filterNonExpiredReports(crowdReports, CROWD_REPORT_MAP_DISPLAY_HOURS);
   // Filter data based on selected filters
   const filteredFloodData = filters.sensors ? floodData : [];
-  const filteredCrowdReports = filters.crowdReports ? crowdReports : [];
+  const filteredCrowdReports = filters.crowdReports ? nonExpiredCrowdReports : [];
 
   return (
     <div className="map-page-layout">
@@ -130,7 +114,7 @@ const MapPage = () => {
             </div>
             <div className="stat-item">
               <span className="stat-label">Báo cáo:</span>
-              <span className="stat-value">{crowdReports.length}</span>
+              <span className="stat-value">{nonExpiredCrowdReports.length}</span>
             </div>
           </div>
         </div>
@@ -140,7 +124,6 @@ const MapPage = () => {
           <MapView 
             floodData={filteredFloodData} 
             crowdReports={filteredCrowdReports} 
-            onSensorSelect={setSelectedSensor}
           />
         </div>
       </div>

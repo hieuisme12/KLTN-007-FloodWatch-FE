@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { FaArrowLeft, FaClock } from 'react-icons/fa6';
+import ErrorToast from '../../components/common/ErrorToast';
 import './NewsDetailPage.css';
 
 const NewsDetailPage = () => {
@@ -423,6 +424,7 @@ const NewsDetailPage = () => {
   if (error) {
     return (
       <div className="news-detail-page">
+        <ErrorToast message={error} onClose={() => setError(null)} />
         <div className="news-detail-container">
           <button className="news-detail-back-btn" onClick={() => navigate(-1)}>
             <FaArrowLeft /> Quay lại

@@ -12,8 +12,10 @@ import {
 import { WiFlood } from 'react-icons/wi';
 import { MdLocationOn } from 'react-icons/md';
 import { statusColors } from '../../utils/constants';
+import { useReporterRanking } from '../../context/ReporterRankingContext';
 
 const CrowdReportsList = ({ reports, loading }) => {
+  const { getReporterReliability } = useReporterRanking();
   // Hàm lấy status info - ưu tiên moderation_status theo logic đúng
   const getStatusInfo = (report) => {
     // Logic: Nếu moderation_status đã được xử lý (approved/rejected), hiển thị nó
@@ -101,7 +103,8 @@ const CrowdReportsList = ({ reports, loading }) => {
       </h3>
       {reports.map((report, index) => {
         const statusInfo = getStatusInfo(report);
-        const reliabilityInfo = getReliabilityBadge(report.reliability_score || 50);
+        const rel = getReporterReliability(report.reporter_id) ?? report.reporter_reliability ?? null;
+        const reliabilityInfo = getReliabilityBadge(rel ?? 50);
         const levelInfo = getFloodLevelInfo(report.flood_level);
 
         return (
@@ -123,7 +126,7 @@ const CrowdReportsList = ({ reports, loading }) => {
                   <strong style={{ fontSize: '14px', color: '#2c3e50' }}>
                     {report.reporter_name || 'Ẩn danh'}
                   </strong>
-                  {report.reliability_score >= 61 && (
+                  {rel != null && (
                     <span style={{
                       fontSize: '10px',
                       background: reliabilityInfo.color + '20',
@@ -132,7 +135,7 @@ const CrowdReportsList = ({ reports, loading }) => {
                       borderRadius: '10px',
                       fontWeight: 'bold'
                     }}>
-                      <reliabilityInfo.icon style={{ fontSize: '10px' }} /> {report.reliability_score}
+                      <reliabilityInfo.icon style={{ fontSize: '10px' }} /> {typeof rel === 'number' ? rel.toFixed(1) : rel}
                     </span>
                   )}
                 </div>
