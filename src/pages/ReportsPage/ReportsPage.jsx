@@ -3,9 +3,11 @@ import { Combobox, Transition } from '@headlessui/react';
 import { CheckIcon } from '@heroicons/react/20/solid';
 import { ChevronUpDownIcon } from '@heroicons/react/20/solid';
 import { fetchCrowdReports, fetchAllCrowdReports } from '../../services/api';
-import { POLLING_INTERVALS } from '../../config/apiConfig';
+import { POLLING_INTERVALS, CROWD_REPORT_MAP_DISPLAY_HOURS } from '../../config/apiConfig';
+import { isReportExpired } from '../../utils/reportHelpers';
 import { useNavigate } from 'react-router-dom';
 import { isModerator, getCurrentUser } from '../../utils/auth';
+import { useReporterRanking } from '../../context/ReporterRankingContext';
 import { 
   FaMobileScreen, 
   FaCheck, 
@@ -25,9 +27,11 @@ import './ReportsPage.css';
 
 const ReportsPage = () => {
   const navigate = useNavigate();
+  const { getReporterReliability } = useReporterRanking();
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all'); // all, verified, pending
+  const [expiryFilter, setExpiryFilter] = useState('active'); // all, active, expired
   const [searchText, setSearchText] = useState('');
   
   // Filter options for Combobox
@@ -36,9 +40,17 @@ const ReportsPage = () => {
     { id: 'verified', name: 'Trạng thái: Đã xác minh' },
     { id: 'pending', name: 'Trạng thái: Chờ xem xét' },
   ];
+
+  const expiryFilterOptions = [
+    { id: 'all', name: 'Thời hạn: Tất cả' },
+    { id: 'active', name: 'Thời hạn: Còn hiệu lực' },
+    { id: 'expired', name: 'Thời hạn: Đã hết hạn' },
+  ];
   
   const selectedFilter = filterOptions.find(opt => opt.id === filter) || filterOptions[0];
+  const selectedExpiryFilter = expiryFilterOptions.find(opt => opt.id === expiryFilter) || expiryFilterOptions[1];
   const [filterQuery, setFilterQuery] = useState('');
+  const [expiryFilterQuery, setExpiryFilterQuery] = useState('');
   
   const filteredOptions =
     filterQuery === ''
@@ -48,6 +60,16 @@ const ReportsPage = () => {
             .toLowerCase()
             .replace(/\s+/g, '')
             .includes(filterQuery.toLowerCase().replace(/\s+/g, ''))
+        );
+
+  const filteredExpiryOptions =
+    expiryFilterQuery === ''
+      ? expiryFilterOptions
+      : expiryFilterOptions.filter((option) =>
+          option.name
+            .toLowerCase()
+            .replace(/\s+/g, '')
+            .includes(expiryFilterQuery.toLowerCase().replace(/\s+/g, ''))
         );
   
   const [locationCache, setLocationCache] = useState(() => {
@@ -266,17 +288,7 @@ const ReportsPage = () => {
 
     loadReports();
     const interval = setInterval(loadReports, POLLING_INTERVALS.CROWD_REPORTS);
-    
-    // Listen for refresh event từ ModerationPage
-    const handleReportsUpdated = () => {
-      loadReports();
-    };
-    window.addEventListener('reportsUpdated', handleReportsUpdated);
-    
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener('reportsUpdated', handleReportsUpdated);
-    };
+    return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Chỉ chạy 1 lần khi mount, không phụ thuộc vào cache để tránh infinite loop
 
@@ -364,6 +376,11 @@ const ReportsPage = () => {
   };
 
   const filteredReports = reports.filter(report => {
+    // Filter by expiry (thời hạn)
+    const expired = isReportExpired(report, CROWD_REPORT_MAP_DISPLAY_HOURS);
+    if (expiryFilter === 'active' && expired) return false;
+    if (expiryFilter === 'expired' && !expired) return false;
+
     // Filter by status
     let matchesFilter = true;
     if (filter === 'verified') {
@@ -528,6 +545,75 @@ const ReportsPage = () => {
                   </div>
                 </Combobox>
               </div>
+
+              <div className="relative" style={{ minWidth: '200px', zIndex: 49 }}>
+                <Combobox value={selectedExpiryFilter} onChange={(option) => setExpiryFilter(option.id)}>
+                  <div className="relative mt-1">
+                    <div className="relative w-full cursor-default overflow-hidden rounded-lg bg-white text-left shadow-md border border-gray-300 focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-200 text-xs">
+                      <Combobox.Input
+                        className="w-full border-none py-2 pl-3 pr-10 text-xs leading-4 text-gray-900 focus:ring-0 focus:outline-none cursor-pointer"
+                        displayValue={(option) => option.name}
+                        onChange={(event) => setExpiryFilterQuery(event.target.value)}
+                        onClick={(e) => e.target.select()}
+                      />
+                      <Combobox.Button className="absolute inset-y-0 right-0 flex items-center pr-2 focus:outline-none outline-none border-none bg-transparent">
+                        <ChevronUpDownIcon
+                          className="h-5 w-5 text-gray-400 pointer-events-none"
+                          aria-hidden="true"
+                        />
+                      </Combobox.Button>
+                    </div>
+                    <Transition
+                      as={Fragment}
+                      leave="transition ease-in duration-100"
+                      leaveFrom="opacity-100"
+                      leaveTo="opacity-0"
+                      afterLeave={() => setExpiryFilterQuery('')}
+                    >
+                      <Combobox.Options className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-xs shadow-lg ring-1 ring-black/5 focus:outline-none">
+                        {filteredExpiryOptions.length === 0 && expiryFilterQuery !== '' ? (
+                          <div className="relative cursor-default select-none px-4 py-2 text-gray-700">
+                            Không tìm thấy.
+                          </div>
+                        ) : (
+                          filteredExpiryOptions.map((option) => (
+                            <Combobox.Option
+                              key={option.id}
+                              className={({ active }) =>
+                                `relative cursor-default select-none py-2 pl-10 pr-4 ${
+                                  active ? 'bg-blue-600 text-white' : 'text-gray-900'
+                                }`
+                              }
+                              value={option}
+                            >
+                              {({ selected, active }) => (
+                                <>
+                                  <span
+                                    className={`block truncate ${
+                                      selected ? 'font-medium' : 'font-normal'
+                                    }`}
+                                  >
+                                    {option.name}
+                                  </span>
+                                  {selected ? (
+                                    <span
+                                      className={`absolute inset-y-0 left-0 flex items-center pl-3 ${
+                                        active ? 'text-white' : 'text-blue-600'
+                                      }`}
+                                    >
+                                      <CheckIcon className="h-5 w-5" aria-hidden="true" />
+                                    </span>
+                                  ) : null}
+                                </>
+                              )}
+                            </Combobox.Option>
+                          ))
+                        )}
+                      </Combobox.Options>
+                    </Transition>
+                  </div>
+                </Combobox>
+              </div>
               
               <div style={{
                 flex: 1,
@@ -637,7 +723,8 @@ const ReportsPage = () => {
             }}>
             {filteredReports.map((report, index) => {
               const statusInfo = getStatusInfo(report);
-              const reliabilityInfo = getReliabilityBadge(report.reliability_score || 50);
+              const rel = getReporterReliability(report.reporter_id) ?? report.reporter_reliability ?? null;
+              const reliabilityInfo = getReliabilityBadge(rel ?? 50);
               const levelInfo = getFloodLevelInfo(report.flood_level);
               const cardId = report.id || `report-${index}`;
               const isHovered = hoveredCardId === cardId;
@@ -796,7 +883,7 @@ const ReportsPage = () => {
                         }}>
                           {report.reporter_name || 'Ẩn danh'}
                         </div>
-                        {report.reliability_score >= 61 && (
+                        {rel != null && (
                           <div style={{
                             fontSize: '11px',
                             background: 'rgba(0,0,0,0.1)',
@@ -806,7 +893,7 @@ const ReportsPage = () => {
                             fontWeight: 'bold',
                             display: 'inline-block'
                           }}>
-                            {reliabilityInfo.text}
+                            Độ tin cậy: {reliabilityInfo.text} ({typeof rel === 'number' ? rel.toFixed(1) : rel})
                           </div>
                         )}
                       </div>

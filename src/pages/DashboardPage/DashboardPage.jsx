@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchFloodData, fetchCrowdReports } from '../../services/api';
-import { POLLING_INTERVALS } from '../../config/apiConfig';
+import { POLLING_INTERVALS, CROWD_REPORT_MAP_DISPLAY_HOURS } from '../../config/apiConfig';
+import { filterNonExpiredReports } from '../../utils/reportHelpers';
 import MapView from '../../components/map/MapView';
 import ChatBot from '../../components/common/ChatBot';
 import SensorDetailPanel from '../../components/map/SensorDetailPanel';
@@ -15,6 +16,7 @@ const DashboardPage = () => {
   const [crowdReports, setCrowdReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedSensor, setSelectedSensor] = useState(null);
+  const [selectedCrowdReport, setSelectedCrowdReport] = useState(null);
   const endpointRef = useRef(null);
 
   // Tự động chọn sensor đầu tiên khi có dữ liệu
@@ -46,8 +48,7 @@ const DashboardPage = () => {
 
   useEffect(() => {
     const loadCrowdReports = async () => {
-      const result = await fetchCrowdReports();
-      
+      const result = await fetchCrowdReports({ moderation_status: 'approved' });
       if (result.success && result.data) {
         setCrowdReports(result.data);
       }
@@ -55,18 +56,10 @@ const DashboardPage = () => {
 
     loadCrowdReports();
     const interval = setInterval(loadCrowdReports, POLLING_INTERVALS.CROWD_REPORTS);
-    
-    // Listen for refresh event từ ModerationPage
-    const handleReportsUpdated = () => {
-      loadCrowdReports();
-    };
-    window.addEventListener('reportsUpdated', handleReportsUpdated);
-    
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener('reportsUpdated', handleReportsUpdated);
-    };
+    return () => clearInterval(interval);
   }, []);
+
+  const nonExpiredCrowdReports = filterNonExpiredReports(crowdReports, CROWD_REPORT_MAP_DISPLAY_HOURS);
 
   return (
     <div className="dashboard-container">
@@ -75,12 +68,19 @@ const DashboardPage = () => {
           <div className="dashboard-map">
             <MapView 
               floodData={floodData} 
-              crowdReports={crowdReports} 
-              onSensorSelect={setSelectedSensor}
+              crowdReports={nonExpiredCrowdReports} 
+              onSensorSelect={(s) => {
+                setSelectedSensor(s);
+                setSelectedCrowdReport(null);
+              }}
+              onCrowdReportSelect={(r) => {
+                setSelectedCrowdReport(r);
+                setSelectedSensor(null);
+              }}
             />
           </div>
         </div>
-        <SensorDetailPanel sensor={selectedSensor} />
+        <SensorDetailPanel sensor={selectedSensor} crowdReport={selectedCrowdReport} />
       </div>
 
       <div className="dashboard-content-wrapper">

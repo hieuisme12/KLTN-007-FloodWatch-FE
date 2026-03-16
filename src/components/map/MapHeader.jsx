@@ -21,7 +21,7 @@ const MapHeader = () => {
           <div className="map-brand-icon-circle">
             <img src="/iuh.png" alt="IUH Logo" className="map-brand-icon-img" />
           </div>
-          <span className="map-brand-text">FLOODSIGHT TP HỒ CHÍ MINH</span>
+          <span className="map-brand-text">FLOODSIGHT THÀNH PHỐ HỒ CHÍ MINH</span>
         </div>
 
         {/* Navigation Section - nằm ở phần màu trắng của banner (bên phải) */}

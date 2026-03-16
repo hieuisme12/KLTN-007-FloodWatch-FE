@@ -2,12 +2,13 @@ import React, { useState, useEffect, Fragment } from 'react';
 import { Transition } from '@headlessui/react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { isAuthenticated, isModerator, getCurrentUser } from '../../utils/auth';
+import { API_CONFIG } from '../../config/apiConfig';
 import { logout } from '../../services/api';
 import { 
   FaHouse, 
   FaClipboardList, 
   FaPlus, 
-  FaMagnifyingGlass, 
+  FaClipboardCheck,
   FaCrown, 
   FaUser, 
   FaBars,
@@ -18,9 +19,19 @@ import './Sidebar.css';
 const Sidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const currentUser = getCurrentUser();
+  const [currentUser, setCurrentUser] = useState(() => getCurrentUser());
   const authenticated = isAuthenticated();
   const moderator = isModerator();
+
+  useEffect(() => {
+    const handleUserUpdated = () => setCurrentUser(getCurrentUser());
+    window.addEventListener('user-updated', handleUserUpdated);
+    return () => window.removeEventListener('user-updated', handleUserUpdated);
+  }, []);
+
+  const sidebarAvatarUrl = currentUser?.avatar
+    ? (API_CONFIG.BASE_URL.replace(/\/$/, '') + (currentUser.avatar.startsWith('/') ? currentUser.avatar : `/profile-icons/${currentUser.avatar}`))
+    : null;
 
   const [collapsed, setCollapsed] = useState(() => {
     const saved = localStorage.getItem('sidebarCollapsed');
@@ -55,12 +66,12 @@ const Sidebar = () => {
     return location.pathname === path || location.pathname.startsWith(path + '/');
   };
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     navigate('/login');
   };
 
-  // Main navigation items
+  // Main navigation items (RBAC: Admin ≠ Moderator; Kiểm duyệt chỉ moderator)
   const mainNavItems = [
     {
       path: '/',
@@ -86,7 +97,7 @@ const Sidebar = () => {
     {
       path: '/moderation',
       label: 'Kiểm duyệt',
-      icon: FaMagnifyingGlass,
+      icon: FaClipboardCheck,
       badge: null,
       requireModerator: true
     }
@@ -110,7 +121,11 @@ const Sidebar = () => {
             onClick={() => navigate('/profile')}
           >
             <div className="sidebar-user-avatar">
-              {currentUser.username?.charAt(0).toUpperCase()}
+              {sidebarAvatarUrl ? (
+                <img src={sidebarAvatarUrl} alt="" className="sidebar-user-avatar-img" />
+              ) : (
+                currentUser.username?.charAt(0).toUpperCase()
+              )}
             </div>
             <div className="sidebar-user-details">
               <div className="sidebar-user-name">{currentUser.full_name || currentUser.username}</div>
@@ -126,7 +141,7 @@ const Sidebar = () => {
             </div>
           </div>
         ) : !collapsed ? (
-          <div className="sidebar-title">FLOODSIGHT TP HỒ CHÍ MINH</div>
+          <div className="sidebar-title">FLOODSIGHT THÀNH PHỐ HỒ CHÍ MINH</div>
         ) : null}
         <button 
           className="sidebar-toggle-btn"

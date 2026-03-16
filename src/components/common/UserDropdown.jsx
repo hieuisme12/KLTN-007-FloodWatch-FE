@@ -21,8 +21,8 @@ const UserDropdown = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     navigate('/login');
   };
 
@@ -118,13 +118,11 @@ const UserDropdown = () => {
               fontWeight: '500'
             }}>
               {currentUser.role === 'admin' ? (
-                <>
-                  <FaCrown style={{ marginRight: '4px' }} /> Quản trị viên
-                </>
+                <><FaCrown style={{ marginRight: '4px' }} /> Quản trị viên</>
+              ) : currentUser.role === 'moderator' ? (
+                <><FaUser style={{ marginRight: '4px' }} /> Điều hành viên</>
               ) : (
-                <>
-                  <FaUser style={{ marginRight: '4px' }} /> Người dùng
-                </>
+                <><FaUser style={{ marginRight: '4px' }} /> Người dùng</>
               )}
             </div>
           </div>

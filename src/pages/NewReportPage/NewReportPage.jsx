@@ -1,84 +1,42 @@
-import React, { useState, Fragment, useEffect } from 'react';
+import React, { useState, Fragment, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Combobox, Transition } from '@headlessui/react';
 import { CheckIcon } from '@heroicons/react/20/solid';
 import { ChevronUpDownIcon } from '@heroicons/react/20/solid';
-import { MapContainer, TileLayer, useMapEvents, Marker, Popup, useMap } from 'react-leaflet';
-import { submitFloodReport } from '../../services/api';
-import { DEFAULT_CENTER, DEFAULT_ZOOM } from '../../utils/constants';
+import Map, { Marker, Popup } from 'react-map-gl/mapbox';
+import 'mapbox-gl/dist/mapbox-gl.css';
+import { submitFloodReport, uploadReportImage, fetchFloodData } from '../../services/api';
+import { isAuthenticated, getCurrentUser } from '../../utils/auth';
+import { DEFAULT_CENTER, DEFAULT_ZOOM, statusColors } from '../../utils/constants';
+import { getSensorDisplayPosition } from '../../data/sensorOverrides';
+import SensorMarker from '../../components/map/SensorMarker';
 import { 
-  FaPenToSquare, 
-  FaCheck, 
-  FaXmark, 
-  FaClock, 
-  FaPaperPlane, 
+  FaPenToSquare,
+  FaCheck,
+  FaXmark,
+  FaClock,
+  FaPaperPlane,
   FaMap,
-  FaTrash
+  FaTrash,
+  FaImage,
+  FaBullseye
 } from 'react-icons/fa6';
 import { WiFlood } from 'react-icons/wi';
 import { MdAddLocation, MdLocationOn, MdLightbulb } from 'react-icons/md';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import ErrorToast from '../../components/common/ErrorToast';
 import './NewReportPage.css';
 
-// Icon cho vị trí đã chọn - sử dụng icon từ react-icons (MdLocationOn)
-const createLocationIcon = () => {
-  // SVG path của MdLocationOn từ react-icons
-  const locationIconSvg = `
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
-      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-    </svg>
-  `;
-
-  const iconHtml = `
-    <div style="
-      background-color: #14b8a6;
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      border: 3px solid white;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    ">${locationIconSvg}</div>
-  `;
-
-  return L.divIcon({
-    html: iconHtml,
-    className: 'location-marker',
-    iconSize: [32, 32],
-    iconAnchor: [16, 16],
-    popupAnchor: [0, -16],
-  });
-};
-
-// Component để lắng nghe click trên map
-const MapClickHandler = ({ onLocationSelect }) => {
-  useMapEvents({
-    click: (e) => {
-      onLocationSelect(e.latlng.lng, e.latlng.lat);
-    },
-  });
-  return null;
-};
-
-// Component để điều khiển map view
-const MapController = ({ center, zoom }) => {
-  const map = useMap();
-  useEffect(() => {
-    if (center) {
-      map.setView(center, zoom || map.getZoom());
-    }
-  }, [center, zoom, map]);
-  return null;
-};
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
+// Mapbox: [lng, lat]; DEFAULT_CENTER là [lat, lng]
+const defaultLng = DEFAULT_CENTER[1];
+const defaultLat = DEFAULT_CENTER[0];
 
 const NewReportPage = () => {
   const navigate = useNavigate();
+  const authenticated = isAuthenticated();
+  const currentUser = getCurrentUser();
   const [formData, setFormData] = useState({
     name: '',
-    reporter_id: null,
     level: '',
     lng: null,
     lat: null
@@ -91,6 +49,8 @@ const NewReportPage = () => {
   const [searchAddress, setSearchAddress] = useState('');
   const [searchingAddress, setSearchingAddress] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
+  const [content, setContent] = useState('');
+  const [photoList, setPhotoList] = useState([]);
   
   // Load cache từ localStorage
   const [locationCache] = useState(() => {
@@ -128,9 +88,9 @@ const NewReportPage = () => {
     setError(null);
     setResult(null);
 
-    // Validation
-    if (!formData.name || formData.name.trim().length < 2) {
-      setError('Tên phải có ít nhất 2 ký tự');
+    // Khách phải nhập tên; user đăng nhập không gửi name (BE lấy từ tài khoản)
+    if (!authenticated && (!formData.name || formData.name.trim().length < 2)) {
+      setError('Vui lòng nhập tên của bạn (ít nhất 2 ký tự) hoặc đăng nhập để dùng tên tài khoản.');
       return;
     }
 
@@ -146,22 +106,66 @@ const NewReportPage = () => {
 
     setLoading(true);
     try {
-      const response = await submitFloodReport(formData);
-      
+      const photoUrls = [];
+      for (const item of photoList) {
+        const uploadResult = await uploadReportImage(item.file);
+        if (!uploadResult.success) {
+          setError(uploadResult.error || 'Tải ảnh lên thất bại');
+          setLoading(false);
+          return;
+        }
+        photoUrls.push(uploadResult.photo_url);
+      }
+      const payload = {
+        level: formData.level,
+        lng: formData.lng,
+        lat: formData.lat,
+        ...(locationDescription && { location_description: locationDescription }),
+        ...(content.trim() && { content: content.trim() }),
+        ...(photoUrls.length > 0 && { photo_url: photoUrls[0], photo_urls: photoUrls })
+      };
+      if (photoUrls.length === 0) delete payload.photo_urls;
+      if (!authenticated) payload.name = formData.name.trim();
+      const response = await submitFloodReport(payload);
+
       if (response.success) {
         setResult(response);
-        // Chuyển về trang reports sau 2 giây
-        setTimeout(() => {
-          navigate('/reports');
-        }, 2000);
+        setTimeout(() => navigate('/reports'), 2000);
       } else {
         setError(response.error || 'Có lỗi xảy ra');
       }
     } catch (err) {
-      setError('Lỗi kết nối: ' + err.message);
+      setError(err?.message || 'Lỗi kết nối');
     } finally {
       setLoading(false);
     }
+  };
+
+  const MAX_PHOTOS = 5;
+  const handlePhotoChange = (e) => {
+    const files = e.target.files ? Array.from(e.target.files) : [];
+    if (files.length === 0) return;
+    setError(null);
+    const valid = files.filter(f => f.type.startsWith('image/'));
+    if (valid.length < files.length) setError('Một số file không phải ảnh đã bỏ qua.');
+    const toAdd = valid.slice(0, MAX_PHOTOS - photoList.length).map(file => ({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      file,
+      previewUrl: URL.createObjectURL(file)
+    }));
+    setPhotoList(prev => [...prev, ...toAdd].slice(0, MAX_PHOTOS));
+    e.target.value = '';
+  };
+  const removePhoto = (id) => {
+    setPhotoList(prev => {
+      const item = prev.find(p => p.id === id);
+      if (item?.previewUrl) URL.revokeObjectURL(item.previewUrl);
+      return prev.filter(p => p.id !== id);
+    });
+  };
+  const clearAllPhotos = () => {
+    photoList.forEach(p => { if (p.previewUrl) URL.revokeObjectURL(p.previewUrl); });
+    setPhotoList([]);
   };
 
   // Hàm format địa chỉ từ reverse geocoding
@@ -378,6 +382,57 @@ const NewReportPage = () => {
   
   // State để điều khiển map view
   const [mapCenter, setMapCenter] = useState(null);
+  const mapRef = useRef(null);
+  const endpointRef = useRef(null);
+  const [sensorViewState, setSensorViewState] = useState(null);
+  const [sensors, setSensors] = useState([]);
+  const [hoveredSensorId, setHoveredSensorId] = useState(null);
+
+  // Zoom map đúng vùng gần các sensor: fetch flood data, lưu danh sách sensor + tính bounds để fit
+  useEffect(() => {
+    let cancelled = false;
+    fetchFloodData(endpointRef).then((res) => {
+      if (cancelled || !res.success || !res.data?.length) return;
+      const list = res.data.filter((s) => s.lat != null && s.lng != null);
+      if (list.length === 0) return;
+      setSensors(list);
+      const points = list.map((s) => getSensorDisplayPosition(s));
+      const lats = points.map((p) => p.lat);
+      const lngs = points.map((p) => p.lng);
+      const minLat = Math.min(...lats);
+      const maxLat = Math.max(...lats);
+      const minLng = Math.min(...lngs);
+      const maxLng = Math.max(...lngs);
+      const pad = 0.003;
+      setSensorViewState({
+        longitude: (minLng + maxLng) / 2,
+        latitude: (minLat + maxLat) / 2,
+        zoom: 14,
+        bounds: [
+          [minLng - pad, minLat - pad],
+          [maxLng + pad, maxLat + pad]
+        ]
+      });
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Mapbox: fly to mapCenter khi chọn vị trí hoặc tìm kiếm địa chỉ
+  useEffect(() => {
+    if (mapCenter && mapRef.current) {
+      mapRef.current.flyTo({ center: [mapCenter[1], mapCenter[0]], zoom: 16, duration: 1000 });
+    }
+  }, [mapCenter]);
+
+  const hasFittedSensorBounds = useRef(false);
+  // Fit bounds theo sensor khi map đã load (zoom vào vùng sensor để người dùng dễ biết)
+  useEffect(() => {
+    if (hasFittedSensorBounds.current || !sensorViewState?.bounds) return;
+    const map = mapRef.current?.getMap?.() ?? mapRef.current;
+    if (!map?.fitBounds) return;
+    hasFittedSensorBounds.current = true;
+    map.fitBounds(sensorViewState.bounds, { padding: 50, duration: 800, maxZoom: 15 });
+  }, [sensorViewState]);
 
   const handleCancel = () => {
     navigate('/reports');
@@ -389,6 +444,9 @@ const NewReportPage = () => {
       background: '#f5f5f5',
       padding: '20px'
     }}>
+      {error && (
+        <ErrorToast message={error} onClose={() => setError(null)} />
+      )}
       {/* Page Title */}
       <div style={{
         backgroundImage: 'url(/add_report.png)',
@@ -451,35 +509,50 @@ const NewReportPage = () => {
             boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
           }}>
             <form onSubmit={handleSubmit}>
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{
-                  display: 'block',
-                  marginBottom: '6px',
-                  fontWeight: '600',
-                  color: '#2c3e50',
-                  fontSize: '13px'
+              {/* Tên: chỉ khách nhập; user đăng nhập dùng tên tài khoản */}
+              {authenticated ? (
+                <div style={{
+                  marginBottom: '16px',
+                  padding: '10px 12px',
+                  background: '#f0f9ff',
+                  borderRadius: '4px',
+                  fontSize: '14px',
+                  color: '#0369a1'
                 }}>
-                  Tên người báo cáo *
-                </label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="VD: Nguyễn Văn A"
-                  required
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    fontSize: '14px',
-                    border: '1px solid #ddd',
-                    borderRadius: '4px',
-                    boxSizing: 'border-box',
-                    transition: 'border-color 0.2s'
-                  }}
-                  onFocus={(e) => e.target.style.borderColor = '#007bff'}
-                  onBlur={(e) => e.target.style.borderColor = '#ddd'}
-                />
-              </div>
+                  Báo cáo sẽ hiển thị với tên: <strong>{currentUser?.full_name || currentUser?.username || 'Bạn'}</strong>
+                </div>
+              ) : (
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{
+                    display: 'block',
+                    marginBottom: '6px',
+                    fontWeight: '600',
+                    color: '#2c3e50',
+                    fontSize: '13px'
+                  }}>
+                    Tên người báo cáo *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="VD: Nguyễn Văn A"
+                    required
+                    minLength={2}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      fontSize: '14px',
+                      border: '1px solid #ddd',
+                      borderRadius: '4px',
+                      boxSizing: 'border-box',
+                      transition: 'border-color 0.2s'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = '#007bff'}
+                    onBlur={(e) => e.target.style.borderColor = '#ddd'}
+                  />
+                </div>
+              )}
 
               <div style={{ marginBottom: '16px' }}>
                 <label style={{
@@ -562,6 +635,92 @@ const NewReportPage = () => {
                       </Transition>
                     </div>
                   </Combobox>
+                </div>
+              </div>
+
+              {/* Nội dung mô tả mức độ ngập (optional) */}
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{
+                  display: 'block',
+                  marginBottom: '6px',
+                  fontWeight: '600',
+                  color: '#2c3e50',
+                  fontSize: '13px'
+                }}>
+                  Nội dung mô tả mức độ ngập (tùy chọn)
+                </label>
+                <textarea
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  placeholder="VD: Nước ngập đến bánh xe, không di chuyển được..."
+                  rows={3}
+                  maxLength={500}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    fontSize: '13px',
+                    border: '1px solid #ddd',
+                    borderRadius: '6px',
+                    resize: 'vertical',
+                    minHeight: '72px',
+                    boxSizing: 'border-box'
+                  }}
+                />
+                <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>{content.length}/500 ký tự</div>
+              </div>
+
+              {/* Hình ảnh hiện trường (optional, tối đa 5 ảnh) */}
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{
+                  display: 'block',
+                  marginBottom: '6px',
+                  fontWeight: '600',
+                  color: '#2c3e50',
+                  fontSize: '13px'
+                }}>
+                  <FaImage style={{ marginRight: '6px' }} /> Hình ảnh hiện trường (tùy chọn, tối đa {MAX_PHOTOS} ảnh)
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handlePhotoChange}
+                  style={{ display: 'none' }}
+                  id="report-photo-input"
+                />
+                <div className="report-photos-section">
+                  {photoList.length < MAX_PHOTOS && (
+                    <label
+                      htmlFor="report-photo-input"
+                      className="report-photo-add-btn"
+                    >
+                      <FaImage style={{ fontSize: '20px', marginBottom: '4px' }} />
+                      <span>Chọn ảnh</span>
+                    </label>
+                  )}
+                  {photoList.length > 0 && (
+                    <div className="report-photos-grid">
+                      {photoList.map((item) => (
+                        <div key={item.id} className="report-photo-item">
+                          <img src={item.previewUrl} alt="Preview" />
+                          <button
+                            type="button"
+                            className="report-photo-remove"
+                            onClick={() => removePhoto(item.id)}
+                            title="Xóa ảnh"
+                            aria-label="Xóa ảnh"
+                          >
+                            <FaXmark style={{ fontSize: '14px' }} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {photoList.length > 0 && (
+                    <button type="button" onClick={clearAllPhotos} className="report-photo-clear-all">
+                      Xóa tất cả ảnh
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -720,28 +879,11 @@ const NewReportPage = () => {
                   <div style={{ marginTop: '8px' }}>
                     {result.message || 'Cảm ơn bạn đã đóng góp thông tin!'}
                   </div>
-                  {result.data?.verified_by_sensor && (
+                  {(result.data?.verified_by_sensor || result.data?.sensor_verified) && (
                     <div style={{ marginTop: '5px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <FaBullseye /> Báo cáo đã được xác minh bởi cảm biến gần đó
                     </div>
                   )}
-                </div>
-              )}
-
-              {/* Error Message */}
-              {error && (
-                <div style={{
-                  padding: '15px',
-                  marginBottom: '20px',
-                  background: '#f8d7da',
-                  color: '#721c24',
-                  border: '1px solid #f5c6cb',
-                  borderRadius: '4px',
-                  fontSize: '14px'
-                }}>
-                  <strong style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <FaXmark /> Lỗi:
-                  </strong> {error}
                 </div>
               )}
 
@@ -871,111 +1013,110 @@ const NewReportPage = () => {
                   <FaTrash style={{ fontSize: '16px', display: 'block' }} />
                 </button>
               )}
-              <MapContainer
-                center={mapCenter || DEFAULT_CENTER}
-                zoom={DEFAULT_ZOOM}
-                style={{ height: '100%', width: '100%' }}
-                key={mapCenter ? `${mapCenter[0]}-${mapCenter[1]}` : 'default'}
-              >
-                <TileLayer
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                />
-                <MapController center={mapCenter} zoom={16} />
-                <MapClickHandler onLocationSelect={handleLocationSelect} />
-                {formData.lat && formData.lng && (
-                  <Marker
-                    position={[formData.lat, formData.lng]}
-                    icon={createLocationIcon()}
-                  >
-                    <Popup>
-                      <div style={{
-                        margin: 0,
-                        padding: 0,
-                        minWidth: '200px'
-                      }}>
-                        {/* Header với icon teal - không có background đen */}
+              {MAPBOX_TOKEN ? (
+                <Map
+                  ref={mapRef}
+                  mapboxAccessToken={MAPBOX_TOKEN}
+                  initialViewState={{
+                    longitude: mapCenter ? mapCenter[1] : defaultLng,
+                    latitude: mapCenter ? mapCenter[0] : defaultLat,
+                    zoom: mapCenter ? 16 : DEFAULT_ZOOM
+                  }}
+                  style={{ height: '100%', width: '100%' }}
+                  mapStyle="mapbox://styles/mapbox/streets-v12"
+                  onClick={(e) => {
+                    setHoveredSensorId(null);
+                    handleLocationSelect(e.lngLat.lng, e.lngLat.lat);
+                  }}
+                >
+                  {/* Marker cảm biến: đồng bộ với map trang chủ, click zoom to / hover hiện thông tin */}
+                  {sensors.map((item, index) => {
+                    const status = item.status || 'normal';
+                    const color = statusColors[status] || statusColors.normal;
+                    const sensorId = item.sensor_id || `sensor-${index}`;
+                    const isOnline = status !== 'offline';
+                    return (
+                      <SensorMarker
+                        key={sensorId}
+                        item={item}
+                        color={color}
+                        isOnline={isOnline}
+                        mode="report"
+                        reportHoverId={sensorId}
+                        hoveredSensorId={hoveredSensorId}
+                        onHoverChange={setHoveredSensorId}
+                        onZoomTo={() => {
+                          const { lat, lng } = getSensorDisplayPosition(item);
+                          const map = mapRef.current?.getMap?.() ?? mapRef.current;
+                          if (map?.flyTo) map.flyTo({ center: [lng, lat], zoom: 16, duration: 800 });
+                        }}
+                      />
+                    );
+                  })}
+                  {formData.lat && formData.lng && (
+                    <>
+                      <Marker longitude={formData.lng} latitude={formData.lat} anchor="center">
                         <div style={{
-                          padding: '8px 0 12px 0',
+                          width: 32,
+                          height: 32,
+                          borderRadius: '50%',
+                          background: '#14b8a6',
+                          border: '3px solid white',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '8px',
-                          borderBottom: '1px solid #e5e7eb',
-                          marginBottom: '8px'
+                          justifyContent: 'center',
+                          color: 'white'
                         }}>
-                          <div style={{
-                            width: '20px',
-                            height: '20px',
-                            background: '#14b8a6',
-                            borderRadius: '50%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: 'white',
-                            fontSize: '12px',
-                            fontWeight: 'bold',
-                            flexShrink: 0
-                          }}>
-                            <WiFlood style={{ fontSize: '14px' }} />
-                          </div>
-                          <span style={{
-                            fontWeight: '600',
-                            fontSize: '14px',
-                            color: '#333'
-                          }}>
-                            Vị trí ngập lụt
-                          </span>
+                          <WiFlood style={{ fontSize: '18px' }} />
                         </div>
-                        {/* Body với thông tin */}
-                        <div style={{
-                          padding: '0'
-                        }}>
-                          <div style={{
-                            fontSize: '13px',
-                            color: '#333',
-                            marginBottom: '6px',
-                            fontWeight: '500'
-                          }}>
-                            {formData.name || 'Chưa có tên'}
-                          </div>
-                          <div style={{
-                            fontSize: '12px',
-                            color: '#666',
-                            marginBottom: '4px',
-                            display: 'flex',
-                            alignItems: 'flex-start',
-                            gap: '4px'
-                          }}>
-                            <MdLocationOn style={{ fontSize: '14px', marginTop: '2px', flexShrink: 0 }} />
-                            <span>{locationDescription || `Lat: ${formData.lat.toFixed(6)}, Lng: ${formData.lng.toFixed(6)}`}</span>
-                          </div>
-                          {formData.level && (
-                            <div style={{
-                              fontSize: '12px',
-                              color: '#666',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}>
-                              Mức độ: {formData.level}
+                      </Marker>
+                      <Popup longitude={formData.lng} latitude={formData.lat} anchor="bottom" closeButton closeOnClick={false}>
+                        <div style={{ margin: 0, padding: 0, minWidth: '200px' }}>
+                          <div style={{ padding: '8px 0 12px 0', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid #e5e7eb', marginBottom: '8px' }}>
+                            <div style={{ width: '20px', height: '20px', background: '#14b8a6', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '12px', fontWeight: 'bold', flexShrink: 0 }}>
+                              <WiFlood style={{ fontSize: '14px' }} />
                             </div>
-                          )}
+                            <span style={{ fontWeight: '600', fontSize: '14px', color: '#333' }}>Vị trí ngập lụt</span>
+                          </div>
+                          <div style={{ padding: 0 }}>
+                            <div style={{ fontSize: '13px', color: '#333', marginBottom: '6px', fontWeight: '500' }}>{formData.name || 'Chưa có tên'}</div>
+                            <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px', display: 'flex', alignItems: 'flex-start', gap: '4px' }}>
+                              <MdLocationOn style={{ fontSize: '14px', marginTop: '2px', flexShrink: 0 }} />
+                              <span>{locationDescription || `Lat: ${formData.lat.toFixed(6)}, Lng: ${formData.lng.toFixed(6)}`}</span>
+                            </div>
+                            {formData.level && (
+                              <div style={{ fontSize: '12px', color: '#666', display: 'flex', alignItems: 'center', gap: '4px' }}>Mức độ: {formData.level}</div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    </Popup>
-                  </Marker>
-                )}
-              </MapContainer>
+                      </Popup>
+                    </>
+                  )}
+                </Map>
+              ) : (
+                <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f0f0f0', color: '#666' }}>
+                  Chưa cấu hình Mapbox token (VITE_MAPBOX_TOKEN trong .env)
+                </div>
+              )}
             </div>
             <div style={{
               marginTop: '10px',
               fontSize: '12px',
               color: '#666',
-              textAlign: 'center'
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '4px'
             }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}>
                 <MdLightbulb /> Click vào bản đồ để đánh dấu vị trí ngập lụt
               </span>
+              {sensors.length > 0 && (
+                <span style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}>
+                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: statusColors.normal, border: '1px solid #fff', boxShadow: '0 1px 2px rgba(0,0,0,0.2)' }} /> Chấm tròn = vị trí cảm biến (báo cáo gần cảm biến sẽ được xác minh)
+                </span>
+              )}
             </div>
           </div>
         </div>

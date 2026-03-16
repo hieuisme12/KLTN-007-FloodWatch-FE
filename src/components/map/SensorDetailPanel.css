@@ -66,6 +66,18 @@
   font-weight: 700;
 }
 
+.sensor-report-type-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 16px;
+  background: #17a2b8;
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 14px;
+  font-weight: 700;
+}
+
 .sensor-detail-update-date {
   font-size: 13px;
   color: #666;

@@ -13,7 +13,7 @@ const Footer = () => {
           <div className="footer-section">
             <div className="footer-section-header">
               <img src="/logo_mini.png" alt="IUH Logo" className="footer-icon" />
-              <h3 className="footer-title">FLOODSIGHT TP HỒ CHÍ MINH</h3>
+              <h3 className="footer-title">FLOODSIGHT THÀNH PHỐ HỒ CHÍ MINH</h3>
             </div>
             <p className="footer-description">
               Hệ thống giám sát và cảnh báo ngập lụt thông minh cho Thành phố Hồ Chí Minh. 
@@ -47,10 +47,7 @@ const Footer = () => {
                 <a href="/reports">Báo cáo ngập lụt</a>
               </li>
               <li>
-                <a href="/new-report">Báo cáo mới</a>
-              </li>
-              <li>
-                <a href="/moderation">Kiểm duyệt</a>
+                <a href="/report/new">Báo cáo mới</a>
               </li>
               <li>
                 <a href="/profile">Tài khoản</a>
@@ -103,7 +100,7 @@ const Footer = () => {
         {/* Footer Bottom */}
         <div className="footer-bottom">
           <div className="footer-copyright">
-            <p>&copy; {new Date().getFullYear()} FLOODSIGHT TP HỒ CHÍ MINH. Tất cả quyền được bảo lưu.</p>
+            <p>&copy; {new Date().getFullYear()} FLOODSIGHT THÀNH PHỐ HỒ CHÍ MINH. Tất cả quyền được bảo lưu.</p>
             <p className="footer-partner">
               Được phát triển bởi <strong>Nhóm 007 - Trường Đại học Công nghiệp TP. Hồ Chí Minh (IUH)</strong>
             </p>

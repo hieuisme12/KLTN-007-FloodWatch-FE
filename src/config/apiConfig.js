@@ -7,9 +7,10 @@ export const API_CONFIG = {
 
 // API Endpoints
 export const API_ENDPOINTS = {
-  // Flood Data
+  // Flood Data (realtime có temperature, humidity từ DHT22)
   FLOOD_DATA: '/api/v1/flood-data',
-  FLOOD_DATA_REALTIME: '/api/v1/flood-data/realtime',
+  FLOOD_DATA_REALTIME: '/api/flood-data/realtime',
+  FLOOD_DATA_REALTIME_V1: '/api/v1/flood-data/realtime',
   SENSOR_HISTORY: '/api/sensors/:sensorId/history',
   
   // Sensors
@@ -19,6 +20,7 @@ export const API_ENDPOINTS = {
   
   // Crowd Reports
   REPORT_FLOOD: '/api/report-flood',
+  UPLOAD_REPORT_IMAGE: '/api/upload/report-image',
   CROWD_REPORTS: '/api/crowd-reports',
   CROWD_REPORTS_ALL: '/api/crowd-reports/all',
   
@@ -64,8 +66,15 @@ export const API_ENDPOINTS = {
   // Authentication
   AUTH_LOGIN: '/api/auth/login',
   AUTH_REGISTER: '/api/auth/register',
+  AUTH_LOGOUT: '/api/auth/logout',
   AUTH_PROFILE: '/api/auth/profile',
-  AUTH_CHANGE_PASSWORD: '/api/auth/change-password'
+  AUTH_PROFILE_ICONS: '/api/auth/profile-icons',
+  AUTH_CHANGE_PASSWORD: '/api/auth/change-password',
+
+  // Stats
+  STATS_ONLINE_USERS: '/api/stats/online-users',
+  STATS_ONLINE_USERS_COUNT: '/api/stats/online-users/count',
+  STATS_MONTHLY_VISITS: '/api/stats/monthly-visits'
 };
 
 // Polling intervals (milliseconds)
@@ -73,6 +82,9 @@ export const POLLING_INTERVALS = {
   FLOOD_DATA: 5000,        // 5 seconds
   CROWD_REPORTS: 10000     // 10 seconds (giảm từ 30s để cập nhật nhanh hơn)
 };
+
+// Báo cáo cộng đồng: số giờ hiển thị trên bản đồ, sau đó coi là hết hạn (ẩn khỏi map)
+export const CROWD_REPORT_MAP_DISPLAY_HOURS = 24;
 
 // Default values
 export const DEFAULTS = {

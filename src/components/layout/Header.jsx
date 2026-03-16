@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { isAuthenticated } from '../../utils/auth';
 import { FaLock, FaPenToSquare } from 'react-icons/fa6';
-import axios from 'axios';
-import { API_CONFIG } from '../../config/apiConfig';
+import { getOnlineUsersCount, getMonthlyVisitsCount } from '../../services/api';
 import './Header.css';
 
 const Header = () => {
@@ -13,52 +12,24 @@ const Header = () => {
   const [totalVisits, setTotalVisits] = useState(0);
   const [monthlyVisits, setMonthlyVisits] = useState(0);
 
-  // Update time every second
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // Fetch statistics - TEMPORARILY DISABLED until backend is ready
-  // useEffect(() => {
-  //   const fetchStats = async () => {
-  //     try {
-  //       // Fetch total visits
-  //       const totalResponse = await axios.get(`${API_CONFIG.BASE_URL}/api/stats/total-visits`, {
-  //         timeout: 3000,
-  //         validateStatus: () => true
-  //       }).catch(() => null);
-  //       
-  //       if (totalResponse && totalResponse.status === 200 && totalResponse.data && totalResponse.data.success) {
-  //         setTotalVisits(totalResponse.data.data.totalVisits || 0);
-  //       } else {
-  //         setTotalVisits(0);
-  //       }
-
-  //       // Fetch monthly visits
-  //       const monthlyResponse = await axios.get(`${API_CONFIG.BASE_URL}/api/stats/monthly-visits`, {
-  //         timeout: 3000,
-  //         validateStatus: () => true
-  //       }).catch(() => null);
-  //       
-  //       if (monthlyResponse && monthlyResponse.status === 200 && monthlyResponse.data && monthlyResponse.data.success) {
-  //         setMonthlyVisits(monthlyResponse.data.data.monthlyVisits || 0);
-  //       } else {
-  //         setMonthlyVisits(0);
-  //       }
-  //     } catch (error) {
-  //       setTotalVisits(0);
-  //       setMonthlyVisits(0);
-  //     }
-  //   };
-
-  //   fetchStats();
-  //   // Update every 5 minutes
-  //   const interval = setInterval(fetchStats, 300000);
-  //   return () => clearInterval(interval);
-  // }, []);
+  useEffect(() => {
+    const fetchStats = async () => {
+      const [onlineRes, monthlyRes] = await Promise.all([
+        getOnlineUsersCount(),
+        getMonthlyVisitsCount()
+      ]);
+      setTotalVisits(onlineRes.success ? onlineRes.count : 0);
+      setMonthlyVisits(monthlyRes.success ? monthlyRes.count : 0);
+    };
+    fetchStats();
+    const interval = setInterval(fetchStats, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Format date in Vietnamese
   const formatDate = (date) => {
@@ -91,7 +62,7 @@ const Header = () => {
           <div className="brand-icon-circle">
             <img src="/iuh.png" alt="IUH Logo" className="brand-icon-img" />
           </div>
-          <span className="brand-text">FLOODSIGHT TP HỒ CHÍ MINH</span>
+          <span className="brand-text">FLOODSIGHT THÀNH PHỐ HỒ CHÍ MINH</span>
         </div>
 
         {/* Statistics Section - nằm ở phần màu trắng của banner */}

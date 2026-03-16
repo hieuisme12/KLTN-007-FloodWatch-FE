@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { fetchPendingReports, moderateReport } from '../../services/api';
 import { isModerator } from '../../utils/auth';
+import { useReporterRanking } from '../../context/ReporterRankingContext';
 import { useNavigate } from 'react-router-dom';
 import { FaMagnifyingGlass, FaClock, FaCheck, FaXmark, FaStar, FaCircle, FaArrowsRotate, FaCircleQuestion, FaClock as FaClockIcon } from 'react-icons/fa6';
 import { WiFlood } from 'react-icons/wi';
@@ -9,6 +10,7 @@ import './ModerationPage.css';
 
 const ModerationPage = () => {
   const navigate = useNavigate();
+  const { getReporterReliability } = useReporterRanking();
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState({});
@@ -411,7 +413,8 @@ const ModerationPage = () => {
           {reports.map((report) => {
             const statusBadge = getStatusBadge(report.validation_status);
             const moderationBadge = getModerationStatusBadge(report.moderation_status);
-            const reliabilityBadge = getReliabilityBadge(report.reliability_score || 0);
+            const rel = getReporterReliability(report.reporter_id) ?? report.reporter_reliability ?? null;
+            const reliabilityBadge = getReliabilityBadge(rel ?? 0);
             const levelInfo = getFloodLevelInfo(report.flood_level);
             const cardId = report.id;
             const isHovered = hoveredCardId === cardId;
@@ -591,7 +594,7 @@ const ModerationPage = () => {
                       }}>
                         ID: {report.id}
                       </div>
-                      {report.reliability_score >= 61 && (
+                      {rel != null && (
                         <div style={{
                           fontSize: '11px',
                           background: 'rgba(0,0,0,0.1)',
@@ -601,7 +604,7 @@ const ModerationPage = () => {
                           fontWeight: 'bold',
                           display: 'inline-block'
                         }}>
-                          {reliabilityBadge.text}
+                          Độ tin cậy người báo cáo: {reliabilityBadge.text} ({typeof rel === 'number' ? rel.toFixed(1) : rel})
                         </div>
                       )}
                     </div>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { FaUser } from 'react-icons/fa6';
 import { login } from '../../services/api';
+import ErrorToast from '../../components/common/ErrorToast';
 import './LoginPage.css';
 
 const LoginPage = () => {
@@ -35,15 +36,12 @@ const LoginPage = () => {
 
   return (
     <div className="login-page">
+      {error && (
+        <ErrorToast message={error} onClose={() => setError('')} />
+      )}
       <div className="login-container">
         <form className="login-form" onSubmit={handleSubmit}>
           <h2 className="login-title">Đăng nhập</h2>
-          
-          {error && (
-            <div className="error-message">
-              {error}
-            </div>
-          )}
 
           <div className="form-group">
             <label htmlFor="username">Tên đăng nhập</label>

@@ -1,4 +1,5 @@
 // Authentication Helper Functions
+// RBAC: Admin (hạ tầng, user, sensor, audit) ≠ Moderator (kiểm duyệt, thống kê). Admin không kế thừa quyền Moderator.
 
 /**
  * Lấy thông tin user hiện tại từ localStorage
@@ -23,7 +24,8 @@ export const isAuthenticated = () => {
 };
 
 /**
- * Kiểm tra xem user có phải admin không
+ * Kiểm tra xem user có phải admin không (chỉ role 'admin')
+ * Admin: hạ tầng (sensor, user, cấu hình, audit). Không duyệt báo cáo.
  */
 export const isAdmin = () => {
   const user = getCurrentUser();
@@ -31,11 +33,12 @@ export const isAdmin = () => {
 };
 
 /**
- * Kiểm tra xem user có phải moderator không (bao gồm admin)
+ * Kiểm tra xem user có phải moderator không (chỉ role 'moderator')
+ * Admin KHÔNG được coi là moderator. Moderator: kiểm duyệt báo cáo, cảnh báo, thống kê nghiệp vụ.
  */
 export const isModerator = () => {
   const user = getCurrentUser();
-  return ['admin', 'moderator'].includes(user?.role);
+  return user?.role === 'moderator';
 };
 
 /**
@@ -48,7 +51,7 @@ export const isUser = () => {
 
 /**
  * Kiểm tra xem user có một trong các roles được chỉ định không
- * @param {string[]} roles - Mảng các roles cần kiểm tra
+ * @param {string[]} roles - Mảng các roles cần kiểm tra (vd: ['admin'], ['moderator'], ['admin', 'moderator'])
  * @returns {boolean}
  */
 export const hasRole = (roles) => {
@@ -58,24 +61,14 @@ export const hasRole = (roles) => {
 };
 
 /**
- * Kiểm tra xem user có quyền thực hiện action không
- * @param {string} requiredRole - Role tối thiểu cần có: 'user', 'moderator', 'admin'
+ * Kiểm tra xem user có đúng role được yêu cầu không (không có thứ bậc kế thừa)
+ * @param {string} role - 'admin' | 'moderator' | 'user'
  * @returns {boolean}
  */
-export const hasPermission = (requiredRole) => {
+export const hasPermission = (role) => {
   const user = getCurrentUser();
   if (!user || !user.role) return false;
-  
-  const roleHierarchy = {
-    'user': 1,
-    'moderator': 2,
-    'admin': 3
-  };
-  
-  const userLevel = roleHierarchy[user.role] || 0;
-  const requiredLevel = roleHierarchy[requiredRole] || 0;
-  
-  return userLevel >= requiredLevel;
+  return user.role === role;
 };
 
 

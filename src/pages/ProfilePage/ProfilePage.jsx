@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getProfile, updateProfile } from '../../services/api';
+import { getProfile, getProfileIcons, updateProfile } from '../../services/api';
+import { API_CONFIG } from '../../config/apiConfig';
+import ErrorToast from '../../components/common/ErrorToast';
 import './ProfilePage.css';
 
 const ProfilePage = () => {
@@ -16,6 +18,9 @@ const ProfilePage = () => {
     email: '',
     phone: ''
   });
+  const [profileIcons, setProfileIcons] = useState([]);
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+  const [savingAvatar, setSavingAvatar] = useState(false);
 
   const loadProfile = async () => {
     setLoading(true);
@@ -33,9 +38,18 @@ const ProfilePage = () => {
     setLoading(false);
   };
 
+  const loadProfileIcons = async () => {
+    const result = await getProfileIcons();
+    if (result.success && result.data) setProfileIcons(result.data);
+  };
+
   useEffect(() => {
     loadProfile();
   }, []);
+
+  useEffect(() => {
+    if (user) loadProfileIcons();
+  }, [user]);
 
   const handleChange = (e) => {
     setFormData({
@@ -73,7 +87,6 @@ const ProfilePage = () => {
     setSuccess('');
   };
 
-  // Get initials for avatar
   const getInitials = () => {
     if (user?.full_name) {
       const parts = user.full_name.trim().split(' ');
@@ -83,6 +96,29 @@ const ProfilePage = () => {
       return user.full_name.charAt(0).toUpperCase();
     }
     return user?.username?.charAt(0).toUpperCase() || 'U';
+  };
+
+  const getAvatarUrl = (avatarFileName) => {
+    if (!avatarFileName) return null;
+    const base = API_CONFIG.BASE_URL.replace(/\/$/, '');
+    const path = avatarFileName.startsWith('/') ? avatarFileName : `/profile-icons/${avatarFileName}`;
+    return base + path;
+  };
+
+  const currentAvatarUrl = user?.avatar ? getAvatarUrl(user.avatar) : null;
+
+  const handleSelectAvatar = async (icon) => {
+    setSavingAvatar(true);
+    setError('');
+    const result = await updateProfile({ avatar: icon.name });
+    if (result.success) {
+      setUser(result.data);
+      setSuccess('Đã đổi ảnh đại diện.');
+      setShowAvatarPicker(false);
+    } else {
+      setError(result.error || 'Đổi ảnh thất bại');
+    }
+    setSavingAvatar(false);
   };
 
   if (loading) {
@@ -98,8 +134,11 @@ const ProfilePage = () => {
   if (!user) {
     return (
       <div className="profile-page">
+        {error && (
+          <ErrorToast message={error || 'Không thể tải thông tin người dùng'} onClose={() => setError('')} />
+        )}
         <div className="profile-container">
-          <div className="error-message">{error || 'Không thể tải thông tin người dùng'}</div>
+          <p className="error-message">{error || 'Không thể tải thông tin người dùng'}</p>
         </div>
       </div>
     );
@@ -110,34 +149,33 @@ const ProfilePage = () => {
       <div className="profile-container">
         <h1 className="profile-title">Chỉnh sửa hồ sơ của bạn</h1>
 
+        {error && (
+          <ErrorToast message={error} onClose={() => setError('')} />
+        )}
         {success && (
           <div className="success-message">
             {success}
           </div>
         )}
 
-        {error && (
-          <div className="error-message">
-            {error}
-          </div>
-        )}
-
         <form className="profile-form" onSubmit={handleSubmit}>
           <div className="profile-form-layout">
-            {/* Left Side - Photo */}
+            {/* Left Side - Photo (chọn từ icon có sẵn) */}
             <div className="profile-photo-section">
               <label className="photo-label">Ảnh đại diện:</label>
               <div className="profile-avatar-container">
                 <div className="profile-avatar">
-                  <span>{getInitials()}</span>
+                  {currentAvatarUrl ? (
+                    <img src={currentAvatarUrl} alt="Avatar" className="profile-avatar-img" />
+                  ) : (
+                    <span>{getInitials()}</span>
+                  )}
                 </div>
               </div>
-              <button 
+              <button
                 type="button"
                 className="btn-change-photo"
-                onClick={() => {
-                  // TODO: Implement photo upload
-                }}
+                onClick={() => setShowAvatarPicker(true)}
               >
                 ĐỔI ẢNH
               </button>
@@ -254,6 +292,42 @@ const ProfilePage = () => {
             )}
           </div>
         </form>
+
+        {/* Modal chọn ảnh đại diện từ danh sách icon có sẵn */}
+        {showAvatarPicker && (
+          <div className="profile-avatar-modal-overlay" onClick={() => !savingAvatar && setShowAvatarPicker(false)}>
+            <div className="profile-avatar-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="profile-avatar-modal-header">
+                <h3>Chọn ảnh đại diện</h3>
+                <button type="button" className="profile-avatar-modal-close" onClick={() => !savingAvatar && setShowAvatarPicker(false)} aria-label="Đóng">×</button>
+              </div>
+              <p className="profile-avatar-modal-hint">Chọn một icon bên dưới (không tải ảnh từ máy).</p>
+              {profileIcons.length === 0 ? (
+                <div className="profile-avatar-modal-loading">Đang tải danh sách ảnh...</div>
+              ) : (
+                <div className="profile-avatar-grid">
+                  {profileIcons.map((icon) => {
+                    const iconUrl = icon.url.startsWith('http') ? icon.url : (API_CONFIG.BASE_URL.replace(/\/$/, '') + (icon.url.startsWith('/') ? icon.url : '/' + icon.url));
+                    const isSelected = user?.avatar === icon.name;
+                    return (
+                      <button
+                        key={icon.name}
+                        type="button"
+                        className={`profile-avatar-grid-item ${isSelected ? 'selected' : ''}`}
+                        onClick={() => handleSelectAvatar(icon)}
+                        disabled={savingAvatar}
+                        title={icon.name}
+                      >
+                        <img src={iconUrl} alt={icon.name} />
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              {savingAvatar && <div className="profile-avatar-modal-saving">Đang lưu...</div>}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
