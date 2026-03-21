@@ -1,6 +1,73 @@
 import axios from 'axios';
 import { API_CONFIG, API_ENDPOINTS, DEFAULTS } from '../config/apiConfig';
 
+/** Khóa localStorage — access JWT (alias key cũ authToken), refresh opaque, session UUID */
+const LS_ACCESS = 'authToken';
+const LS_REFRESH = 'refreshToken';
+const LS_SESSION = 'sessionToken';
+
+/**
+ * Ghi đè token sau login / register / refresh (rotation: luôn cả access + refresh).
+ * @param {object} data — từ BE: access_token | token, refresh_token, session_token, user?
+ */
+export function persistAuthTokens(data) {
+  if (!data || typeof data !== 'object') return;
+  const access = data.access_token || data.token;
+  if (access) localStorage.setItem(LS_ACCESS, access);
+  if (data.refresh_token) localStorage.setItem(LS_REFRESH, data.refresh_token);
+  if (data.session_token) localStorage.setItem(LS_SESSION, data.session_token);
+  if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
+}
+
+export function clearAuthStorage() {
+  localStorage.removeItem(LS_ACCESS);
+  localStorage.removeItem(LS_REFRESH);
+  localStorage.removeItem(LS_SESSION);
+  localStorage.removeItem('user');
+}
+
+/** Một promise refresh dùng chung — tránh nhiều request 401 gọi refresh song song */
+let refreshPromise = null;
+
+function attemptTokenRefresh() {
+  if (refreshPromise) return refreshPromise;
+
+  const refresh = localStorage.getItem(LS_REFRESH);
+  const session = localStorage.getItem(LS_SESSION);
+
+  if (!refresh || !session) {
+    return Promise.reject(new Error('Missing refresh or session token'));
+  }
+
+  refreshPromise = axios
+    .post(`${API_CONFIG.BASE_URL}${API_ENDPOINTS.AUTH_REFRESH}`, {
+      refresh_token: refresh,
+      session_token: session
+    })
+    .then((res) => {
+      const payload = res.data;
+      if (payload?.success && payload?.data) {
+        persistAuthTokens(payload.data);
+        return payload.data;
+      }
+      throw new Error('Invalid refresh response');
+    })
+    .finally(() => {
+      refreshPromise = null;
+    });
+
+  return refreshPromise;
+}
+
+function isAuthEndpointNoRefresh(url) {
+  if (!url || typeof url !== 'string') return false;
+  return (
+    url.includes('/api/auth/login') ||
+    url.includes('/api/auth/register') ||
+    url.includes('/api/auth/refresh')
+  );
+}
+
 // Tạo axios instance với interceptor để tự động thêm token
 const apiClient = axios.create({
   baseURL: API_CONFIG.BASE_URL
@@ -9,7 +76,7 @@ const apiClient = axios.create({
 // Interceptor: Tự động thêm token vào header cho mọi request
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('authToken');
+    const token = localStorage.getItem(LS_ACCESS);
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -20,20 +87,43 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Interceptor: Xử lý lỗi 401 (token hết hạn) - tự động logout
+// Interceptor: 401 → refresh (một lần) → retry; refresh/login/register path không retry refresh
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      // Token hết hạn hoặc không hợp lệ
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('user');
-      // Redirect to login nếu cần
+  async (error) => {
+    const { response, config } = error;
+    if (!response || response.status !== 401 || !config) {
+      return Promise.reject(error);
+    }
+
+    if (isAuthEndpointNoRefresh(config.url || '')) {
+      return Promise.reject(error);
+    }
+
+    if (config._authRetry) {
+      clearAuthStorage();
       if (window.location.pathname !== '/login') {
         window.location.href = '/login';
       }
+      return Promise.reject(error);
     }
-    return Promise.reject(error);
+
+    try {
+      await attemptTokenRefresh();
+      config._authRetry = true;
+      const access = localStorage.getItem(LS_ACCESS);
+      config.headers = config.headers || {};
+      if (access) {
+        config.headers.Authorization = `Bearer ${access}`;
+      }
+      return apiClient(config);
+    } catch {
+      clearAuthStorage();
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+      return Promise.reject(error);
+    }
   }
 );
 
@@ -251,13 +341,7 @@ export const login = async (username, password) => {
     });
     
     if (response.data && response.data.success) {
-      // Lưu thông tin user và token vào localStorage
-      if (response.data.data.user) {
-        localStorage.setItem('user', JSON.stringify(response.data.data.user));
-      }
-      if (response.data.data.token) {
-        localStorage.setItem('authToken', response.data.data.token);
-      }
+      persistAuthTokens(response.data.data);
       return { 
         success: true, 
         data: response.data.data 
@@ -281,6 +365,7 @@ export const register = async (userData) => {
     const response = await axios.post(`${API_CONFIG.BASE_URL}${API_ENDPOINTS.AUTH_REGISTER}`, userData);
     
     if (response.data && response.data.success) {
+      persistAuthTokens(response.data.data);
       return { 
         success: true, 
         data: response.data.data 
@@ -382,9 +467,12 @@ export const changePassword = async (oldPassword, newPassword) => {
     });
     
     if (response.data && response.data.success) {
+      // BE revoke toàn bộ phiên — xóa token, bắt đăng nhập lại
+      clearAuthStorage();
       return { 
         success: true, 
-        message: response.data.message || 'Đổi mật khẩu thành công'
+        message: response.data.message || 'Đổi mật khẩu thành công',
+        requiresReLogin: true
       };
     } else {
       return { 
@@ -401,16 +489,15 @@ export const changePassword = async (oldPassword, newPassword) => {
 };
 
 export const logout = async () => {
-  const token = localStorage.getItem('authToken');
+  const token = localStorage.getItem(LS_ACCESS);
   if (token) {
     try {
       await apiClient.post(API_ENDPOINTS.AUTH_LOGOUT);
     } catch {
-      // BE có thể chưa có endpoint; vẫn xóa token ở client
+      // Vẫn xóa local dù BE lỗi / 401
     }
   }
-  localStorage.removeItem('user');
-  localStorage.removeItem('authToken');
+  clearAuthStorage();
 };
 
 // Re-export auth helpers from utils/auth.js for backward compatibility
