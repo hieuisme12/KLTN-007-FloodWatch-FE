@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { FaWater } from 'react-icons/fa6';
 import { register } from '../../services/api';
+import { isAuthenticated } from '../../utils/auth';
 import ErrorToast from '../../components/common/ErrorToast';
 import './RegisterPage.css';
 
@@ -48,8 +49,13 @@ const RegisterPage = () => {
       const result = await register(registerData);
       
       if (result.success) {
-        alert('Đăng ký thành công! Vui lòng đăng nhập.');
-        navigate('/login');
+        if (isAuthenticated()) {
+          alert('Đăng ký thành công! Bạn đã được đăng nhập.');
+          navigate('/');
+        } else {
+          alert('Đăng ký thành công! Vui lòng đăng nhập.');
+          navigate('/login');
+        }
       } else {
         setError(result.error || 'Đăng ký thất bại');
       }
