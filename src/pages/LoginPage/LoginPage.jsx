@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { FaUser } from 'react-icons/fa6';
 import { login } from '../../services/api';
 import ErrorToast from '../../components/common/ErrorToast';
@@ -10,21 +10,35 @@ const LoginPage = () => {
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
+  const [verifyHint, setVerifyHint] = useState('');
+  const [needsEmailVerifyCta, setNeedsEmailVerifyCta] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    const st = location.state;
+    if (st?.postVerifyMessage) {
+      setVerifyHint(st.postVerifyMessage);
+      if (st.username) setUsername(st.username);
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
+    setNeedsEmailVerifyCta(false);
+
     try {
       const result = await login(username, password);
-      
+
       if (result.success) {
-        // Redirect to dashboard after successful login
         navigate('/dashboard');
       } else {
+        setNeedsEmailVerifyCta(Boolean(result.needsEmailVerification));
         setError(result.error || 'Đăng nhập thất bại');
       }
     } catch {
@@ -36,6 +50,19 @@ const LoginPage = () => {
 
   return (
     <div className="login-page">
+      {verifyHint && (
+        <div className="login-success-hint" role="status">
+          {verifyHint}
+          <button
+            type="button"
+            className="login-success-hint-close"
+            onClick={() => setVerifyHint('')}
+            aria-label="Đóng"
+          >
+            ×
+          </button>
+        </div>
+      )}
       {error && (
         <ErrorToast message={error} onClose={() => setError('')} />
       )}
@@ -87,6 +114,17 @@ const LoginPage = () => {
           >
             {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
           </button>
+
+          {needsEmailVerifyCta && (
+            <p className="login-verify-cta">
+              <Link
+                to="/register/verify"
+                state={{ fromLogin: true, username }}
+              >
+                Xác minh email / nhập mã OTP
+              </Link>
+            </p>
+          )}
 
           <div className="divider">
             <span>HOẶC</span>

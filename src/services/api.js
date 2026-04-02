@@ -64,6 +64,9 @@ function isAuthEndpointNoRefresh(url) {
   return (
     url.includes('/api/auth/login') ||
     url.includes('/api/auth/register') ||
+    url.includes('/api/auth/verify-otp') ||
+    url.includes('/api/auth/send-otp') ||
+    url.includes('/api/auth/resend-otp') ||
     url.includes('/api/auth/refresh')
   );
 }
@@ -339,47 +342,165 @@ export const login = async (username, password) => {
       username,
       password
     });
-    
+
     if (response.data && response.data.success) {
       persistAuthTokens(response.data.data);
-      return { 
-        success: true, 
-        data: response.data.data 
-      };
-    } else {
-      return { 
-        success: false, 
-        error: response.data.error || 'Đăng nhập thất bại' 
+      return {
+        success: true,
+        data: response.data.data
       };
     }
+    return {
+      success: false,
+      error: response.data?.error || 'Đăng nhập thất bại'
+    };
   } catch (error) {
-    return { 
-      success: false, 
-      error: error.response?.data?.error || error.message
+    const status = error.response?.status;
+    const data = error.response?.data;
+    if (status === 403) {
+      return {
+        success: false,
+        needsEmailVerification: true,
+        error:
+          data?.error ||
+          'Vui lòng xác minh email (mã OTP) trước khi đăng nhập'
+      };
+    }
+    if (status === 401) {
+      return {
+        success: false,
+        error: data?.error || 'Sai tên đăng nhập hoặc mật khẩu'
+      };
+    }
+    return {
+      success: false,
+      error: data?.error || error.message
     };
   }
 };
 
+/**
+ * Đăng ký — BE 201 chỉ trả user, không JWT. Sau đó FE chuyển bước verify-otp.
+ */
 export const register = async (userData) => {
   try {
-    const response = await axios.post(`${API_CONFIG.BASE_URL}${API_ENDPOINTS.AUTH_REGISTER}`, userData);
-    
-    if (response.data && response.data.success) {
-      persistAuthTokens(response.data.data);
-      return { 
-        success: true, 
-        data: response.data.data 
-      };
-    } else {
-      return { 
-        success: false, 
-        error: response.data.error || 'Đăng ký thất bại' 
+    const payload = {
+      ...userData,
+      email:
+        typeof userData.email === 'string'
+          ? userData.email.trim().toLowerCase()
+          : userData.email
+    };
+    const response = await axios.post(
+      `${API_CONFIG.BASE_URL}${API_ENDPOINTS.AUTH_REGISTER}`,
+      payload
+    );
+
+    if (response.data?.success && response.data?.data) {
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
       };
     }
+    return {
+      success: false,
+      error: response.data?.error || 'Đăng ký thất bại'
+    };
   } catch (error) {
-    return { 
-      success: false, 
-      error: error.response?.data?.error || error.message
+    const data = error.response?.data;
+    return {
+      success: false,
+      error: data?.error || data?.message || error.message
+    };
+  }
+};
+
+/**
+ * Xác minh OTP sau đăng ký (hoặc purpose khác do BE trả về).
+ */
+export const verifyOtp = async (email, otpCode) => {
+  try {
+    const response = await axios.post(
+      `${API_CONFIG.BASE_URL}${API_ENDPOINTS.AUTH_VERIFY_OTP}`,
+      {
+        email: String(email).trim().toLowerCase(),
+        otp_code: String(otpCode).trim()
+      }
+    );
+
+    if (response.data?.success && response.data?.data) {
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    }
+    return {
+      success: false,
+      error: response.data?.error || 'Xác minh thất bại'
+    };
+  } catch (error) {
+    const data = error.response?.data;
+    return {
+      success: false,
+      error: data?.error || error.message
+    };
+  }
+};
+
+/** Gửi OTP lần đầu (email đã tồn tại trong hệ thống). */
+export const sendOtp = async (email) => {
+  try {
+    const response = await axios.post(
+      `${API_CONFIG.BASE_URL}${API_ENDPOINTS.AUTH_SEND_OTP}`,
+      { email: String(email).trim().toLowerCase() }
+    );
+
+    if (response.data?.success) {
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    }
+    return {
+      success: false,
+      error: response.data?.error || 'Không gửi được mã OTP'
+    };
+  } catch (error) {
+    const data = error.response?.data;
+    return {
+      success: false,
+      error: data?.error || error.message
+    };
+  }
+};
+
+/** Gửi lại OTP (cùng logic giới hạn với send-otp). */
+export const resendOtp = async (email) => {
+  try {
+    const response = await axios.post(
+      `${API_CONFIG.BASE_URL}${API_ENDPOINTS.AUTH_RESEND_OTP}`,
+      { email: String(email).trim().toLowerCase() }
+    );
+
+    if (response.data?.success) {
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    }
+    return {
+      success: false,
+      error: response.data?.error || 'Không gửi lại được mã OTP'
+    };
+  } catch (error) {
+    const data = error.response?.data;
+    return {
+      success: false,
+      error: data?.error || error.message
     };
   }
 };

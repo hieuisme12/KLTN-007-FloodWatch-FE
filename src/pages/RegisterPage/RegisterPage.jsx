@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { FaWater } from 'react-icons/fa6';
 import { register } from '../../services/api';
-import { isAuthenticated } from '../../utils/auth';
 import ErrorToast from '../../components/common/ErrorToast';
 import './RegisterPage.css';
 
@@ -47,15 +46,21 @@ const RegisterPage = () => {
       // eslint-disable-next-line no-unused-vars
       const { confirmPassword, ...registerData } = formData;
       const result = await register(registerData);
-      
+
       if (result.success) {
-        if (isAuthenticated()) {
-          alert('Đăng ký thành công! Bạn đã được đăng nhập.');
-          navigate('/');
-        } else {
-          alert('Đăng ký thành công! Vui lòng đăng nhập.');
-          navigate('/login');
-        }
+        const user = result.data?.user;
+        const email =
+          user?.email ||
+          (typeof registerData.email === 'string'
+            ? registerData.email.trim().toLowerCase()
+            : '');
+        navigate('/register/verify', {
+          replace: true,
+          state: {
+            email,
+            username: user?.username || registerData.username
+          }
+        });
       } else {
         setError(result.error || 'Đăng ký thất bại');
       }

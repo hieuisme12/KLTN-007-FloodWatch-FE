@@ -6,6 +6,7 @@ import ReportsPage from './pages/ReportsPage';
 import NewReportPage from './pages/NewReportPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import VerifyRegisterOtpPage from './pages/VerifyRegisterOtpPage/VerifyRegisterOtpPage';
 import ProfilePage from './pages/ProfilePage';
 import NewsDetailPage from './pages/NewsDetailPage';
 import MapPage from './pages/MapPage';
@@ -34,6 +35,7 @@ function App() {
         {/* Login và Register không có Navigation */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/register/verify" element={<VerifyRegisterOtpPage />} />
         
         {/* Các trang khác có Navigation */}
         <Route 

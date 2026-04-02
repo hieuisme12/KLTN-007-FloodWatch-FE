@@ -66,6 +66,9 @@ export const API_ENDPOINTS = {
   // Authentication
   AUTH_LOGIN: '/api/auth/login',
   AUTH_REGISTER: '/api/auth/register',
+  AUTH_VERIFY_OTP: '/api/auth/verify-otp',
+  AUTH_SEND_OTP: '/api/auth/send-otp',
+  AUTH_RESEND_OTP: '/api/auth/resend-otp',
   AUTH_REFRESH: '/api/auth/refresh',
   AUTH_LOGOUT: '/api/auth/logout',
   AUTH_PROFILE: '/api/auth/profile',
