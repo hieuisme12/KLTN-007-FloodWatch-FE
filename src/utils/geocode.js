@@ -66,7 +66,9 @@ function getCache() {
 function setCache(cache) {
   try {
     localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
-  } catch {}
+  } catch {
+    // Quota, private mode, or disabled storage — caller keeps in-memory cache if any
+  }
 }
 
 /**

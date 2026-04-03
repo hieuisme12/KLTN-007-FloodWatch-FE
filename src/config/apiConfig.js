@@ -1,6 +1,6 @@
 // API Configuration
 export const API_CONFIG = {
-  BASE_URL: import.meta.env.VITE_API_BASE_URL || 'https://kltn-007-floodwatch-be-production.up.railway.app',
+  BASE_URL: import.meta.env.VITE_API_BASE_URL || 'https://api.floodsight.id.vn',
   TIMEOUT: 10000, // 10 seconds
   RETRY_ATTEMPTS: 3
 };
@@ -11,6 +11,12 @@ export const API_ENDPOINTS = {
   FLOOD_DATA: '/api/v1/flood-data',
   FLOOD_DATA_REALTIME: '/api/flood-data/realtime',
   FLOOD_DATA_REALTIME_V1: '/api/v1/flood-data/realtime',
+  /** Sensor–crowd fusion (bản đồ trộn) */
+  FUSION_POINTS: '/api/v1/fusion/points',
+  /** Dự báo mực nước ngắn hạn theo trạm */
+  FORECAST_SENSOR: '/api/v1/forecast/sensor/:sensorId',
+  /** Thời tiết Open-Meteo (TP.HCM) */
+  WEATHER_HCM: '/api/v1/weather/hcm',
   SENSOR_HISTORY: '/api/sensors/:sensorId/history',
   
   // Sensors
@@ -25,6 +31,7 @@ export const API_ENDPOINTS = {
   CROWD_REPORTS_ALL: '/api/crowd-reports/all',
   
   // Report Moderation (Moderator/Admin)
+  REPORTS_ALL: '/api/reports/all',
   REPORTS_PENDING: '/api/reports/pending',
   REPORT_MODERATE: '/api/reports/:reportId/moderate',
   REPORTS_RELIABILITY_RANKING: '/api/reports/reliability-ranking',
@@ -72,6 +79,8 @@ export const API_ENDPOINTS = {
   AUTH_REFRESH: '/api/auth/refresh',
   AUTH_LOGOUT: '/api/auth/logout',
   AUTH_PROFILE: '/api/auth/profile',
+  /** Lưu GPS sau Geolocation (JSON body: lat, lng, accuracy_m) */
+  AUTH_LOCATION: '/api/auth/location',
   AUTH_PROFILE_ICONS: '/api/auth/profile-icons',
   AUTH_CHANGE_PASSWORD: '/api/auth/change-password',
 

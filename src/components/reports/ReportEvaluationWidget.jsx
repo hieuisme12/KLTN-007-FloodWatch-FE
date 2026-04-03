@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { FaStar } from 'react-icons/fa6';
 import { getReportEvaluationAverage, getReportEvaluations, submitReportEvaluation } from '../../services/api';
 import { isAuthenticated, getCurrentUser } from '../../utils/auth';
@@ -17,7 +17,7 @@ const ReportEvaluationWidget = ({ reportId, reporterId = null, compact = false }
   const [message, setMessage] = useState('');
   const [userAlreadyRated, setUserAlreadyRated] = useState(false);
 
-  const fetchAverage = async () => {
+  const fetchAverage = useCallback(async () => {
     if (!reportId) return;
     setLoading(true);
     const res = await getReportEvaluationAverage(reportId);
@@ -29,9 +29,9 @@ const ReportEvaluationWidget = ({ reportId, reporterId = null, compact = false }
       setAverage(null);
       setCount(0);
     }
-  };
+  }, [reportId]);
 
-  const checkUserAlreadyRated = async () => {
+  const checkUserAlreadyRated = useCallback(async () => {
     if (!reportId || !isAuthenticated()) return;
     const res = await getReportEvaluations(reportId);
     const currentUser = getCurrentUser();
@@ -39,15 +39,31 @@ const ReportEvaluationWidget = ({ reportId, reporterId = null, compact = false }
     const list = res.data || [];
     const alreadyRated = list.some((e) => Number(e.evaluator_id) === Number(currentUser.id));
     setUserAlreadyRated(alreadyRated);
-  };
-
-  useEffect(() => {
-    fetchAverage();
   }, [reportId]);
 
   useEffect(() => {
-    checkUserAlreadyRated();
-  }, [reportId]);
+    if (!reportId) return;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      void fetchAverage();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [reportId, fetchAverage]);
+
+  useEffect(() => {
+    if (!reportId) return;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      void checkUserAlreadyRated();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [reportId, checkUserAlreadyRated]);
 
   const handleSubmit = async () => {
     if (!reportId || selectedRating < 1 || selectedRating > 5) return;

@@ -11,8 +11,7 @@ import {
 } from 'react-icons/fa6';
 import { WiFlood } from 'react-icons/wi';
 import { MdLocationOn } from 'react-icons/md';
-import { statusColors } from '../../utils/constants';
-import { useReporterRanking } from '../../context/ReporterRankingContext';
+import { useReporterRanking } from '../../context/ReporterRankingProvider';
 
 const CrowdReportsList = ({ reports, loading }) => {
   const { getReporterReliability } = useReporterRanking();

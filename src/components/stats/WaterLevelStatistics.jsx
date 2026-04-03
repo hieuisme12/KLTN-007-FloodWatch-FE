@@ -2,8 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { fetchFloodData } from '../../services/api';
 import { POLLING_INTERVALS } from '../../config/apiConfig';
 import { FaChartColumn } from 'react-icons/fa6';
-import './WaterLevelStatistics.css';
-
 const WaterLevelStatistics = () => {
   const [waterLevelData, setWaterLevelData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -54,7 +52,8 @@ const WaterLevelStatistics = () => {
           
           setWaterLevelData(dailyData);
         }
-      } catch (error) {
+      } catch {
+        // Bỏ qua lỗi API; UI vẫn tắt loading ở finally
       } finally {
         setLoading(false);
       }

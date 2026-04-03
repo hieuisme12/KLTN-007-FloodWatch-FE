@@ -188,8 +188,8 @@ const ReportFloodForm = ({ onSuccess, onClose }) => {
           setFormData(prev => ({ ...prev, lng, lat, location_description: data.display_name }));
         }
       }
-    } catch (err) {
-      // Vẫn cho phép submit với lat/lng, nhưng thử lấy địa chỉ đơn giản hơn
+    } catch {
+      // Vẫn cho phép submit với lat/lng khi reverse geocoding lỗi
       setFormData(prev => ({ ...prev, lng, lat }));
     }
   };
