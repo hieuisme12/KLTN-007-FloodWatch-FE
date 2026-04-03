@@ -307,6 +307,126 @@ export const fetchCrowdReports = async (params = {}) => {
   }
 };
 
+const normalizeFusionCrowdPoint = (p) => {
+  if (!p || typeof p !== 'object') return null;
+  const lat = p.lat ?? p.latitude;
+  const lng = p.lng ?? p.longitude;
+  if (lat == null || lng == null) return null;
+  return {
+    ...p,
+    lat: Number(lat),
+    lng: Number(lng),
+    crowd_only_cm: p.crowd_only_cm != null ? Number(p.crowd_only_cm) : null,
+    fused_cm: p.fused_cm != null ? Number(p.fused_cm) : null,
+    coverage: p.coverage,
+    nearest_sensor: p.nearest_sensor ?? p.nearestSensor,
+    weights: p.weights
+  };
+};
+
+/**
+ * Điểm trộn sensor–crowd (public). Query: crowd_hours, sensor_hours, include_sensors, bbox min_lng…
+ */
+export const fetchFusionPoints = async (params = {}) => {
+  try {
+    const defaults = {
+      crowd_hours: 24,
+      sensor_hours: 1,
+      include_sensors: 'false'
+    };
+    const merged = { ...defaults, ...params };
+    const usp = new URLSearchParams();
+    Object.entries(merged).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') usp.set(k, String(v));
+    });
+    const url = `${API_CONFIG.BASE_URL}${API_ENDPOINTS.FUSION_POINTS}?${usp}`;
+    const response = await axios.get(url, { timeout: API_CONFIG.TIMEOUT });
+    if (response.data && response.data.success) {
+      const raw = response.data.data || {};
+      const crowdRaw = Array.isArray(raw.crowd) ? raw.crowd : [];
+      const crowd = crowdRaw.map(normalizeFusionCrowdPoint).filter(Boolean);
+      const sensors = Array.isArray(raw.sensors) ? raw.sensors : [];
+      return {
+        success: true,
+        data: { ...raw, crowd, sensors }
+      };
+    }
+    return {
+      success: false,
+      data: { crowd: [], sensors: [] },
+      error: response.data?.error || response.data?.message
+    };
+  } catch (error) {
+    const err = error.response?.data?.error || error.response?.data?.message;
+    return {
+      success: false,
+      data: { crowd: [], sensors: [] },
+      error: err || error.message
+    };
+  }
+};
+
+/**
+ * Dự báo ngắn hạn theo trạm (public). Query: horizon (phút), sample_minutes
+ */
+export const fetchForecastForSensor = async (sensorId, params = {}) => {
+  try {
+    const path = API_ENDPOINTS.FORECAST_SENSOR.replace(':sensorId', encodeURIComponent(sensorId));
+    const merged = { horizon: 60, sample_minutes: 90, ...params };
+    const usp = new URLSearchParams();
+    Object.entries(merged).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') usp.set(k, String(v));
+    });
+    const url = `${API_CONFIG.BASE_URL}${path}?${usp}`;
+    const response = await axios.get(url, { timeout: API_CONFIG.TIMEOUT });
+    if (response.data && response.data.success) {
+      return { success: true, data: response.data.data || null };
+    }
+    return {
+      success: false,
+      data: null,
+      error: response.data?.error || response.data?.message
+    };
+  } catch (error) {
+    const status = error.response?.status;
+    return {
+      success: false,
+      data: null,
+      status,
+      error: error.response?.data?.error || error.response?.data?.message || error.message
+    };
+  }
+};
+
+/**
+ * Thời tiết TP.HCM (Open-Meteo qua BE). Query: forecast_days, lat, lon
+ */
+export const fetchWeatherHcm = async (params = {}) => {
+  try {
+    const merged = { forecast_days: 3, ...params };
+    const usp = new URLSearchParams();
+    Object.entries(merged).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') usp.set(k, String(v));
+    });
+    const url = `${API_CONFIG.BASE_URL}${API_ENDPOINTS.WEATHER_HCM}?${usp}`;
+    const response = await axios.get(url, { timeout: 20000 });
+    if (response.data && response.data.success) {
+      return { success: true, data: response.data.data || null };
+    }
+    return {
+      success: false,
+      data: null,
+      error: response.data?.error || response.data?.message
+    };
+  } catch (error) {
+    return {
+      success: false,
+      data: null,
+      error: error.response?.data?.error || error.response?.data?.message || error.message
+    };
+  }
+};
+
 // Lấy tất cả báo cáo (không giới hạn thời gian)
 export const fetchAllCrowdReports = async (params = {}) => {
   try {
@@ -501,6 +621,35 @@ export const resendOtp = async (email) => {
     return {
       success: false,
       error: data?.error || error.message
+    };
+  }
+};
+
+/**
+ * Gửi tọa độ hiện tại lên BE (sau khi có quyền Geolocation). Cần Bearer JWT.
+ * Body: { lat, lng, accuracy_m? }
+ */
+export const postAuthLocation = async ({ lat, lng, accuracy_m }) => {
+  try {
+    const body = {
+      lat: Number(lat),
+      lng: Number(lng)
+    };
+    if (accuracy_m != null && !Number.isNaN(Number(accuracy_m))) {
+      body.accuracy_m = Number(accuracy_m);
+    }
+    const response = await apiClient.post(API_ENDPOINTS.AUTH_LOCATION, body);
+    if (response.data && response.data.success) {
+      return { success: true, data: response.data.data };
+    }
+    return {
+      success: false,
+      error: response.data?.error || response.data?.message || 'Không lưu được vị trí'
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.response?.data?.error || error.response?.data?.message || error.message
     };
   }
 };
@@ -798,6 +947,34 @@ export const deleteSensor = async (sensorId) => {
 // ==================== REPORT MODERATION APIs (Moderator/Admin) ====================
 
 /**
+ * Danh sách toàn bộ báo cáo (admin/moderator). GET /api/reports/all
+ * Response items có thể gồm confidence, confidence_breakdown.
+ */
+export const fetchAllReportsAdmin = async (params = {}) => {
+  try {
+    const queryParams = { limit: 500, ...params };
+    const queryString = new URLSearchParams(
+      Object.fromEntries(Object.entries(queryParams).filter(([, v]) => v != null && v !== ''))
+    ).toString();
+    const response = await apiClient.get(`${API_ENDPOINTS.REPORTS_ALL}?${queryString}`);
+    if (response.data && response.data.success) {
+      return { success: true, data: response.data.data || [] };
+    }
+    return {
+      success: false,
+      data: [],
+      error: response.data?.error || response.data?.message
+    };
+  } catch (error) {
+    return {
+      success: false,
+      data: [],
+      error: error.response?.data?.error || error.response?.data?.message || error.message
+    };
+  }
+};
+
+/**
  * Lấy báo cáo cần kiểm duyệt
  */
 export const fetchPendingReports = async (limit = 50) => {
@@ -903,7 +1080,7 @@ export const getReportEvaluations = async (reportId) => {
       return { success: true, data: response.data.data };
     }
     return { success: true, data: [] };
-  } catch (error) {
+  } catch {
     return { success: false, data: [] };
   }
 };
@@ -921,7 +1098,7 @@ export const getReportEvaluationAverage = async (reportId) => {
       return { success: true, average: data.average ?? data.avg_rating ?? data.rating, count: data.count ?? 0 };
     }
     return { success: true, average: null, count: 0 };
-  } catch (error) {
+  } catch {
     return { success: false, average: null, count: 0 };
   }
 };
@@ -944,7 +1121,7 @@ export const getOnlineUsersCount = async () => {
       return { success: true, count };
     }
     return { success: false, count: 0 };
-  } catch (error) {
+  } catch {
     return { success: false, count: 0 };
   }
 };
@@ -965,7 +1142,7 @@ export const getMonthlyVisitsCount = async () => {
       return { success: true, count };
     }
     return { success: false, count: 0 };
-  } catch (error) {
+  } catch {
     return { success: false, count: 0 };
   }
 };
@@ -987,7 +1164,7 @@ export const getOnlineUsers = async () => {
       return { success: true, count, online_users: data.online_users };
     }
     return { success: false, count: 0, online_users: [] };
-  } catch (error) {
+  } catch {
     return { success: false, count: 0, online_users: [] };
   }
 };

@@ -1,19 +1,23 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { ReporterRankingProvider } from './context/ReporterRankingContext';
+import { ReporterRankingProvider } from './context/ReporterRankingProvider';
 import DashboardPage from './pages/DashboardPage';
 import ReportsPage from './pages/ReportsPage';
 import NewReportPage from './pages/NewReportPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
-import VerifyRegisterOtpPage from './pages/VerifyRegisterOtpPage/VerifyRegisterOtpPage';
+import VerifyRegisterOtpPage from './pages/VerifyRegisterOtpPage';
 import ProfilePage from './pages/ProfilePage';
 import NewsDetailPage from './pages/NewsDetailPage';
 import MapPage from './pages/MapPage';
 import ModerationPage from './pages/ModerationPage';
+import AboutPage from './pages/InfoPages/AboutPage';
+import PrivacyPage from './pages/InfoPages/PrivacyPage';
+import TermsPage from './pages/InfoPages/TermsPage';
+import FaqPage from './pages/InfoPages/FaqPage';
+import ContactPage from './pages/InfoPages/ContactPage';
 import Layout from './components/layout/Layout';
 import { isAuthenticated, isModerator } from './utils/auth';
-import './App.css';
 
 // Protected Route – chỉ cần đăng nhập (bất kỳ role)
 const ProtectedRoute = ({ children }) => {
@@ -103,6 +107,46 @@ function App() {
         <Route 
           path="/map" 
           element={<MapPage />} 
+        />
+        <Route
+          path="/about"
+          element={
+            <Layout>
+              <AboutPage />
+            </Layout>
+          }
+        />
+        <Route
+          path="/privacy"
+          element={
+            <Layout>
+              <PrivacyPage />
+            </Layout>
+          }
+        />
+        <Route
+          path="/terms"
+          element={
+            <Layout>
+              <TermsPage />
+            </Layout>
+          }
+        />
+        <Route
+          path="/faq"
+          element={
+            <Layout>
+              <FaqPage />
+            </Layout>
+          }
+        />
+        <Route
+          path="/contact"
+          element={
+            <Layout>
+              <ContactPage />
+            </Layout>
+          }
         />
       </Routes>
       </ReporterRankingProvider>

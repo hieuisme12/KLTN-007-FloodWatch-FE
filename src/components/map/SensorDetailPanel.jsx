@@ -6,20 +6,21 @@ import { getStatusLabel, getVelocityLabel } from '../../utils/markerUtils';
 import { statusColors } from '../../utils/constants';
 import { fetchAddressFromCoords } from '../../utils/geocode';
 import { getSensorDisplayAddress } from '../../data/sensorOverrides';
-import { useReporterRanking } from '../../context/ReporterRankingContext';
+import { useReporterRanking } from '../../context/ReporterRankingProvider';
 import ReportEvaluationWidget from '../reports/ReportEvaluationWidget';
-import './SensorDetailPanel.css';
-
+import SensorForecastSection from './SensorForecastSection';
+import ConfidenceBadge from '../common/ConfidenceBadge';
 const PANEL_TITLE = 'CHI TIẾT VỊ TRÍ';
 
 const SensorDetailPanel = ({ sensor, crowdReport }) => {
   const { getReporterReliability } = useReporterRanking();
-  const [reportAddress, setReportAddress] = useState(crowdReport?.location_description || null);
-  const [sensorAddress, setSensorAddress] = useState(null);
+  const reportDesc = crowdReport?.location_description || null;
+  const [reportFetched, setReportFetched] = useState(null);
+  const sensorStaticAddr = sensor ? getSensorDisplayAddress(sensor) : null;
+  const [sensorFetched, setSensorFetched] = useState(null);
 
   useEffect(() => {
-    if (!crowdReport || crowdReport.location_description) {
-      setReportAddress(crowdReport?.location_description || null);
+    if (!crowdReport || reportDesc) {
       return;
     }
     const lat = crowdReport.lat;
@@ -27,33 +28,32 @@ const SensorDetailPanel = ({ sensor, crowdReport }) => {
     if (lat == null || lng == null) return;
     let cancelled = false;
     fetchAddressFromCoords(lat, lng).then((addr) => {
-      if (!cancelled) setReportAddress(addr);
+      if (!cancelled) setReportFetched(addr);
     });
-    return () => { cancelled = true; };
-  }, [crowdReport?.id, crowdReport?.lat, crowdReport?.lng, crowdReport?.location_description]);
+    return () => {
+      cancelled = true;
+    };
+  }, [crowdReport?.id, crowdReport?.lat, crowdReport?.lng, reportDesc]); // eslint-disable-line react-hooks/exhaustive-deps -- geocode theo id/lat/lng/mô tả, không theo object crowdReport
 
-  useEffect(() => {
-    if (!sensor) {
-      setSensorAddress(null);
-      return;
-    }
-    const override = getSensorDisplayAddress(sensor);
-    if (override) {
-      setSensorAddress(override);
-      return;
-    }
-    const lat = sensor.lat;
-    const lng = sensor.lng;
-    if (lat == null || lng == null) {
-      setSensorAddress(null);
-      return;
-    }
-    let cancelled = false;
-    fetchAddressFromCoords(lat, lng).then((addr) => {
-      if (!cancelled) setSensorAddress(addr);
-    });
-    return () => { cancelled = true; };
-  }, [sensor?.sensor_id, sensor?.location_name, sensor?.lat, sensor?.lng, sensor?.address]);
+  useEffect(
+    () => {
+      if (!sensor || sensorStaticAddr) {
+        return;
+      }
+      const lat = sensor.lat;
+      const lng = sensor.lng;
+      if (lat == null || lng == null) return;
+      let cancelled = false;
+      fetchAddressFromCoords(lat, lng).then((addr) => {
+        if (!cancelled) setSensorFetched(addr);
+      });
+      return () => {
+        cancelled = true;
+      };
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- geocode theo trường cụ thể, không theo tham chiếu sensor
+    [sensor?.sensor_id, sensor?.lat, sensor?.lng, sensor?.address, sensor?.location_name, sensorStaticAddr],
+  );
 
   // Không chọn gì: hướng dẫn chọn điểm
   if (!sensor && !crowdReport) {
@@ -109,7 +109,13 @@ const SensorDetailPanel = ({ sensor, crowdReport }) => {
           <div className="sensor-detail-item sensor-detail-location">
             <span className="sensor-detail-label"><MdLocationOn style={{ marginRight: '4px' }} /> Địa chỉ:</span>
             <span className="sensor-detail-value">
-              {reportAddress === null && !crowdReport.location_description ? 'Đang tải địa chỉ...' : (reportAddress || crowdReport.location_description || `Tọa độ: ${crowdReport.lat?.toFixed(6)}, ${crowdReport.lng?.toFixed(6)}`)}
+              {!reportDesc && reportFetched === null && crowdReport.lat != null && crowdReport.lng != null
+                ? 'Đang tải địa chỉ...'
+                : reportDesc ||
+                  reportFetched ||
+                  (crowdReport.lat != null && crowdReport.lng != null
+                    ? `Tọa độ: ${crowdReport.lat.toFixed(6)}, ${crowdReport.lng.toFixed(6)}`
+                    : '—')}
             </span>
           </div>
           <div className="sensor-detail-item">
@@ -133,6 +139,15 @@ const SensorDetailPanel = ({ sensor, crowdReport }) => {
           {crowdReport.verified_by_sensor && (
             <div className="sensor-detail-item" style={{ color: '#28a745', fontSize: '13px' }}>
               <FaCheck style={{ marginRight: '6px' }} /> Đã xác minh bởi hệ thống cảm biến
+            </div>
+          )}
+          {crowdReport.confidence != null && (
+            <div className="sensor-detail-item sensor-detail-confidence">
+              <ConfidenceBadge
+                confidence={crowdReport.confidence}
+                breakdown={crowdReport.confidence_breakdown}
+                showBreakdownToggle
+              />
             </div>
           )}
           {(() => {
@@ -251,9 +266,16 @@ const SensorDetailPanel = ({ sensor, crowdReport }) => {
         <div className="sensor-detail-item sensor-detail-location">
           <span className="sensor-detail-label"><MdLocationOn style={{ marginRight: '4px' }} /> Địa chỉ:</span>
           <span className="sensor-detail-value">
-            {sensorAddress !== null ? (sensorAddress || sensor.address || sensor.location_address || '—') : 'Đang tải địa chỉ...'}
+            {!sensorStaticAddr && sensorFetched === null && sensor.lat != null && sensor.lng != null
+              ? 'Đang tải địa chỉ...'
+              : sensorStaticAddr ||
+                sensorFetched ||
+                sensor.address ||
+                sensor.location_address ||
+                '—'}
           </span>
         </div>
+        <SensorForecastSection key={`forecast-${sensor.sensor_id}`} sensorId={sensor.sensor_id} />
       </div>
     </div>
   );

@@ -3,8 +3,6 @@ import { Marker, Popup } from 'react-map-gl/mapbox';
 import { getSensorDisplayAddress, getSensorDisplayPosition } from '../../data/sensorOverrides';
 import { fetchAddressFromCoords } from '../../utils/geocode';
 import { MdLocationOn } from 'react-icons/md';
-import './SensorMarker.css';
-
 /**
  * Marker cảm biến dùng chung: trang Map (home) và trang New Report (mini map).
  * - mode="map": click mở popup, onClick(item) cho parent.

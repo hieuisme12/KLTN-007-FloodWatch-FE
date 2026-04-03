@@ -26,4 +26,14 @@ export default defineConfig([
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
     },
   },
+  {
+    files: [
+      'src/context/ReporterRankingProvider.jsx',
+      'src/context/SidebarProvider.jsx',
+    ],
+    rules: {
+      // Cùng file: Provider + hook + context — hợp lệ; Fast Refresh chỉ khó hot-reload an toàn
+      'react-refresh/only-export-components': 'off',
+    },
+  },
 ])
