@@ -1,6 +1,76 @@
 import axios from 'axios';
 import { API_CONFIG, API_ENDPOINTS, DEFAULTS } from '../config/apiConfig';
 
+/** Khóa localStorage — access JWT (alias key cũ authToken), refresh opaque, session UUID */
+const LS_ACCESS = 'authToken';
+const LS_REFRESH = 'refreshToken';
+const LS_SESSION = 'sessionToken';
+
+/**
+ * Ghi đè token sau login / register / refresh (rotation: luôn cả access + refresh).
+ * @param {object} data — từ BE: access_token | token, refresh_token, session_token, user?
+ */
+export function persistAuthTokens(data) {
+  if (!data || typeof data !== 'object') return;
+  const access = data.access_token || data.token;
+  if (access) localStorage.setItem(LS_ACCESS, access);
+  if (data.refresh_token) localStorage.setItem(LS_REFRESH, data.refresh_token);
+  if (data.session_token) localStorage.setItem(LS_SESSION, data.session_token);
+  if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
+}
+
+export function clearAuthStorage() {
+  localStorage.removeItem(LS_ACCESS);
+  localStorage.removeItem(LS_REFRESH);
+  localStorage.removeItem(LS_SESSION);
+  localStorage.removeItem('user');
+}
+
+/** Một promise refresh dùng chung — tránh nhiều request 401 gọi refresh song song */
+let refreshPromise = null;
+
+function attemptTokenRefresh() {
+  if (refreshPromise) return refreshPromise;
+
+  const refresh = localStorage.getItem(LS_REFRESH);
+  const session = localStorage.getItem(LS_SESSION);
+
+  if (!refresh || !session) {
+    return Promise.reject(new Error('Missing refresh or session token'));
+  }
+
+  refreshPromise = axios
+    .post(`${API_CONFIG.BASE_URL}${API_ENDPOINTS.AUTH_REFRESH}`, {
+      refresh_token: refresh,
+      session_token: session
+    })
+    .then((res) => {
+      const payload = res.data;
+      if (payload?.success && payload?.data) {
+        persistAuthTokens(payload.data);
+        return payload.data;
+      }
+      throw new Error('Invalid refresh response');
+    })
+    .finally(() => {
+      refreshPromise = null;
+    });
+
+  return refreshPromise;
+}
+
+function isAuthEndpointNoRefresh(url) {
+  if (!url || typeof url !== 'string') return false;
+  return (
+    url.includes('/api/auth/login') ||
+    url.includes('/api/auth/register') ||
+    url.includes('/api/auth/verify-otp') ||
+    url.includes('/api/auth/send-otp') ||
+    url.includes('/api/auth/resend-otp') ||
+    url.includes('/api/auth/refresh')
+  );
+}
+
 // Tạo axios instance với interceptor để tự động thêm token
 const apiClient = axios.create({
   baseURL: API_CONFIG.BASE_URL
@@ -9,7 +79,7 @@ const apiClient = axios.create({
 // Interceptor: Tự động thêm token vào header cho mọi request
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('authToken');
+    const token = localStorage.getItem(LS_ACCESS);
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -20,20 +90,43 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Interceptor: Xử lý lỗi 401 (token hết hạn) - tự động logout
+// Interceptor: 401 → refresh (một lần) → retry; refresh/login/register path không retry refresh
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      // Token hết hạn hoặc không hợp lệ
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('user');
-      // Redirect to login nếu cần
+  async (error) => {
+    const { response, config } = error;
+    if (!response || response.status !== 401 || !config) {
+      return Promise.reject(error);
+    }
+
+    if (isAuthEndpointNoRefresh(config.url || '')) {
+      return Promise.reject(error);
+    }
+
+    if (config._authRetry) {
+      clearAuthStorage();
       if (window.location.pathname !== '/login') {
         window.location.href = '/login';
       }
+      return Promise.reject(error);
     }
-    return Promise.reject(error);
+
+    try {
+      await attemptTokenRefresh();
+      config._authRetry = true;
+      const access = localStorage.getItem(LS_ACCESS);
+      config.headers = config.headers || {};
+      if (access) {
+        config.headers.Authorization = `Bearer ${access}`;
+      }
+      return apiClient(config);
+    } catch {
+      clearAuthStorage();
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+      return Promise.reject(error);
+    }
   }
 );
 
@@ -64,6 +157,7 @@ const normalizeFloodData = (data, isRealtimeEndpoint = false) => {
     return {
       sensor_id: item.sensor_id,
       location_name: item.location_name || 'Vị trí không xác định',
+      address: item.address || item.location_address || null,
       model: item.model || 'N/A',
       sensor_status: item.sensor_status || status,
       water_level: waterLevel,
@@ -74,60 +168,62 @@ const normalizeFloodData = (data, isRealtimeEndpoint = false) => {
       warning_threshold: warningThreshold,
       danger_threshold: dangerThreshold,
       last_data_time: item.last_data_time || item.created_at,
-      created_at: item.created_at || new Date().toISOString()
+      created_at: item.created_at || new Date().toISOString(),
+      temperature: item.temperature ?? null,
+      humidity: item.humidity ?? null
     };
   });
 };
 
-// Fetch dữ liệu flood với fallback endpoint
+// Fetch dữ liệu flood: ưu tiên /api/flood-data/realtime (có temperature, humidity), fallback nếu 404
 export const fetchFloodData = async (endpointRef) => {
+  const base = API_CONFIG.BASE_URL.replace(/\/$/, '');
+  const tryRealtime = (url) =>
+    axios.get(`${url}?t=${Date.now()}`, { validateStatus: (s) => s < 500 });
+
   try {
     let response;
     let isRealtimeEndpoint = false;
 
-    // Nếu chưa xác định endpoint nào hoạt động, thử endpoint mới trước
     if (endpointRef.current === null) {
       try {
-        // Thử endpoint mới với validateStatus để không throw 404
-        response = await axios.get(`${API_CONFIG.BASE_URL}${API_ENDPOINTS.FLOOD_DATA_REALTIME}?t=${Date.now()}`, {
-          validateStatus: (status) => status < 500 // Chỉ throw nếu >= 500
-        });
-        
-        // Kiểm tra status code
-        if (response.status === 404) {
-          // Endpoint không tồn tại, fallback
-          endpointRef.current = 'fallback';
-          isRealtimeEndpoint = false;
-          // Gọi endpoint cũ
-          response = await axios.get(`${API_CONFIG.BASE_URL}${API_ENDPOINTS.FLOOD_DATA}?t=${Date.now()}`);
-        } else if (response.status === 200) {
-          // Endpoint tồn tại
+        response = await tryRealtime(base + API_ENDPOINTS.FLOOD_DATA_REALTIME);
+        if (response.status === 200) {
           endpointRef.current = 'realtime';
           isRealtimeEndpoint = true;
+        } else if (response.status === 404) {
+          response = await tryRealtime(base + API_ENDPOINTS.FLOOD_DATA_REALTIME_V1);
+          if (response.status === 200) {
+            endpointRef.current = 'realtime_v1';
+            isRealtimeEndpoint = true;
+          } else {
+            endpointRef.current = 'fallback';
+            response = await axios.get(`${base}${API_ENDPOINTS.FLOOD_DATA}?t=${Date.now()}`);
+          }
+        } else {
+          endpointRef.current = 'fallback';
+          response = await axios.get(`${base}${API_ENDPOINTS.FLOOD_DATA}?t=${Date.now()}`);
         }
       } catch {
         endpointRef.current = 'fallback';
-        isRealtimeEndpoint = false;
-        // Gọi endpoint cũ
-        response = await axios.get(`${API_CONFIG.BASE_URL}${API_ENDPOINTS.FLOOD_DATA}?t=${Date.now()}`);
+        response = await axios.get(`${base}${API_ENDPOINTS.FLOOD_DATA}?t=${Date.now()}`);
       }
     } else {
-      // Sử dụng endpoint đã xác định
-      if (endpointRef.current === 'realtime') {
-        response = await axios.get(`${API_CONFIG.BASE_URL}${API_ENDPOINTS.FLOOD_DATA_REALTIME}?t=${Date.now()}`);
-        isRealtimeEndpoint = true;
-      } else {
-        response = await axios.get(`${API_CONFIG.BASE_URL}${API_ENDPOINTS.FLOOD_DATA}?t=${Date.now()}`);
-        isRealtimeEndpoint = false;
-      }
+      const url =
+        endpointRef.current === 'realtime'
+          ? base + API_ENDPOINTS.FLOOD_DATA_REALTIME
+          : endpointRef.current === 'realtime_v1'
+            ? base + API_ENDPOINTS.FLOOD_DATA_REALTIME_V1
+            : base + API_ENDPOINTS.FLOOD_DATA;
+      isRealtimeEndpoint = endpointRef.current === 'realtime' || endpointRef.current === 'realtime_v1';
+      response = await axios.get(`${url}?t=${Date.now()}`);
     }
-    
-    if (response.data && response.data.success && response.data.data) {
+
+    if (response.data && response.data.success && Array.isArray(response.data.data)) {
       const normalizedData = normalizeFloodData(response.data.data, isRealtimeEndpoint);
       return { success: true, data: normalizedData };
-    } else {
-      return { success: false, data: [] };
     }
+    return { success: false, data: [] };
   } catch (error) {
     return { success: false, data: null, error };
   }
@@ -135,40 +231,74 @@ export const fetchFloodData = async (endpointRef) => {
 
 // ==================== CROWDSOURCING APIs ====================
 
-// Gửi báo cáo ngập từ người dùng
+/**
+ * Upload ảnh báo cáo. BE trả { success, url, filename }. url dạng /uploads/xxx.jpg → ghép BASE_URL làm photo_url.
+ * multipart/form-data, field name: image
+ */
+export const uploadReportImage = async (file) => {
+  try {
+    const formData = new FormData();
+    formData.append('image', file);
+    const response = await apiClient.post(API_ENDPOINTS.UPLOAD_REPORT_IMAGE, formData);
+    if (response.data && response.data.success && response.data.url) {
+      const base = API_CONFIG.BASE_URL.replace(/\/$/, '');
+      const photoUrl = response.data.url.startsWith('http') ? response.data.url : base + (response.data.url.startsWith('/') ? response.data.url : '/' + response.data.url);
+      return { success: true, photo_url: photoUrl };
+    }
+    return { success: false, error: response.data?.error || 'Upload thất bại' };
+  } catch (err) {
+    const msg = err.response?.data?.error || err.response?.data?.message || err.message;
+    return { success: false, error: msg || 'Tải ảnh lên thất bại' };
+  }
+};
+
+// Gửi báo cáo ngập. BE: 400 khi không có sensor trong 500m → error "Hiện tại khu vực chưa có máy đo, không thể xác thực"
+function parseRetryAfterSeconds(error) {
+  const h = error.response?.headers;
+  const raw = h?.['retry-after'] ?? h?.['Retry-After'];
+  if (raw == null || raw === '') return null;
+  const n = parseInt(String(raw), 10);
+  return Number.isFinite(n) ? n : null;
+}
+
 export const submitFloodReport = async (reportData) => {
   try {
-    const response = await axios.post(`${API_CONFIG.BASE_URL}${API_ENDPOINTS.REPORT_FLOOD}`, reportData);
-    
+    const response = await apiClient.post(API_ENDPOINTS.REPORT_FLOOD, reportData);
     if (response.data && response.data.success) {
-      return { 
-        success: true, 
+      return {
+        success: true,
         data: response.data.data || null,
         message: response.data.message || 'Báo cáo đã được gửi thành công'
       };
-    } else {
-      return { 
-        success: false, 
-        error: response.data?.error || 'Có lỗi xảy ra' 
-      };
     }
+    return {
+      success: false,
+      error: response.data?.error || 'Có lỗi xảy ra'
+    };
   } catch (error) {
-    if (error.response) {
-      return { 
-        success: false, 
-        error: error.response.data?.error || 'Có lỗi xảy ra' 
-      };
-    } else if (error.request) {
-      return { 
-        success: false, 
-        error: 'Không thể kết nối đến server' 
-      };
-    } else {
-      return { 
-        success: false, 
-        error: error.message || 'Có lỗi xảy ra' 
+    const status = error.response?.status;
+    const errMsg = error.response?.data?.error || error.response?.data?.message;
+    if (status === 400 && errMsg) {
+      return { success: false, error: errMsg };
+    }
+    if (status === 429) {
+      const retryAfterSec = parseRetryAfterSeconds(error);
+      let msg =
+        errMsg ||
+        (retryAfterSec != null
+          ? `Bạn gửi quá nhiều báo cáo. Vui lòng thử lại sau khoảng ${Math.max(1, Math.ceil(retryAfterSec / 60))} phút.`
+          : 'Bạn gửi quá nhiều báo cáo. Vui lòng thử lại sau.');
+      return {
+        success: false,
+        error: msg,
+        status: 429,
+        retryAfterSeconds: retryAfterSec
       };
     }
+    return {
+      success: false,
+      error: errMsg || (error.request ? 'Không thể kết nối đến server' : error.message || 'Có lỗi xảy ra')
+    };
   }
 };
 
@@ -196,6 +326,126 @@ export const fetchCrowdReports = async (params = {}) => {
       success: false, 
       data: [], 
       error: error.response?.data || error.message
+    };
+  }
+};
+
+const normalizeFusionCrowdPoint = (p) => {
+  if (!p || typeof p !== 'object') return null;
+  const lat = p.lat ?? p.latitude;
+  const lng = p.lng ?? p.longitude;
+  if (lat == null || lng == null) return null;
+  return {
+    ...p,
+    lat: Number(lat),
+    lng: Number(lng),
+    crowd_only_cm: p.crowd_only_cm != null ? Number(p.crowd_only_cm) : null,
+    fused_cm: p.fused_cm != null ? Number(p.fused_cm) : null,
+    coverage: p.coverage,
+    nearest_sensor: p.nearest_sensor ?? p.nearestSensor,
+    weights: p.weights
+  };
+};
+
+/**
+ * Điểm trộn sensor–crowd (public). Query: crowd_hours, sensor_hours, include_sensors, bbox min_lng…
+ */
+export const fetchFusionPoints = async (params = {}) => {
+  try {
+    const defaults = {
+      crowd_hours: 24,
+      sensor_hours: 1,
+      include_sensors: 'false'
+    };
+    const merged = { ...defaults, ...params };
+    const usp = new URLSearchParams();
+    Object.entries(merged).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') usp.set(k, String(v));
+    });
+    const url = `${API_CONFIG.BASE_URL}${API_ENDPOINTS.FUSION_POINTS}?${usp}`;
+    const response = await axios.get(url, { timeout: API_CONFIG.TIMEOUT });
+    if (response.data && response.data.success) {
+      const raw = response.data.data || {};
+      const crowdRaw = Array.isArray(raw.crowd) ? raw.crowd : [];
+      const crowd = crowdRaw.map(normalizeFusionCrowdPoint).filter(Boolean);
+      const sensors = Array.isArray(raw.sensors) ? raw.sensors : [];
+      return {
+        success: true,
+        data: { ...raw, crowd, sensors }
+      };
+    }
+    return {
+      success: false,
+      data: { crowd: [], sensors: [] },
+      error: response.data?.error || response.data?.message
+    };
+  } catch (error) {
+    const err = error.response?.data?.error || error.response?.data?.message;
+    return {
+      success: false,
+      data: { crowd: [], sensors: [] },
+      error: err || error.message
+    };
+  }
+};
+
+/**
+ * Dự báo ngắn hạn theo trạm (public). Query: horizon (phút), sample_minutes
+ */
+export const fetchForecastForSensor = async (sensorId, params = {}) => {
+  try {
+    const path = API_ENDPOINTS.FORECAST_SENSOR.replace(':sensorId', encodeURIComponent(sensorId));
+    const merged = { horizon: 60, sample_minutes: 90, ...params };
+    const usp = new URLSearchParams();
+    Object.entries(merged).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') usp.set(k, String(v));
+    });
+    const url = `${API_CONFIG.BASE_URL}${path}?${usp}`;
+    const response = await axios.get(url, { timeout: API_CONFIG.TIMEOUT });
+    if (response.data && response.data.success) {
+      return { success: true, data: response.data.data || null };
+    }
+    return {
+      success: false,
+      data: null,
+      error: response.data?.error || response.data?.message
+    };
+  } catch (error) {
+    const status = error.response?.status;
+    return {
+      success: false,
+      data: null,
+      status,
+      error: error.response?.data?.error || error.response?.data?.message || error.message
+    };
+  }
+};
+
+/**
+ * Thời tiết TP.HCM (Open-Meteo qua BE). Query: forecast_days, lat, lon
+ */
+export const fetchWeatherHcm = async (params = {}) => {
+  try {
+    const merged = { forecast_days: 3, ...params };
+    const usp = new URLSearchParams();
+    Object.entries(merged).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') usp.set(k, String(v));
+    });
+    const url = `${API_CONFIG.BASE_URL}${API_ENDPOINTS.WEATHER_HCM}?${usp}`;
+    const response = await axios.get(url, { timeout: 20000 });
+    if (response.data && response.data.success) {
+      return { success: true, data: response.data.data || null };
+    }
+    return {
+      success: false,
+      data: null,
+      error: response.data?.error || response.data?.message
+    };
+  } catch (error) {
+    return {
+      success: false,
+      data: null,
+      error: error.response?.data?.error || error.response?.data?.message || error.message
     };
   }
 };
@@ -235,52 +485,194 @@ export const login = async (username, password) => {
       username,
       password
     });
-    
+
     if (response.data && response.data.success) {
-      // Lưu thông tin user và token vào localStorage
-      if (response.data.data.user) {
-        localStorage.setItem('user', JSON.stringify(response.data.data.user));
-      }
-      if (response.data.data.token) {
-        localStorage.setItem('authToken', response.data.data.token);
-      }
-      return { 
-        success: true, 
-        data: response.data.data 
-      };
-    } else {
-      return { 
-        success: false, 
-        error: response.data.error || 'Đăng nhập thất bại' 
+      persistAuthTokens(response.data.data);
+      return {
+        success: true,
+        data: response.data.data
       };
     }
+    return {
+      success: false,
+      error: response.data?.error || 'Đăng nhập thất bại'
+    };
   } catch (error) {
-    return { 
-      success: false, 
-      error: error.response?.data?.error || error.message
+    const status = error.response?.status;
+    const data = error.response?.data;
+    if (status === 403) {
+      return {
+        success: false,
+        needsEmailVerification: true,
+        error:
+          data?.error ||
+          'Vui lòng xác minh email (mã OTP) trước khi đăng nhập'
+      };
+    }
+    if (status === 401) {
+      return {
+        success: false,
+        error: data?.error || 'Sai tên đăng nhập hoặc mật khẩu'
+      };
+    }
+    return {
+      success: false,
+      error: data?.error || error.message
     };
   }
 };
 
+/**
+ * Đăng ký — BE 201 chỉ trả user, không JWT. Sau đó FE chuyển bước verify-otp.
+ */
 export const register = async (userData) => {
   try {
-    const response = await axios.post(`${API_CONFIG.BASE_URL}${API_ENDPOINTS.AUTH_REGISTER}`, userData);
-    
-    if (response.data && response.data.success) {
-      return { 
-        success: true, 
-        data: response.data.data 
-      };
-    } else {
-      return { 
-        success: false, 
-        error: response.data.error || 'Đăng ký thất bại' 
+    const payload = {
+      ...userData,
+      email:
+        typeof userData.email === 'string'
+          ? userData.email.trim().toLowerCase()
+          : userData.email
+    };
+    const response = await axios.post(
+      `${API_CONFIG.BASE_URL}${API_ENDPOINTS.AUTH_REGISTER}`,
+      payload
+    );
+
+    if (response.data?.success && response.data?.data) {
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
       };
     }
+    return {
+      success: false,
+      error: response.data?.error || 'Đăng ký thất bại'
+    };
   } catch (error) {
-    return { 
-      success: false, 
-      error: error.response?.data?.error || error.message
+    const data = error.response?.data;
+    return {
+      success: false,
+      error: data?.error || data?.message || error.message
+    };
+  }
+};
+
+/**
+ * Xác minh OTP sau đăng ký (hoặc purpose khác do BE trả về).
+ */
+export const verifyOtp = async (email, otpCode) => {
+  try {
+    const response = await axios.post(
+      `${API_CONFIG.BASE_URL}${API_ENDPOINTS.AUTH_VERIFY_OTP}`,
+      {
+        email: String(email).trim().toLowerCase(),
+        otp_code: String(otpCode).trim()
+      }
+    );
+
+    if (response.data?.success && response.data?.data) {
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    }
+    return {
+      success: false,
+      error: response.data?.error || 'Xác minh thất bại'
+    };
+  } catch (error) {
+    const data = error.response?.data;
+    return {
+      success: false,
+      error: data?.error || error.message
+    };
+  }
+};
+
+/** Gửi OTP lần đầu (email đã tồn tại trong hệ thống). */
+export const sendOtp = async (email) => {
+  try {
+    const response = await axios.post(
+      `${API_CONFIG.BASE_URL}${API_ENDPOINTS.AUTH_SEND_OTP}`,
+      { email: String(email).trim().toLowerCase() }
+    );
+
+    if (response.data?.success) {
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    }
+    return {
+      success: false,
+      error: response.data?.error || 'Không gửi được mã OTP'
+    };
+  } catch (error) {
+    const data = error.response?.data;
+    return {
+      success: false,
+      error: data?.error || error.message
+    };
+  }
+};
+
+/** Gửi lại OTP (cùng logic giới hạn với send-otp). */
+export const resendOtp = async (email) => {
+  try {
+    const response = await axios.post(
+      `${API_CONFIG.BASE_URL}${API_ENDPOINTS.AUTH_RESEND_OTP}`,
+      { email: String(email).trim().toLowerCase() }
+    );
+
+    if (response.data?.success) {
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    }
+    return {
+      success: false,
+      error: response.data?.error || 'Không gửi lại được mã OTP'
+    };
+  } catch (error) {
+    const data = error.response?.data;
+    return {
+      success: false,
+      error: data?.error || error.message
+    };
+  }
+};
+
+/**
+ * Gửi tọa độ hiện tại lên BE (sau khi có quyền Geolocation). Cần Bearer JWT.
+ * Body: { lat, lng, accuracy_m? }
+ */
+export const postAuthLocation = async ({ lat, lng, accuracy_m }) => {
+  try {
+    const body = {
+      lat: Number(lat),
+      lng: Number(lng)
+    };
+    if (accuracy_m != null && !Number.isNaN(Number(accuracy_m))) {
+      body.accuracy_m = Number(accuracy_m);
+    }
+    const response = await apiClient.post(API_ENDPOINTS.AUTH_LOCATION, body);
+    if (response.data && response.data.success) {
+      return { success: true, data: response.data.data };
+    }
+    return {
+      success: false,
+      error: response.data?.error || response.data?.message || 'Không lưu được vị trí'
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.response?.data?.error || error.response?.data?.message || error.message
     };
   }
 };
@@ -312,14 +704,34 @@ export const getProfile = async () => {
   }
 };
 
+/**
+ * Lấy danh sách icon ảnh đại diện có sẵn (cần đăng nhập).
+ * @returns {{ success: boolean, data?: Array<{ name: string, url: string }>, error?: string }}
+ */
+export const getProfileIcons = async () => {
+  try {
+    const response = await apiClient.get(API_ENDPOINTS.AUTH_PROFILE_ICONS);
+    if (response.data && response.data.success && Array.isArray(response.data.data)) {
+      return { success: true, data: response.data.data };
+    }
+    return { success: false, error: response.data?.error || 'Không thể tải danh sách ảnh đại diện' };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.response?.data?.error || error.message
+    };
+  }
+};
+
 export const updateProfile = async (profileData) => {
   try {
     const response = await apiClient.put(API_ENDPOINTS.AUTH_PROFILE, profileData);
     
     if (response.data && response.data.success) {
-      // Cập nhật thông tin user trong localStorage
+      // Cập nhật thông tin user trong localStorage và báo cho UI (sidebar, header) cập nhật realtime
       if (response.data.data) {
         localStorage.setItem('user', JSON.stringify(response.data.data));
+        window.dispatchEvent(new CustomEvent('user-updated'));
       }
       return { 
         success: true, 
@@ -348,9 +760,12 @@ export const changePassword = async (oldPassword, newPassword) => {
     });
     
     if (response.data && response.data.success) {
+      // BE revoke toàn bộ phiên — xóa token, bắt đăng nhập lại
+      clearAuthStorage();
       return { 
         success: true, 
-        message: response.data.message || 'Đổi mật khẩu thành công'
+        message: response.data.message || 'Đổi mật khẩu thành công',
+        requiresReLogin: true
       };
     } else {
       return { 
@@ -366,10 +781,16 @@ export const changePassword = async (oldPassword, newPassword) => {
   }
 };
 
-export const logout = () => {
-  // Xóa thông tin user và token khỏi localStorage
-  localStorage.removeItem('user');
-  localStorage.removeItem('authToken');
+export const logout = async () => {
+  const token = localStorage.getItem(LS_ACCESS);
+  if (token) {
+    try {
+      await apiClient.post(API_ENDPOINTS.AUTH_LOGOUT);
+    } catch {
+      // Vẫn xóa local dù BE lỗi / 401
+    }
+  }
+  clearAuthStorage();
 };
 
 // Re-export auth helpers from utils/auth.js for backward compatibility
@@ -549,6 +970,34 @@ export const deleteSensor = async (sensorId) => {
 // ==================== REPORT MODERATION APIs (Moderator/Admin) ====================
 
 /**
+ * Danh sách toàn bộ báo cáo (admin/moderator). GET /api/reports/all
+ * Response items có thể gồm confidence, confidence_breakdown.
+ */
+export const fetchAllReportsAdmin = async (params = {}) => {
+  try {
+    const queryParams = { limit: 500, ...params };
+    const queryString = new URLSearchParams(
+      Object.fromEntries(Object.entries(queryParams).filter(([, v]) => v != null && v !== ''))
+    ).toString();
+    const response = await apiClient.get(`${API_ENDPOINTS.REPORTS_ALL}?${queryString}`);
+    if (response.data && response.data.success) {
+      return { success: true, data: response.data.data || [] };
+    }
+    return {
+      success: false,
+      data: [],
+      error: response.data?.error || response.data?.message
+    };
+  } catch (error) {
+    return {
+      success: false,
+      data: [],
+      error: error.response?.data?.error || error.response?.data?.message || error.message
+    };
+  }
+};
+
+/**
  * Lấy báo cáo cần kiểm duyệt
  */
 export const fetchPendingReports = async (limit = 50) => {
@@ -601,7 +1050,7 @@ export const moderateReport = async (reportId, action, rejectionReason = null) =
 };
 
 /**
- * Lấy xếp hạng tin cậy
+ * Lấy xếp hạng tin cậy reporter (moderator/admin)
  */
 export const fetchReliabilityRanking = async (limit = 100) => {
   try {
@@ -612,9 +1061,202 @@ export const fetchReliabilityRanking = async (limit = 100) => {
     }
     return { success: false, data: [] };
   } catch (error) {
-    return { 
-      success: false, 
+    return {
+      success: false,
       data: [],
+      error: error.response?.data?.error || error.message
+    };
+  }
+};
+
+/**
+ * Gửi đánh giá báo cáo (rating 1-5). Cần đăng nhập.
+ * POST /api/report-evaluations/:reportId
+ */
+export const submitReportEvaluation = async (reportId, rating, comment = null) => {
+  try {
+    const endpoint = API_ENDPOINTS.REPORT_EVALUATIONS.replace(':reportId', reportId);
+    const body = { rating: Number(rating) };
+    if (comment != null && String(comment).trim()) body.comment = String(comment).trim();
+    const response = await apiClient.post(endpoint, body);
+    if (response.data && response.data.success) {
+      return { success: true, data: response.data.data, message: response.data.message || 'Đánh giá thành công' };
+    }
+    return { success: false, error: response.data?.error || 'Gửi đánh giá thất bại' };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.response?.data?.error || error.message
+    };
+  }
+};
+
+/**
+ * Lấy danh sách đánh giá của một báo cáo (để kiểm tra user hiện tại đã đánh giá chưa).
+ * GET /api/report-evaluations/:reportId
+ */
+export const getReportEvaluations = async (reportId) => {
+  try {
+    const endpoint = API_ENDPOINTS.REPORT_EVALUATIONS.replace(':reportId', reportId);
+    const response = await apiClient.get(endpoint);
+    if (response.data && response.data.success && Array.isArray(response.data.data)) {
+      return { success: true, data: response.data.data };
+    }
+    return { success: true, data: [] };
+  } catch {
+    return { success: false, data: [] };
+  }
+};
+
+/**
+ * Lấy điểm trung bình đánh giá của một báo cáo.
+ * GET /api/report-evaluations/:reportId/average
+ */
+export const getReportEvaluationAverage = async (reportId) => {
+  try {
+    const endpoint = API_ENDPOINTS.REPORT_EVALUATIONS_AVERAGE.replace(':reportId', reportId);
+    const response = await apiClient.get(endpoint);
+    if (response.data && response.data.success && response.data.data != null) {
+      const data = response.data.data;
+      return { success: true, average: data.average ?? data.avg_rating ?? data.rating, count: data.count ?? 0 };
+    }
+    return { success: true, average: null, count: 0 };
+  } catch {
+    return { success: false, average: null, count: 0 };
+  }
+};
+
+// ==================== STATS APIs ====================
+
+/**
+ * Lấy số user đang online – cho mọi người (admin, user, khách). Không cần đăng nhập.
+ * GET /api/stats/online-users/count
+ * Response: { success: true, data: { count: N } }
+ */
+export const getOnlineUsersCount = async () => {
+  try {
+    const response = await axios.get(`${API_CONFIG.BASE_URL}${API_ENDPOINTS.STATS_ONLINE_USERS_COUNT}`, {
+      timeout: 5000,
+      validateStatus: (status) => status === 200 || status === 404
+    });
+    if (response.status === 200 && response.data?.success && response.data.data) {
+      const count = response.data.data.count ?? 0;
+      return { success: true, count };
+    }
+    return { success: false, count: 0 };
+  } catch {
+    return { success: false, count: 0 };
+  }
+};
+
+/**
+ * Lấy lượt truy cập tháng (nếu BE có endpoint). Không cần token.
+ * GET /api/stats/monthly-visits → { success: true, data: { count: N } } hoặc tương tự
+ */
+export const getMonthlyVisitsCount = async () => {
+  try {
+    const response = await axios.get(`${API_CONFIG.BASE_URL}${API_ENDPOINTS.STATS_MONTHLY_VISITS}`, {
+      timeout: 5000,
+      validateStatus: (status) => status === 200 || status === 404
+    });
+    if (response.status === 200 && response.data?.success && response.data.data != null) {
+      const data = response.data.data;
+      const count = data.count ?? data.monthlyVisits ?? 0;
+      return { success: true, count };
+    }
+    return { success: false, count: 0 };
+  } catch {
+    return { success: false, count: 0 };
+  }
+};
+
+/**
+ * Lấy danh sách chi tiết user đang online (Admin only, cần JWT).
+ * GET /api/stats/online-users
+ * Response: { success: true, data: { online_users: [...], count: N } }
+ */
+export const getOnlineUsers = async () => {
+  try {
+    const response = await apiClient.get(API_ENDPOINTS.STATS_ONLINE_USERS, {
+      timeout: 5000,
+      validateStatus: (status) => status === 200 || status === 403
+    });
+    if (response.status === 200 && response.data?.success && response.data.data) {
+      const data = response.data.data;
+      const count = data.count ?? (Array.isArray(data.online_users) ? data.online_users.length : 0);
+      return { success: true, count, online_users: data.online_users };
+    }
+    return { success: false, count: 0, online_users: [] };
+  } catch {
+    return { success: false, count: 0, online_users: [] };
+  }
+};
+
+// ==================== RESEARCH APIs ====================
+
+const appendBboxParams = (query, bbox) => {
+  if (!bbox) return;
+  const { min_lng, max_lng, min_lat, max_lat } = bbox;
+  const hasLng = Number.isFinite(Number(min_lng)) && Number.isFinite(Number(max_lng));
+  const hasLat = Number.isFinite(Number(min_lat)) && Number.isFinite(Number(max_lat));
+  if (hasLng && hasLat) {
+    query.set('min_lng', String(min_lng));
+    query.set('max_lng', String(max_lng));
+    query.set('min_lat', String(min_lat));
+    query.set('max_lat', String(max_lat));
+  }
+};
+
+/**
+ * D1: Đánh giá định lượng baseline crowd_only vs fused.
+ * GET /api/v1/research/evaluation
+ */
+export const getResearchEvaluation = async (params = {}) => {
+  try {
+    const query = new URLSearchParams();
+    if (params.crowd_hours != null) query.set('crowd_hours', String(params.crowd_hours));
+    if (params.sensor_hours != null) query.set('sensor_hours', String(params.sensor_hours));
+    appendBboxParams(query, params.bbox);
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+
+    const response = await apiClient.get(`${API_ENDPOINTS.RESEARCH_EVALUATION}${suffix}`);
+    if (response.data?.success && response.data?.data) {
+      return { success: true, data: response.data.data, meta: response.data.meta || null };
+    }
+    return { success: false, data: null, meta: null, error: response.data?.error || 'Không tải được dữ liệu đánh giá' };
+  } catch (error) {
+    return {
+      success: false,
+      data: null,
+      meta: null,
+      error: error.response?.data?.error || error.message
+    };
+  }
+};
+
+/**
+ * D2: Hotspot thiếu cảm biến từ dữ liệu crowdsourcing.
+ * GET /api/v1/research/cold-start-hotspots
+ */
+export const getResearchColdStartHotspots = async (params = {}) => {
+  try {
+    const query = new URLSearchParams();
+    if (params.report_hours != null) query.set('report_hours', String(params.report_hours));
+    if (params.no_sensor_radius_m != null) query.set('no_sensor_radius_m', String(params.no_sensor_radius_m));
+    if (params.min_reports != null) query.set('min_reports', String(params.min_reports));
+    appendBboxParams(query, params.bbox);
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+
+    const response = await apiClient.get(`${API_ENDPOINTS.RESEARCH_COLD_START_HOTSPOTS}${suffix}`);
+    if (response.data?.success && Array.isArray(response.data?.data)) {
+      return { success: true, data: response.data.data, meta: response.data.meta || null };
+    }
+    return { success: true, data: [], meta: response.data?.meta || null };
+  } catch (error) {
+    return {
+      success: false,
+      data: [],
+      meta: null,
       error: error.response?.data?.error || error.message
     };
   }
@@ -962,13 +1604,202 @@ export const fetchCombinedHeatmap = async (params) => {
     const response = await axios.get(`${API_CONFIG.BASE_URL}${API_ENDPOINTS.HEATMAP_COMBINED}?${queryString}`);
     
     if (response.data && response.data.success) {
-      return { success: true, data: response.data.data || [] };
+      const raw = response.data.data;
+      const rows = Array.isArray(raw) ? raw : raw?.points || raw?.features || [];
+      return { success: true, data: rows };
     }
     return { success: false, data: [] };
   } catch (error) {
     return { 
       success: false, 
       data: [],
+      error: error.response?.data?.error || error.message
+    };
+  }
+};
+
+/**
+ * C2: Chuỗi theo giờ 24h gần nhất (sensor + crowd đã duyệt). Public.
+ */
+export const fetchHeatmapTimeline24h = async (params = {}) => {
+  try {
+    const usp = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') usp.set(k, String(v));
+    });
+    const qs = usp.toString();
+    const url = `${API_CONFIG.BASE_URL}${API_ENDPOINTS.HEATMAP_TIMELINE_24H}${qs ? `?${qs}` : ''}`;
+    const response = await axios.get(url, { timeout: API_CONFIG.TIMEOUT });
+    if (response.data?.success) {
+      const raw = response.data.data;
+      const series = Array.isArray(raw) ? raw : raw?.series || raw?.hours || raw?.timeline || [];
+      return { success: true, data: series, meta: response.data.meta || null };
+    }
+    return {
+      success: false,
+      data: [],
+      meta: null,
+      error: response.data?.error || response.data?.message
+    };
+  } catch (error) {
+    return {
+      success: false,
+      data: [],
+      meta: null,
+      error: error.response?.data?.error || error.message
+    };
+  }
+};
+
+// ==================== ROUTING (AMC-A*) ====================
+
+/**
+ * User: tìm đường an toàn theo AMC-A*.
+ * GET /api/v1/routing/safe-path
+ */
+export const fetchSafePath = async (params) => {
+  try {
+    const required = ['start_lng', 'start_lat', 'end_lng', 'end_lat'];
+    for (const key of required) {
+      if (params?.[key] == null || params?.[key] === '') {
+        return { success: false, data: null, error: `Thiếu tham số ${key}` };
+      }
+    }
+    const query = new URLSearchParams();
+    query.set('start_lng', String(params.start_lng));
+    query.set('start_lat', String(params.start_lat));
+    query.set('end_lng', String(params.end_lng));
+    query.set('end_lat', String(params.end_lat));
+    if (params.vehicle_type) query.set('vehicle_type', String(params.vehicle_type));
+    if (params.nearest_node_max_m != null) query.set('nearest_node_max_m', String(params.nearest_node_max_m));
+    const url = `${API_CONFIG.BASE_URL}${API_ENDPOINTS.ROUTING_SAFE_PATH}?${query.toString()}`;
+    const response = await axios.get(url, {
+      timeout: Math.max(15000, API_CONFIG.TIMEOUT),
+      validateStatus: (s) => s >= 200 && s < 500
+    });
+    if (response.status >= 200 && response.status < 300 && response.data?.success) {
+      return { success: true, data: response.data.data ?? response.data, status: response.status };
+    }
+    return {
+      success: false,
+      data: response.data?.data ?? null,
+      status: response.status,
+      error: response.data?.error || response.data?.message || 'Không tìm được đường an toàn'
+    };
+  } catch (error) {
+    return {
+      success: false,
+      data: null,
+      status: error.response?.status,
+      error: error.response?.data?.error || error.response?.data?.message || error.message
+    };
+  }
+};
+
+// ==================== ADMIN OPS (JWT admin) ====================
+
+/**
+ * B1: Sức khỏe thiết bị theo flood_logs / energy_logs.
+ */
+export const fetchAdminDevicesHealth = async (params = {}) => {
+  try {
+    const usp = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') usp.set(k, String(v));
+    });
+    const qs = usp.toString();
+    const response = await apiClient.get(
+      `${API_ENDPOINTS.ADMIN_DEVICES_HEALTH}${qs ? `?${qs}` : ''}`,
+      { validateStatus: (s) => s === 200 || s === 403 }
+    );
+    if (response.status === 200 && response.data?.success) {
+      return { success: true, data: response.data.data ?? response.data };
+    }
+    return {
+      success: false,
+      data: null,
+      error: response.data?.error || (response.status === 403 ? 'Cần quyền quản trị viên' : 'Không tải được dữ liệu')
+    };
+  } catch (error) {
+    return {
+      success: false,
+      data: null,
+      error: error.response?.data?.error || error.message
+    };
+  }
+};
+
+/**
+ * C1 (admin): Thống kê gửi cảnh báo đa kênh. Query: hours (1–168).
+ */
+export const fetchAdminEmergencyAlertsSummary = async (hours = 24) => {
+  try {
+    const h = Math.min(168, Math.max(1, Number(hours) || 24));
+    const response = await apiClient.get(
+      `${API_ENDPOINTS.ADMIN_EMERGENCY_ALERTS_SUMMARY}?hours=${h}`,
+      { validateStatus: (s) => s === 200 || s === 403 }
+    );
+    if (response.status === 200 && response.data?.success) {
+      return { success: true, data: response.data.data ?? response.data, hours: h };
+    }
+    return {
+      success: false,
+      data: null,
+      error: response.data?.error || (response.status === 403 ? 'Cần quyền quản trị viên' : 'Không tải được thống kê')
+    };
+  } catch (error) {
+    return {
+      success: false,
+      data: null,
+      error: error.response?.data?.error || error.message
+    };
+  }
+};
+
+// ==================== TELEGRAM (user JWT) ====================
+
+/** POST — trả deep_link để mở bot */
+export const postTelegramLink = async () => {
+  try {
+    const response = await apiClient.post(API_ENDPOINTS.AUTH_TELEGRAM_LINK, {});
+    if (response.data?.success && response.data?.data) {
+      return { success: true, data: response.data.data };
+    }
+    return { success: false, error: response.data?.error || 'Không tạo được liên kết Telegram' };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.response?.data?.error || error.response?.data?.message || error.message
+    };
+  }
+};
+
+export const getTelegramLinkStatus = async () => {
+  try {
+    const response = await apiClient.get(API_ENDPOINTS.AUTH_TELEGRAM_STATUS);
+    if (response.data?.success) {
+      return { success: true, data: response.data.data ?? {} };
+    }
+    return { success: false, data: null, error: response.data?.error };
+  } catch (error) {
+    return {
+      success: false,
+      data: null,
+      error: error.response?.data?.error || error.message
+    };
+  }
+};
+
+export const deleteTelegramUnlink = async () => {
+  try {
+    const response = await apiClient.delete(API_ENDPOINTS.AUTH_TELEGRAM_UNLINK);
+    if (response.data?.success) {
+      return { success: true, message: response.data.message };
+    }
+    return { success: false, error: response.data?.error || 'Gỡ liên kết thất bại' };
+  } catch (error) {
+    return {
+      success: false,
       error: error.response?.data?.error || error.message
     };
   }

@@ -74,6 +74,11 @@ const AlertPanel = ({ floodData }) => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <WiFlood /> Mực nước: <strong style={{ color: color }}>{alert.water_level.toFixed(1)} cm</strong>
                 </div>
+                <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+                  Nhiệt độ: {alert.temperature != null ? `${alert.temperature.toFixed(1)} °C` : '—'}
+                  {' · '}
+                  Độ ẩm: {alert.humidity != null ? `${alert.humidity.toFixed(0)} %` : '—'}
+                </div>
                 <div style={{ fontSize: '11px', color: '#999', marginTop: '4px' }}>
                   {new Date(alert.last_data_time || alert.created_at).toLocaleString('vi-VN')}
                 </div>

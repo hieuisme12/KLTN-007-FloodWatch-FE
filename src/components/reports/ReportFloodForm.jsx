@@ -1,47 +1,24 @@
-import React, { useState, Fragment } from 'react';
+import React, { useState, useEffect, Fragment } from 'react';
 import { Combobox, Transition } from '@headlessui/react';
 import { CheckIcon } from '@heroicons/react/20/solid';
 import { ChevronUpDownIcon } from '@heroicons/react/20/solid';
-import { MapContainer, TileLayer, useMapEvents, Marker } from 'react-leaflet';
+import Map, { Marker } from 'react-map-gl/mapbox';
+import 'mapbox-gl/dist/mapbox-gl.css';
 import { FaPenToSquare, FaCheck, FaXmark, FaClock, FaPaperPlane, FaXmark as FaClose } from 'react-icons/fa6';
 import { submitFloodReport } from '../../services/api';
+import ErrorToast from '../common/ErrorToast';
+import { isAuthenticated, getCurrentUser } from '../../utils/auth';
 import { DEFAULT_CENTER, DEFAULT_ZOOM } from '../../utils/constants';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
 
-// Icon cho vị trí đã chọn
-const createLocationIcon = () => {
-  return L.divIcon({
-    html: `
-      <div style="
-        background-color: #007bff;
-        width: 20px;
-        height: 20px;
-        border-radius: 50%;
-        border: 3px solid white;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-      "></div>
-    `,
-    className: 'location-marker',
-    iconSize: [20, 20],
-    iconAnchor: [10, 10],
-  });
-};
-
-// Component để lắng nghe click trên map
-const MapClickHandler = ({ onLocationSelect  }) => {
-  useMapEvents({
-    click: (e) => {
-      onLocationSelect(e.latlng.lng, e.latlng.lat);
-    },
-  });
-  return null;
-};
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
+const defaultLng = DEFAULT_CENTER[1];
+const defaultLat = DEFAULT_CENTER[0];
 
 const ReportFloodForm = ({ onSuccess, onClose }) => {
+  const authenticated = isAuthenticated();
+  const currentUser = getCurrentUser();
   const [formData, setFormData] = useState({
     name: '',
-    reporter_id: null, // Có thể lấy từ user context sau
     level: '',
     lng: null,
     lat: null,
@@ -50,6 +27,18 @@ const ReportFloodForm = ({ onSuccess, onClose }) => {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  /** B3: chống spam sau 429 hoặc sau mỗi lần gửi thành công */
+  const [cooldownUntil, setCooldownUntil] = useState(0);
+  const [, setCooldownPulse] = useState(0);
+
+  useEffect(() => {
+    if (!cooldownUntil || Date.now() >= cooldownUntil) return undefined;
+    const t = setInterval(() => setCooldownPulse((x) => x + 1), 1000);
+    return () => clearInterval(t);
+  }, [cooldownUntil]);
+
+  const cooldownSecondsLeft =
+    cooldownUntil > Date.now() ? Math.ceil((cooldownUntil - Date.now()) / 1000) : 0;
   
   // Flood level options for Combobox
   const floodLevelOptions = [
@@ -77,9 +66,9 @@ const ReportFloodForm = ({ onSuccess, onClose }) => {
     setError(null);
     setResult(null);
 
-    // Validation
-    if (!formData.name || formData.name.trim().length < 2) {
-      setError('Tên phải có ít nhất 2 ký tự');
+    // Khách (không đăng nhập) bắt buộc nhập tên; user đăng nhập không gửi name (BE lấy từ tài khoản)
+    if (!authenticated && (!formData.name || formData.name.trim().length < 2)) {
+      setError('Vui lòng nhập tên của bạn (ít nhất 2 ký tự) hoặc đăng nhập để dùng tên tài khoản.');
       return;
     }
 
@@ -93,13 +82,27 @@ const ReportFloodForm = ({ onSuccess, onClose }) => {
       return;
     }
 
+    if (cooldownSecondsLeft > 0) {
+      setError(`Vui lòng đợi thêm ${cooldownSecondsLeft} giây trước khi gửi lại.`);
+      return;
+    }
+
     setLoading(true);
     try {
-      const response = await submitFloodReport(formData);
-      
+      // User đăng nhập: không gửi name (backend lấy full_name hoặc username từ token)
+      const payload = {
+        level: formData.level,
+        lng: formData.lng,
+        lat: formData.lat,
+        ...(formData.location_description && { location_description: formData.location_description })
+      };
+      if (!authenticated) {
+        payload.name = formData.name.trim();
+      }
+      const response = await submitFloodReport(payload);
+
       if (response.success) {
         setResult(response);
-        // Reset form
         setFormData({
           name: '',
           level: '',
@@ -107,13 +110,32 @@ const ReportFloodForm = ({ onSuccess, onClose }) => {
           lat: null,
           location_description: null
         });
-        
+        setCooldownUntil(Date.now() + 4000);
+
         // Callback success (chỉ gọi nếu có data)
         if (onSuccess && response.data) {
           onSuccess(response.data);
         }
       } else {
-        setError(response.error || 'Có lỗi xảy ra');
+        if (response.status === 429) {
+          const extra =
+            response.retryAfterSeconds != null
+              ? Math.max(1, Math.ceil(response.retryAfterSeconds / 60))
+              : null;
+          setError(
+            response.error ||
+              (extra != null
+                ? `Bạn gửi quá nhiều báo cáo. Thử lại sau khoảng ${extra} phút.`
+                : 'Bạn gửi quá nhiều báo cáo. Vui lòng thử lại sau.')
+          );
+          const ms =
+            response.retryAfterSeconds != null
+              ? Math.max(5000, response.retryAfterSeconds * 1000)
+              : 60000;
+          setCooldownUntil(Date.now() + ms);
+        } else {
+          setError(response.error || 'Có lỗi xảy ra');
+        }
       }
     } catch (err) {
       setError('Lỗi kết nối: ' + err.message);
@@ -202,8 +224,8 @@ const ReportFloodForm = ({ onSuccess, onClose }) => {
           setFormData(prev => ({ ...prev, lng, lat, location_description: data.display_name }));
         }
       }
-    } catch (err) {
-      // Vẫn cho phép submit với lat/lng, nhưng thử lấy địa chỉ đơn giản hơn
+    } catch {
+      // Vẫn cho phép submit với lat/lng khi reverse geocoding lỗi
       setFormData(prev => ({ ...prev, lng, lat }));
     }
   };
@@ -256,27 +278,34 @@ const ReportFloodForm = ({ onSuccess, onClose }) => {
 
       {/* Form */}
       <form onSubmit={handleSubmit} style={{ padding: '20px', overflowY: 'auto', flex: 1 }}>
-        {/* Tên */}
-        <div style={{ marginBottom: '15px' }}>
-          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-            Tên của bạn <span style={{ color: 'red' }}>*</span>
-          </label>
-          <input
-            type="text"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            placeholder="Nhập tên hoặc để ẩn danh"
-            style={{
-              width: '100%',
-              padding: '10px',
-              border: '1px solid #ddd',
-              borderRadius: '6px',
-              fontSize: '14px',
-              boxSizing: 'border-box'
-            }}
-            required
-          />
-        </div>
+        {/* Tên: chỉ hiển thị cho khách (chưa đăng nhập); user đăng nhập dùng tên tài khoản trên bản đồ */}
+        {authenticated ? (
+          <div style={{ marginBottom: '15px', padding: '10px', background: '#f0f9ff', borderRadius: '6px', fontSize: '14px', color: '#0369a1' }}>
+            Báo cáo sẽ hiển thị với tên: <strong>{currentUser?.full_name || currentUser?.username || 'Bạn'}</strong>
+          </div>
+        ) : (
+          <div style={{ marginBottom: '15px' }}>
+            <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+              Tên của bạn <span style={{ color: 'red' }}>*</span>
+            </label>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              placeholder="Nhập tên (ít nhất 2 ký tự)"
+              style={{
+                width: '100%',
+                padding: '10px',
+                border: '1px solid #ddd',
+                borderRadius: '6px',
+                fontSize: '14px',
+                boxSizing: 'border-box'
+              }}
+              required
+              minLength={2}
+            />
+          </div>
+        )}
 
         {/* Mức độ ngập */}
         <div style={{ marginBottom: '15px' }}>
@@ -366,20 +395,36 @@ const ReportFloodForm = ({ onSuccess, onClose }) => {
             Click vào bản đồ để chọn vị trí ngập
           </p>
           <div style={{ height: '300px', borderRadius: '6px', overflow: 'hidden', border: '1px solid #ddd' }}>
-            <MapContainer
-              center={formData.lat && formData.lng ? [formData.lat, formData.lng] : DEFAULT_CENTER}
-              zoom={formData.lat && formData.lng ? 15 : DEFAULT_ZOOM}
-              style={{ height: '100%', width: '100%' }}
-            >
-              <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-              <MapClickHandler 
-                onLocationSelect={handleLocationSelect}
-                selectedLocation={formData.lat && formData.lng ? [formData.lat, formData.lng] : null}
-              />
-              {formData.lat && formData.lng && (
-                <Marker position={[formData.lat, formData.lng]} icon={createLocationIcon()} />
-              )}
-            </MapContainer>
+            {MAPBOX_TOKEN ? (
+              <Map
+                mapboxAccessToken={MAPBOX_TOKEN}
+                initialViewState={{
+                  longitude: formData.lng != null ? formData.lng : defaultLng,
+                  latitude: formData.lat != null ? formData.lat : defaultLat,
+                  zoom: formData.lat && formData.lng ? 15 : DEFAULT_ZOOM
+                }}
+                style={{ height: '100%', width: '100%' }}
+                mapStyle="mapbox://styles/mapbox/streets-v12"
+                onClick={(e) => handleLocationSelect(e.lngLat.lng, e.lngLat.lat)}
+              >
+                {formData.lat != null && formData.lng != null && (
+                  <Marker longitude={formData.lng} latitude={formData.lat} anchor="center">
+                    <div style={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: '50%',
+                      background: '#007bff',
+                      border: '3px solid white',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+                    }} />
+                  </Marker>
+                )}
+              </Map>
+            ) : (
+              <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f0f0f0', color: '#666' }}>
+                Chưa cấu hình Mapbox token
+              </div>
+            )}
           </div>
           {formData.lat && formData.lng && (
             <div style={{ fontSize: '12px', color: '#28a745', marginTop: '5px' }}>
@@ -395,18 +440,8 @@ const ReportFloodForm = ({ onSuccess, onClose }) => {
           )}
         </div>
 
-        {/* Error message */}
         {error && (
-          <div style={{
-            padding: '10px',
-            background: '#fff5f5',
-            border: '1px solid #dc3545',
-            borderRadius: '6px',
-            color: '#dc3545',
-            marginBottom: '15px'
-          }}>
-            <FaXmark style={{ marginRight: '6px' }} /> {error}
-          </div>
+          <ErrorToast message={error} onClose={() => setError(null)} />
         )}
 
         {/* Success message */}
@@ -448,23 +483,32 @@ const ReportFloodForm = ({ onSuccess, onClose }) => {
         {/* Submit button */}
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || cooldownSecondsLeft > 0}
+          title={
+            cooldownSecondsLeft > 0
+              ? `Có thể gửi lại sau ${cooldownSecondsLeft} giây`
+              : undefined
+          }
           style={{
             width: '100%',
             padding: '12px',
-            background: loading ? '#6c757d' : '#007bff',
+            background: loading || cooldownSecondsLeft > 0 ? '#6c757d' : '#007bff',
             color: 'white',
             border: 'none',
             borderRadius: '6px',
             fontSize: '16px',
             fontWeight: 'bold',
-            cursor: loading ? 'not-allowed' : 'pointer',
+            cursor: loading || cooldownSecondsLeft > 0 ? 'not-allowed' : 'pointer',
             transition: 'background 0.3s'
           }}
         >
           {loading ? (
             <>
               <FaClock /> Đang gửi...
+            </>
+          ) : cooldownSecondsLeft > 0 ? (
+            <>
+              <FaClock /> Đợi {cooldownSecondsLeft}s…
             </>
           ) : (
             <>

@@ -1,41 +1,62 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { ReporterRankingProvider } from './context/ReporterRankingProvider';
 import DashboardPage from './pages/DashboardPage';
 import ReportsPage from './pages/ReportsPage';
 import NewReportPage from './pages/NewReportPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import VerifyRegisterOtpPage from './pages/VerifyRegisterOtpPage';
 import ProfilePage from './pages/ProfilePage';
-import ModerationPage from './pages/ModerationPage';
 import NewsDetailPage from './pages/NewsDetailPage';
 import MapPage from './pages/MapPage';
+import ModerationPage from './pages/ModerationPage';
+import ResearchAnalyticsPage from './pages/ResearchAnalyticsPage';
+import AboutPage from './pages/InfoPages/AboutPage';
+import PrivacyPage from './pages/InfoPages/PrivacyPage';
+import TermsPage from './pages/InfoPages/TermsPage';
+import FaqPage from './pages/InfoPages/FaqPage';
+import ContactPage from './pages/InfoPages/ContactPage';
 import Layout from './components/layout/Layout';
-import { isAuthenticated, isModerator } from './utils/auth';
-import './App.css';
+import { isAuthenticated, hasRole, isModerator, isAdmin } from './utils/auth';
+import EmergencyAlertsPage from './pages/EmergencyAlertsPage';
+import AdminOperationsPage from './pages/AdminOperationsPage';
+import RoutingPage from './pages/RoutingPage';
 
-// Protected Route Component - chỉ cho các trang yêu cầu đăng nhập bắt buộc
+// Protected Route – chỉ cần đăng nhập (bất kỳ role)
 const ProtectedRoute = ({ children }) => {
   return isAuthenticated() ? children : <Navigate to="/login" replace />;
 };
 
-// Moderator Route Component - chỉ cho moderator và admin
+// Moderator Route – CHỈ role moderator (Admin không được vào trang kiểm duyệt)
 const ModeratorRoute = ({ children }) => {
-  if (!isAuthenticated()) {
-    return <Navigate to="/login" replace />;
-  }
-  if (!isModerator()) {
-    return <Navigate to="/" replace />;
-  }
+  if (!isAuthenticated()) return <Navigate to="/login" replace />;
+  if (!isModerator()) return <Navigate to="/" replace />;
+  return children;
+};
+
+const ResearchRoute = ({ children }) => {
+  if (!isAuthenticated()) return <Navigate to="/login" replace />;
+  if (!hasRole(['admin', 'moderator'])) return <Navigate to="/" replace />;
+  return children;
+};
+
+/** Chỉ admin — B1/C1 vận hành, không gộp moderator */
+const AdminRoute = ({ children }) => {
+  if (!isAuthenticated()) return <Navigate to="/login" replace />;
+  if (!isAdmin()) return <Navigate to="/" replace />;
   return children;
 };
 
 function App() {
   return (
     <Router>
+      <ReporterRankingProvider>
       <Routes>
         {/* Login và Register không có Navigation */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/register/verify" element={<VerifyRegisterOtpPage />} />
         
         {/* Các trang khác có Navigation */}
         <Route 
@@ -82,15 +103,53 @@ function App() {
             </Layout>
           } 
         />
-        <Route 
-          path="/moderation" 
+        <Route
+          path="/moderation"
           element={
             <Layout>
               <ModeratorRoute>
                 <ModerationPage />
               </ModeratorRoute>
             </Layout>
-          } 
+          }
+        />
+        <Route
+          path="/research"
+          element={
+            <Layout>
+              <ResearchRoute>
+                <ResearchAnalyticsPage />
+              </ResearchRoute>
+            </Layout>
+          }
+        />
+        <Route
+          path="/emergency-alerts"
+          element={
+            <Layout>
+              <ProtectedRoute>
+                <EmergencyAlertsPage />
+              </ProtectedRoute>
+            </Layout>
+          }
+        />
+        <Route
+          path="/admin/operations"
+          element={
+            <Layout>
+              <AdminRoute>
+                <AdminOperationsPage />
+              </AdminRoute>
+            </Layout>
+          }
+        />
+        <Route
+          path="/routing"
+          element={
+            <Layout>
+              <RoutingPage />
+            </Layout>
+          }
         />
         <Route 
           path="/news/:id" 
@@ -104,7 +163,48 @@ function App() {
           path="/map" 
           element={<MapPage />} 
         />
+        <Route
+          path="/about"
+          element={
+            <Layout>
+              <AboutPage />
+            </Layout>
+          }
+        />
+        <Route
+          path="/privacy"
+          element={
+            <Layout>
+              <PrivacyPage />
+            </Layout>
+          }
+        />
+        <Route
+          path="/terms"
+          element={
+            <Layout>
+              <TermsPage />
+            </Layout>
+          }
+        />
+        <Route
+          path="/faq"
+          element={
+            <Layout>
+              <FaqPage />
+            </Layout>
+          }
+        />
+        <Route
+          path="/contact"
+          element={
+            <Layout>
+              <ContactPage />
+            </Layout>
+          }
+        />
       </Routes>
+      </ReporterRankingProvider>
     </Router>
   );
 }
