@@ -56,6 +56,19 @@ export const API_ENDPOINTS = {
   // Heatmap
   HEATMAP: '/api/heatmap',
   HEATMAP_COMBINED: '/api/heatmap/combined',
+  HEATMAP_TIMELINE_24H: '/api/heatmap/timeline-24h',
+  
+  // Routing (AMC-A*)
+  ROUTING_SAFE_PATH: '/api/v1/routing/safe-path',
+
+  // Admin (JWT role admin)
+  ADMIN_DEVICES_HEALTH: '/api/v1/admin/devices/health',
+  ADMIN_EMERGENCY_ALERTS_SUMMARY: '/api/v1/admin/emergency-alerts/summary',
+
+  // Telegram (user JWT)
+  AUTH_TELEGRAM_LINK: '/api/auth/telegram/link',
+  AUTH_TELEGRAM_STATUS: '/api/auth/telegram/status',
+  AUTH_TELEGRAM_UNLINK: '/api/auth/telegram/unlink',
   
   // OTA Updates (Admin)
   OTA: '/api/ota',
@@ -87,7 +100,11 @@ export const API_ENDPOINTS = {
   // Stats
   STATS_ONLINE_USERS: '/api/stats/online-users',
   STATS_ONLINE_USERS_COUNT: '/api/stats/online-users/count',
-  STATS_MONTHLY_VISITS: '/api/stats/monthly-visits'
+  STATS_MONTHLY_VISITS: '/api/stats/monthly-visits',
+
+  // Research analytics (Admin/Moderator)
+  RESEARCH_EVALUATION: '/api/v1/research/evaluation',
+  RESEARCH_COLD_START_HOTSPOTS: '/api/v1/research/cold-start-hotspots'
 };
 
 // Polling intervals (milliseconds)

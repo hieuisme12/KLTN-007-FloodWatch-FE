@@ -1,7 +1,7 @@
 import React, { Fragment, useEffect, useState } from 'react';
 import { Transition } from '@headlessui/react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { isAuthenticated, isModerator, getCurrentUser } from '../../utils/auth';
+import { isAdmin, isAuthenticated, isModerator, getCurrentUser } from '../../utils/auth';
 import { API_CONFIG } from '../../config/apiConfig';
 import { logout } from '../../services/api';
 import { useSidebar } from '@/context/SidebarProvider';
@@ -15,6 +15,9 @@ import {
   FaUser,
   FaBars,
   FaRightFromBracket,
+  FaBell,
+  FaServer,
+  FaRoute,
 } from 'react-icons/fa6';
 
 const scrollbarAside =
@@ -27,6 +30,7 @@ const Sidebar = () => {
   const [currentUser, setCurrentUser] = useState(() => getCurrentUser());
   const authenticated = isAuthenticated();
   const moderator = isModerator();
+  const admin = isAdmin();
 
   useEffect(() => {
     const handleUserUpdated = () => setCurrentUser(getCurrentUser());
@@ -53,14 +57,20 @@ const Sidebar = () => {
 
   const mainNavItems = [
     { path: '/', label: 'Trang chủ', icon: FaHouse, badge: null, public: true },
+    { path: '/routing', label: 'Tìm đường', icon: FaRoute, badge: null, public: true },
     { path: '/reports', label: 'Báo cáo', icon: FaClipboardList, badge: null, public: true },
     { path: '/report/new', label: 'Báo cáo mới', icon: FaPlus, badge: null, requireAuth: true },
+    { path: '/emergency-alerts', label: 'Cảnh báo khẩn', icon: FaBell, badge: null, requireAuth: true },
     { path: '/moderation', label: 'Kiểm duyệt', icon: FaClipboardCheck, badge: null, requireModerator: true },
+    { path: '/research', label: 'Research', icon: FaClipboardList, badge: null, requireResearch: true },
+    { path: '/admin/operations', label: 'Vận hành', icon: FaServer, badge: null, requireAdmin: true },
   ];
 
   const visibleNavItems = mainNavItems.filter((item) => {
     if (item.public) return true;
     if (item.requireModerator) return moderator;
+    if (item.requireResearch) return moderator || admin;
+    if (item.requireAdmin) return admin;
     if (item.requireAuth) return authenticated;
     return false;
   });

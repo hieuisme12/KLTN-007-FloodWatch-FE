@@ -253,6 +253,14 @@ export const uploadReportImage = async (file) => {
 };
 
 // Gửi báo cáo ngập. BE: 400 khi không có sensor trong 500m → error "Hiện tại khu vực chưa có máy đo, không thể xác thực"
+function parseRetryAfterSeconds(error) {
+  const h = error.response?.headers;
+  const raw = h?.['retry-after'] ?? h?.['Retry-After'];
+  if (raw == null || raw === '') return null;
+  const n = parseInt(String(raw), 10);
+  return Number.isFinite(n) ? n : null;
+}
+
 export const submitFloodReport = async (reportData) => {
   try {
     const response = await apiClient.post(API_ENDPOINTS.REPORT_FLOOD, reportData);
@@ -268,9 +276,24 @@ export const submitFloodReport = async (reportData) => {
       error: response.data?.error || 'Có lỗi xảy ra'
     };
   } catch (error) {
+    const status = error.response?.status;
     const errMsg = error.response?.data?.error || error.response?.data?.message;
-    if (error.response?.status === 400 && errMsg) {
+    if (status === 400 && errMsg) {
       return { success: false, error: errMsg };
+    }
+    if (status === 429) {
+      const retryAfterSec = parseRetryAfterSeconds(error);
+      let msg =
+        errMsg ||
+        (retryAfterSec != null
+          ? `Bạn gửi quá nhiều báo cáo. Vui lòng thử lại sau khoảng ${Math.max(1, Math.ceil(retryAfterSec / 60))} phút.`
+          : 'Bạn gửi quá nhiều báo cáo. Vui lòng thử lại sau.');
+      return {
+        success: false,
+        error: msg,
+        status: 429,
+        retryAfterSeconds: retryAfterSec
+      };
     }
     return {
       success: false,
@@ -1169,6 +1192,76 @@ export const getOnlineUsers = async () => {
   }
 };
 
+// ==================== RESEARCH APIs ====================
+
+const appendBboxParams = (query, bbox) => {
+  if (!bbox) return;
+  const { min_lng, max_lng, min_lat, max_lat } = bbox;
+  const hasLng = Number.isFinite(Number(min_lng)) && Number.isFinite(Number(max_lng));
+  const hasLat = Number.isFinite(Number(min_lat)) && Number.isFinite(Number(max_lat));
+  if (hasLng && hasLat) {
+    query.set('min_lng', String(min_lng));
+    query.set('max_lng', String(max_lng));
+    query.set('min_lat', String(min_lat));
+    query.set('max_lat', String(max_lat));
+  }
+};
+
+/**
+ * D1: Đánh giá định lượng baseline crowd_only vs fused.
+ * GET /api/v1/research/evaluation
+ */
+export const getResearchEvaluation = async (params = {}) => {
+  try {
+    const query = new URLSearchParams();
+    if (params.crowd_hours != null) query.set('crowd_hours', String(params.crowd_hours));
+    if (params.sensor_hours != null) query.set('sensor_hours', String(params.sensor_hours));
+    appendBboxParams(query, params.bbox);
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+
+    const response = await apiClient.get(`${API_ENDPOINTS.RESEARCH_EVALUATION}${suffix}`);
+    if (response.data?.success && response.data?.data) {
+      return { success: true, data: response.data.data, meta: response.data.meta || null };
+    }
+    return { success: false, data: null, meta: null, error: response.data?.error || 'Không tải được dữ liệu đánh giá' };
+  } catch (error) {
+    return {
+      success: false,
+      data: null,
+      meta: null,
+      error: error.response?.data?.error || error.message
+    };
+  }
+};
+
+/**
+ * D2: Hotspot thiếu cảm biến từ dữ liệu crowdsourcing.
+ * GET /api/v1/research/cold-start-hotspots
+ */
+export const getResearchColdStartHotspots = async (params = {}) => {
+  try {
+    const query = new URLSearchParams();
+    if (params.report_hours != null) query.set('report_hours', String(params.report_hours));
+    if (params.no_sensor_radius_m != null) query.set('no_sensor_radius_m', String(params.no_sensor_radius_m));
+    if (params.min_reports != null) query.set('min_reports', String(params.min_reports));
+    appendBboxParams(query, params.bbox);
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+
+    const response = await apiClient.get(`${API_ENDPOINTS.RESEARCH_COLD_START_HOTSPOTS}${suffix}`);
+    if (response.data?.success && Array.isArray(response.data?.data)) {
+      return { success: true, data: response.data.data, meta: response.data.meta || null };
+    }
+    return { success: true, data: [], meta: response.data?.meta || null };
+  } catch (error) {
+    return {
+      success: false,
+      data: [],
+      meta: null,
+      error: error.response?.data?.error || error.message
+    };
+  }
+};
+
 // ==================== REPORT EVALUATION APIs ====================
 
 /**
@@ -1511,13 +1604,202 @@ export const fetchCombinedHeatmap = async (params) => {
     const response = await axios.get(`${API_CONFIG.BASE_URL}${API_ENDPOINTS.HEATMAP_COMBINED}?${queryString}`);
     
     if (response.data && response.data.success) {
-      return { success: true, data: response.data.data || [] };
+      const raw = response.data.data;
+      const rows = Array.isArray(raw) ? raw : raw?.points || raw?.features || [];
+      return { success: true, data: rows };
     }
     return { success: false, data: [] };
   } catch (error) {
     return { 
       success: false, 
       data: [],
+      error: error.response?.data?.error || error.message
+    };
+  }
+};
+
+/**
+ * C2: Chuỗi theo giờ 24h gần nhất (sensor + crowd đã duyệt). Public.
+ */
+export const fetchHeatmapTimeline24h = async (params = {}) => {
+  try {
+    const usp = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') usp.set(k, String(v));
+    });
+    const qs = usp.toString();
+    const url = `${API_CONFIG.BASE_URL}${API_ENDPOINTS.HEATMAP_TIMELINE_24H}${qs ? `?${qs}` : ''}`;
+    const response = await axios.get(url, { timeout: API_CONFIG.TIMEOUT });
+    if (response.data?.success) {
+      const raw = response.data.data;
+      const series = Array.isArray(raw) ? raw : raw?.series || raw?.hours || raw?.timeline || [];
+      return { success: true, data: series, meta: response.data.meta || null };
+    }
+    return {
+      success: false,
+      data: [],
+      meta: null,
+      error: response.data?.error || response.data?.message
+    };
+  } catch (error) {
+    return {
+      success: false,
+      data: [],
+      meta: null,
+      error: error.response?.data?.error || error.message
+    };
+  }
+};
+
+// ==================== ROUTING (AMC-A*) ====================
+
+/**
+ * User: tìm đường an toàn theo AMC-A*.
+ * GET /api/v1/routing/safe-path
+ */
+export const fetchSafePath = async (params) => {
+  try {
+    const required = ['start_lng', 'start_lat', 'end_lng', 'end_lat'];
+    for (const key of required) {
+      if (params?.[key] == null || params?.[key] === '') {
+        return { success: false, data: null, error: `Thiếu tham số ${key}` };
+      }
+    }
+    const query = new URLSearchParams();
+    query.set('start_lng', String(params.start_lng));
+    query.set('start_lat', String(params.start_lat));
+    query.set('end_lng', String(params.end_lng));
+    query.set('end_lat', String(params.end_lat));
+    if (params.vehicle_type) query.set('vehicle_type', String(params.vehicle_type));
+    if (params.nearest_node_max_m != null) query.set('nearest_node_max_m', String(params.nearest_node_max_m));
+    const url = `${API_CONFIG.BASE_URL}${API_ENDPOINTS.ROUTING_SAFE_PATH}?${query.toString()}`;
+    const response = await axios.get(url, {
+      timeout: Math.max(15000, API_CONFIG.TIMEOUT),
+      validateStatus: (s) => s >= 200 && s < 500
+    });
+    if (response.status >= 200 && response.status < 300 && response.data?.success) {
+      return { success: true, data: response.data.data ?? response.data, status: response.status };
+    }
+    return {
+      success: false,
+      data: response.data?.data ?? null,
+      status: response.status,
+      error: response.data?.error || response.data?.message || 'Không tìm được đường an toàn'
+    };
+  } catch (error) {
+    return {
+      success: false,
+      data: null,
+      status: error.response?.status,
+      error: error.response?.data?.error || error.response?.data?.message || error.message
+    };
+  }
+};
+
+// ==================== ADMIN OPS (JWT admin) ====================
+
+/**
+ * B1: Sức khỏe thiết bị theo flood_logs / energy_logs.
+ */
+export const fetchAdminDevicesHealth = async (params = {}) => {
+  try {
+    const usp = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') usp.set(k, String(v));
+    });
+    const qs = usp.toString();
+    const response = await apiClient.get(
+      `${API_ENDPOINTS.ADMIN_DEVICES_HEALTH}${qs ? `?${qs}` : ''}`,
+      { validateStatus: (s) => s === 200 || s === 403 }
+    );
+    if (response.status === 200 && response.data?.success) {
+      return { success: true, data: response.data.data ?? response.data };
+    }
+    return {
+      success: false,
+      data: null,
+      error: response.data?.error || (response.status === 403 ? 'Cần quyền quản trị viên' : 'Không tải được dữ liệu')
+    };
+  } catch (error) {
+    return {
+      success: false,
+      data: null,
+      error: error.response?.data?.error || error.message
+    };
+  }
+};
+
+/**
+ * C1 (admin): Thống kê gửi cảnh báo đa kênh. Query: hours (1–168).
+ */
+export const fetchAdminEmergencyAlertsSummary = async (hours = 24) => {
+  try {
+    const h = Math.min(168, Math.max(1, Number(hours) || 24));
+    const response = await apiClient.get(
+      `${API_ENDPOINTS.ADMIN_EMERGENCY_ALERTS_SUMMARY}?hours=${h}`,
+      { validateStatus: (s) => s === 200 || s === 403 }
+    );
+    if (response.status === 200 && response.data?.success) {
+      return { success: true, data: response.data.data ?? response.data, hours: h };
+    }
+    return {
+      success: false,
+      data: null,
+      error: response.data?.error || (response.status === 403 ? 'Cần quyền quản trị viên' : 'Không tải được thống kê')
+    };
+  } catch (error) {
+    return {
+      success: false,
+      data: null,
+      error: error.response?.data?.error || error.message
+    };
+  }
+};
+
+// ==================== TELEGRAM (user JWT) ====================
+
+/** POST — trả deep_link để mở bot */
+export const postTelegramLink = async () => {
+  try {
+    const response = await apiClient.post(API_ENDPOINTS.AUTH_TELEGRAM_LINK, {});
+    if (response.data?.success && response.data?.data) {
+      return { success: true, data: response.data.data };
+    }
+    return { success: false, error: response.data?.error || 'Không tạo được liên kết Telegram' };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.response?.data?.error || error.response?.data?.message || error.message
+    };
+  }
+};
+
+export const getTelegramLinkStatus = async () => {
+  try {
+    const response = await apiClient.get(API_ENDPOINTS.AUTH_TELEGRAM_STATUS);
+    if (response.data?.success) {
+      return { success: true, data: response.data.data ?? {} };
+    }
+    return { success: false, data: null, error: response.data?.error };
+  } catch (error) {
+    return {
+      success: false,
+      data: null,
+      error: error.response?.data?.error || error.message
+    };
+  }
+};
+
+export const deleteTelegramUnlink = async () => {
+  try {
+    const response = await apiClient.delete(API_ENDPOINTS.AUTH_TELEGRAM_UNLINK);
+    if (response.data?.success) {
+      return { success: true, message: response.data.message };
+    }
+    return { success: false, error: response.data?.error || 'Gỡ liên kết thất bại' };
+  } catch (error) {
+    return {
+      success: false,
       error: error.response?.data?.error || error.message
     };
   }

@@ -12,6 +12,7 @@ import {
 import { WiFlood } from 'react-icons/wi';
 import { MdLocationOn } from 'react-icons/md';
 import { useReporterRanking } from '../../context/ReporterRankingProvider';
+import ConfidenceBadge from '../common/ConfidenceBadge';
 
 const CrowdReportsList = ({ reports, loading }) => {
   const { getReporterReliability } = useReporterRanking();
@@ -142,16 +143,25 @@ const CrowdReportsList = ({ reports, loading }) => {
                   {new Date(report.created_at).toLocaleString('vi-VN')}
                 </div>
               </div>
-              <span style={{
-                fontSize: '11px',
-                background: statusInfo.color + '20',
-                color: statusInfo.color,
-                padding: '4px 8px',
-                borderRadius: '12px',
-                fontWeight: 'bold'
-              }}>
-                <statusInfo.icon style={{ fontSize: '11px' }} /> {statusInfo.text}
-              </span>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
+                <span style={{
+                  fontSize: '11px',
+                  background: statusInfo.color + '20',
+                  color: statusInfo.color,
+                  padding: '4px 8px',
+                  borderRadius: '12px',
+                  fontWeight: 'bold'
+                }}>
+                  <statusInfo.icon style={{ fontSize: '11px' }} /> {statusInfo.text}
+                </span>
+                {report.moderation_status === 'approved' && report.confidence != null && (
+                  <ConfidenceBadge
+                    confidence={report.confidence}
+                    breakdown={report.confidence_breakdown}
+                    showBreakdownToggle
+                  />
+                )}
+              </div>
             </div>
 
             {/* Body */}
