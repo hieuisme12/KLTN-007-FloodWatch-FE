@@ -1,4 +1,4 @@
-import React, { useState, Fragment } from 'react';
+import React, { useState, useEffect, Fragment } from 'react';
 import { Combobox, Transition } from '@headlessui/react';
 import { CheckIcon } from '@heroicons/react/20/solid';
 import { ChevronUpDownIcon } from '@heroicons/react/20/solid';
@@ -27,6 +27,18 @@ const ReportFloodForm = ({ onSuccess, onClose }) => {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  /** B3: chống spam sau 429 hoặc sau mỗi lần gửi thành công */
+  const [cooldownUntil, setCooldownUntil] = useState(0);
+  const [, setCooldownPulse] = useState(0);
+
+  useEffect(() => {
+    if (!cooldownUntil || Date.now() >= cooldownUntil) return undefined;
+    const t = setInterval(() => setCooldownPulse((x) => x + 1), 1000);
+    return () => clearInterval(t);
+  }, [cooldownUntil]);
+
+  const cooldownSecondsLeft =
+    cooldownUntil > Date.now() ? Math.ceil((cooldownUntil - Date.now()) / 1000) : 0;
   
   // Flood level options for Combobox
   const floodLevelOptions = [
@@ -70,6 +82,11 @@ const ReportFloodForm = ({ onSuccess, onClose }) => {
       return;
     }
 
+    if (cooldownSecondsLeft > 0) {
+      setError(`Vui lòng đợi thêm ${cooldownSecondsLeft} giây trước khi gửi lại.`);
+      return;
+    }
+
     setLoading(true);
     try {
       // User đăng nhập: không gửi name (backend lấy full_name hoặc username từ token)
@@ -93,13 +110,32 @@ const ReportFloodForm = ({ onSuccess, onClose }) => {
           lat: null,
           location_description: null
         });
-        
+        setCooldownUntil(Date.now() + 4000);
+
         // Callback success (chỉ gọi nếu có data)
         if (onSuccess && response.data) {
           onSuccess(response.data);
         }
       } else {
-        setError(response.error || 'Có lỗi xảy ra');
+        if (response.status === 429) {
+          const extra =
+            response.retryAfterSeconds != null
+              ? Math.max(1, Math.ceil(response.retryAfterSeconds / 60))
+              : null;
+          setError(
+            response.error ||
+              (extra != null
+                ? `Bạn gửi quá nhiều báo cáo. Thử lại sau khoảng ${extra} phút.`
+                : 'Bạn gửi quá nhiều báo cáo. Vui lòng thử lại sau.')
+          );
+          const ms =
+            response.retryAfterSeconds != null
+              ? Math.max(5000, response.retryAfterSeconds * 1000)
+              : 60000;
+          setCooldownUntil(Date.now() + ms);
+        } else {
+          setError(response.error || 'Có lỗi xảy ra');
+        }
       }
     } catch (err) {
       setError('Lỗi kết nối: ' + err.message);
@@ -447,23 +483,32 @@ const ReportFloodForm = ({ onSuccess, onClose }) => {
         {/* Submit button */}
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || cooldownSecondsLeft > 0}
+          title={
+            cooldownSecondsLeft > 0
+              ? `Có thể gửi lại sau ${cooldownSecondsLeft} giây`
+              : undefined
+          }
           style={{
             width: '100%',
             padding: '12px',
-            background: loading ? '#6c757d' : '#007bff',
+            background: loading || cooldownSecondsLeft > 0 ? '#6c757d' : '#007bff',
             color: 'white',
             border: 'none',
             borderRadius: '6px',
             fontSize: '16px',
             fontWeight: 'bold',
-            cursor: loading ? 'not-allowed' : 'pointer',
+            cursor: loading || cooldownSecondsLeft > 0 ? 'not-allowed' : 'pointer',
             transition: 'background 0.3s'
           }}
         >
           {loading ? (
             <>
               <FaClock /> Đang gửi...
+            </>
+          ) : cooldownSecondsLeft > 0 ? (
+            <>
+              <FaClock /> Đợi {cooldownSecondsLeft}s…
             </>
           ) : (
             <>

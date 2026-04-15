@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import Map, { Marker, Popup } from 'react-map-gl/mapbox';
+import Map, { Marker, Popup, Source, Layer } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { statusColors, DEFAULT_CENTER, DEFAULT_ZOOM } from '../../utils/constants';
 import { fetchAddressFromCoords } from '../../utils/geocode';
@@ -7,7 +7,7 @@ import { getSensorDisplayPosition } from '../../data/sensorOverrides';
 import { FaMobileScreen, FaCheck, FaXmark, FaClock, FaStar, FaCircle, FaLayerGroup } from 'react-icons/fa6';
 import { WiFlood } from 'react-icons/wi';
 import { MdLocationOn } from 'react-icons/md';
-import { getOnlineUsersCount, fetchFusionPoints, getProfile } from '../../services/api';
+import { getOnlineUsersCount, fetchFusionPoints, fetchCombinedHeatmap, getProfile } from '../../services/api';
 import { API_CONFIG } from '../../config/apiConfig';
 import {
   fusionCmToColor,
@@ -101,6 +101,29 @@ const getStackOffsetPx = (index) => ({ x: index * STACK_OFFSET_PX, y: index * ST
 const getFanAngle = (index, count) => {
   if (count <= 1) return 0;
   return -FAN_ANGLE_SPAN / 2 + (index / (count - 1)) * FAN_ANGLE_SPAN;
+};
+
+/** C2: chuẩn hóa điểm heatmap → GeoJSON cho Mapbox heatmap layer */
+const buildHeatmapGeoJSON = (rows) => {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return { type: 'FeatureCollection', features: [] };
+  }
+  const features = [];
+  rows.forEach((row, i) => {
+    const lat = row?.lat ?? row?.latitude;
+    const lng = row?.lng ?? row?.longitude;
+    if (lat == null || lng == null) return;
+    const rawW =
+      row.weight ?? row.intensity ?? row.value ?? row.count ?? row.density ?? row.score ?? 1;
+    const w = Math.min(20, Math.max(0.15, Number(rawW) || 1));
+    features.push({
+      type: 'Feature',
+      id: `h-${i}`,
+      properties: { w },
+      geometry: { type: 'Point', coordinates: [Number(lng), Number(lat)] }
+    });
+  });
+  return { type: 'FeatureCollection', features };
 };
 
 // Chỉ phần nội dung marker (tên, pill, avatar, pin) – dùng trong Marker đơn và trong stack.
@@ -651,7 +674,9 @@ const MapView = ({
   fusionEnabled: fusionEnabledProp,
   onFusionEnabledChange,
   /** Trang chủ (dashboard): false — ẩn lớp trộn. Trang /map: true (mặc định) */
-  showFusionLayer = true
+  showFusionLayer = true,
+  /** C2: lớp nhiệt kết hợp sensor + crowd (public API) */
+  heatmapEnabled = false
 }) => {
   const { getReporterReliability } = useReporterRanking();
   const [fusionInternal, setFusionInternal] = useState(false);
@@ -664,6 +689,7 @@ const MapView = ({
   const [fusionWaterMode, setFusionWaterMode] = useState('fused');
   const [fusionCrowd, setFusionCrowd] = useState([]);
   const [fusionPanelOpen, setFusionPanelOpen] = useState(false);
+  const [heatGeoJSON, setHeatGeoJSON] = useState(() => ({ type: 'FeatureCollection', features: [] }));
   const [onlineCount, setOnlineCount] = useState(0);
   const [mapStyle, setMapStyle] = useState(MAP_STYLES.streets.url);
   const [mapStyleOpen, setMapStyleOpen] = useState(false);
@@ -771,6 +797,25 @@ const MapView = ({
   }, [effectiveFusionEnabled]);
 
   useEffect(() => {
+    if (!heatmapEnabled) {
+      queueMicrotask(() => setHeatGeoJSON({ type: 'FeatureCollection', features: [] }));
+      return;
+    }
+    let cancelled = false;
+    const load = async () => {
+      const res = await fetchCombinedHeatmap({ hours: 24 });
+      if (cancelled) return;
+      setHeatGeoJSON(buildHeatmapGeoJSON(res.success ? res.data : []));
+    };
+    load();
+    const iv = setInterval(load, 120000);
+    return () => {
+      cancelled = true;
+      clearInterval(iv);
+    };
+  }, [heatmapEnabled]);
+
+  useEffect(() => {
     if (typeof navigator === 'undefined' || !navigator.geolocation) return;
     const watchId = navigator.geolocation.watchPosition(
       (pos) => {
@@ -841,6 +886,35 @@ const MapView = ({
         mapStyle={mapStyle}
         onClick={() => setOpenPopupId(null)}
       >
+        {heatmapEnabled && heatGeoJSON.features.length > 0 && (
+          <Source id="combined-heat" type="geojson" data={heatGeoJSON}>
+            <Layer
+              id="combined-heat-layer"
+              type="heatmap"
+              paint={{
+                'heatmap-weight': ['interpolate', ['linear'], ['get', 'w'], 0, 0, 20, 1],
+                'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 10, 0.8, 14, 1.4],
+                'heatmap-color': [
+                  'interpolate',
+                  ['linear'],
+                  ['heatmap-density'],
+                  0,
+                  'rgba(33,102,172,0)',
+                  0.25,
+                  'rgb(103,169,207)',
+                  0.5,
+                  'rgb(253,219,199)',
+                  0.75,
+                  'rgb(239,138,98)',
+                  1,
+                  'rgb(178,24,43)'
+                ],
+                'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 8, 12, 12, 22],
+                'heatmap-opacity': 0.72
+              }}
+            />
+          </Source>
+        )}
         {floodData.map((item, index) => {
           const status = item.status || 'normal';
           const color = statusColors[status] || statusColors.normal;

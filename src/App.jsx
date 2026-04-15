@@ -11,13 +11,17 @@ import ProfilePage from './pages/ProfilePage';
 import NewsDetailPage from './pages/NewsDetailPage';
 import MapPage from './pages/MapPage';
 import ModerationPage from './pages/ModerationPage';
+import ResearchAnalyticsPage from './pages/ResearchAnalyticsPage';
 import AboutPage from './pages/InfoPages/AboutPage';
 import PrivacyPage from './pages/InfoPages/PrivacyPage';
 import TermsPage from './pages/InfoPages/TermsPage';
 import FaqPage from './pages/InfoPages/FaqPage';
 import ContactPage from './pages/InfoPages/ContactPage';
 import Layout from './components/layout/Layout';
-import { isAuthenticated, isModerator } from './utils/auth';
+import { isAuthenticated, hasRole, isModerator, isAdmin } from './utils/auth';
+import EmergencyAlertsPage from './pages/EmergencyAlertsPage';
+import AdminOperationsPage from './pages/AdminOperationsPage';
+import RoutingPage from './pages/RoutingPage';
 
 // Protected Route – chỉ cần đăng nhập (bất kỳ role)
 const ProtectedRoute = ({ children }) => {
@@ -28,6 +32,19 @@ const ProtectedRoute = ({ children }) => {
 const ModeratorRoute = ({ children }) => {
   if (!isAuthenticated()) return <Navigate to="/login" replace />;
   if (!isModerator()) return <Navigate to="/" replace />;
+  return children;
+};
+
+const ResearchRoute = ({ children }) => {
+  if (!isAuthenticated()) return <Navigate to="/login" replace />;
+  if (!hasRole(['admin', 'moderator'])) return <Navigate to="/" replace />;
+  return children;
+};
+
+/** Chỉ admin — B1/C1 vận hành, không gộp moderator */
+const AdminRoute = ({ children }) => {
+  if (!isAuthenticated()) return <Navigate to="/login" replace />;
+  if (!isAdmin()) return <Navigate to="/" replace />;
   return children;
 };
 
@@ -93,6 +110,44 @@ function App() {
               <ModeratorRoute>
                 <ModerationPage />
               </ModeratorRoute>
+            </Layout>
+          }
+        />
+        <Route
+          path="/research"
+          element={
+            <Layout>
+              <ResearchRoute>
+                <ResearchAnalyticsPage />
+              </ResearchRoute>
+            </Layout>
+          }
+        />
+        <Route
+          path="/emergency-alerts"
+          element={
+            <Layout>
+              <ProtectedRoute>
+                <EmergencyAlertsPage />
+              </ProtectedRoute>
+            </Layout>
+          }
+        />
+        <Route
+          path="/admin/operations"
+          element={
+            <Layout>
+              <AdminRoute>
+                <AdminOperationsPage />
+              </AdminRoute>
+            </Layout>
+          }
+        />
+        <Route
+          path="/routing"
+          element={
+            <Layout>
+              <RoutingPage />
             </Layout>
           }
         />
