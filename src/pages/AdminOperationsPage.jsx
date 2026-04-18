@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   fetchAdminDevicesHealth,
-  fetchAdminEmergencyAlertsSummary
+  fetchAdminEmergencyAlertsSummary,
+  putAdminManualFloodDepthsBatch
 } from '../services/api';
 import { isAdmin } from '../utils/auth';
 import { useNavigate } from 'react-router-dom';
 import ErrorToast from '../components/common/ErrorToast';
-import { FaServer, FaChartColumn } from 'react-icons/fa6';
+import { FaServer, FaChartColumn, FaDroplet } from 'react-icons/fa6';
 
 const statusBadgeClass = (status) => {
   const s = String(status || '').toLowerCase();
@@ -33,6 +34,11 @@ export default function AdminOperationsPage() {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [manualFloodJson, setManualFloodJson] = useState(
+    '{\n  "updates": [\n    { "edge_id": 0, "manual_flood_depth_cm": 35 },\n    { "edge_id": 0, "manual_flood_depth_cm": null }\n  ]\n}'
+  );
+  const [manualFloodBusy, setManualFloodBusy] = useState(false);
+  const [manualFloodFeedback, setManualFloodFeedback] = useState('');
 
   const load = useCallback(async () => {
     if (!isAdmin()) return;
@@ -56,13 +62,39 @@ export default function AdminOperationsPage() {
 
   const devices = normalizeDeviceRows(health);
 
+  const submitManualFloodBatch = async () => {
+    setManualFloodFeedback('');
+    setError('');
+    let parsed;
+    try {
+      parsed = JSON.parse(manualFloodJson);
+    } catch {
+      setManualFloodFeedback('JSON không hợp lệ.');
+      return;
+    }
+    const updates = parsed?.updates;
+    if (!Array.isArray(updates)) {
+      setManualFloodFeedback('Cần object có khóa "updates" là mảng.');
+      return;
+    }
+    setManualFloodBusy(true);
+    const res = await putAdminManualFloodDepthsBatch(updates);
+    setManualFloodBusy(false);
+    if (res.success) {
+      setManualFloodFeedback(res.message || 'Đã cập nhật manual_flood_depth_cm. Gọi lại safe-path để so sánh.');
+    } else {
+      setManualFloodFeedback(res.error || 'Thất bại.');
+    }
+  };
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Vận hành hệ thống</h1>
           <p className="mt-1 text-sm text-slate-600">
-            B1 — sức khỏe thiết bị; C1 — thống kê cảnh báo đa kênh. Chỉ tài khoản <strong>admin</strong>.
+            B1 — sức khỏe thiết bị; C1 — thống kê cảnh báo; routing — ghi đè độ ngập cạnh (demo). Chỉ{' '}
+            <strong>admin</strong>.
           </p>
         </div>
         <label className="flex items-center gap-2 text-sm text-slate-700">
@@ -166,6 +198,39 @@ export default function AdminOperationsPage() {
                 {JSON.stringify(summary, null, 2)}
               </pre>
             )}
+          </section>
+
+          <section className="mt-10">
+            <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold text-slate-800">
+              <FaDroplet className="h-5 w-5 text-sky-600" />
+              Mô phỏng ngập trên đồ thị (routing)
+            </h2>
+            <p className="mb-3 text-sm text-slate-600">
+              <code className="text-xs">PUT /api/v1/admin/routing/manual-flood-depths/batch</code> — body{' '}
+              <code className="text-xs">{'{ "updates": [ { "edge_id", "manual_flood_depth_cm" | null } ] }'}</code>.
+              Giá trị <code className="text-xs">null</code> bỏ override, quay về sensor + crowd. Sau khi gửi, thử lại
+              trang tìm đường an toàn.
+            </p>
+            <textarea
+              value={manualFloodJson}
+              onChange={(e) => setManualFloodJson(e.target.value)}
+              rows={10}
+              className="mb-2 w-full rounded-lg border border-slate-300 bg-slate-50 p-3 font-mono text-xs text-slate-900"
+              spellCheck={false}
+            />
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                disabled={manualFloodBusy}
+                onClick={() => void submitManualFloodBatch()}
+                className="rounded-lg bg-sky-700 px-4 py-2 text-sm font-medium text-white hover:bg-sky-800 disabled:opacity-50"
+              >
+                {manualFloodBusy ? 'Đang gửi…' : 'Gửi batch'}
+              </button>
+              {manualFloodFeedback && (
+                <span className="text-sm text-slate-700">{manualFloodFeedback}</span>
+              )}
+            </div>
           </section>
         </>
       )}

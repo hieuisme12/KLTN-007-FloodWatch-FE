@@ -694,21 +694,55 @@ const MapView = ({
   const [mapStyle, setMapStyle] = useState(MAP_STYLES.streets.url);
   const [mapStyleOpen, setMapStyleOpen] = useState(false);
   const [openPopupId, setOpenPopupId] = useState(null);
-  /** Vị trí người dùng: GPS (ưu tiên) hoặc last_known từ profile */
-  const [userLocation, setUserLocation] = useState(() => {
+  /**
+   * Vị trí trên bản đồ: `gps` = Geolocation của **thiết bị/trình duyệt đang mở** (không lấy từ máy khác qua mạng).
+   * `profile` = last_known từ tài khoản đang đăng nhập (server). Đổi user → reset theo user hiện tại.
+   */
+  const [userLocation, setUserLocation] = useState(null);
+  const [authUserKey, setAuthUserKey] = useState(() => {
     const u = getCurrentUser();
-    if (!u) return null;
-    const lat = u.last_known_lat ?? u.last_known_latitude;
-    const lng = u.last_known_lng ?? u.last_known_longitude;
-    if (lat == null || lng == null) return null;
-    const acc = u.last_location_accuracy_m ?? u.last_location_accuracy;
-    return {
-      lat: Number(lat),
-      lng: Number(lng),
-      accuracy: acc != null ? Number(acc) : null,
-      source: 'profile'
-    };
+    return u ? `u:${u.id ?? u.user_id ?? u.username ?? ''}` : 'guest';
   });
+
+  useEffect(() => {
+    const syncKey = () => {
+      const u = getCurrentUser();
+      setAuthUserKey(u ? `u:${u.id ?? u.user_id ?? u.username ?? ''}` : 'guest');
+    };
+    window.addEventListener('user-updated', syncKey);
+    const onStorage = (e) => {
+      if (e.key === 'user' || e.key === 'authToken') syncKey();
+    };
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener('user-updated', syncKey);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated()) {
+      setUserLocation((prev) => (prev?.source === 'gps' ? prev : null));
+      return;
+    }
+    const u = getCurrentUser();
+    const lat = u?.last_known_lat ?? u?.last_known_latitude;
+    const lng = u?.last_known_lng ?? u?.last_known_longitude;
+    if (lat != null && lng != null) {
+      const acc = u.last_location_accuracy_m ?? u.last_location_accuracy;
+      setUserLocation((prev) => {
+        if (prev?.source === 'gps') return prev;
+        return {
+          lat: Number(lat),
+          lng: Number(lng),
+          accuracy: acc != null ? Number(acc) : null,
+          source: 'profile'
+        };
+      });
+      return;
+    }
+    setUserLocation((prev) => (prev?.source === 'gps' ? prev : null));
+  }, [authUserKey]);
   const [hoveredStackId, setHoveredStackId] = useState(null);
   const [hoveredStackIndex, setHoveredStackIndex] = useState(null);
   const stackLeaveTimeoutRef = useRef(null);
@@ -858,7 +892,7 @@ const MapView = ({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [authUserKey]);
 
   const displayCrowdReports = effectiveFusionEnabled ? [] : crowdReports;
   const markerTheme =

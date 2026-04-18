@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { fetchReliabilityRanking } from '../services/api';
+import { isAdmin, isModerator } from '../utils/auth';
 
 const ReporterRankingContext = createContext(null);
 
@@ -12,18 +13,29 @@ export function ReporterRankingProvider({ children }) {
   const [mapByReporterId, setMapByReporterId] = useState({});
 
   useEffect(() => {
-    let cancelled = false;
-    fetchReliabilityRanking(500).then((res) => {
-      if (cancelled || !res.success || !Array.isArray(res.data)) return;
-      const next = {};
-      res.data.forEach((row) => {
-        const id = row.reporter_id;
-        if (id != null) next[id] = row.avg_reliability != null ? Number(row.avg_reliability) : null;
+    let reqId = 0;
+    const load = () => {
+      if (!isAdmin() && !isModerator()) {
+        setMapByReporterId({});
+        return;
+      }
+      const myId = ++reqId;
+      fetchReliabilityRanking(500).then((res) => {
+        if (myId !== reqId || !res.success || !Array.isArray(res.data)) return;
+        const next = {};
+        res.data.forEach((row) => {
+          const id = row.reporter_id;
+          if (id != null) next[id] = row.avg_reliability != null ? Number(row.avg_reliability) : null;
+        });
+        setMapByReporterId(next);
       });
-      setMapByReporterId(next);
-    });
+    };
+
+    load();
+    window.addEventListener('user-updated', load);
     return () => {
-      cancelled = true;
+      reqId += 1;
+      window.removeEventListener('user-updated', load);
     };
   }, []);
 

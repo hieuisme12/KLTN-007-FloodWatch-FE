@@ -40,7 +40,9 @@ const FLOOD_SOURCE_LABELS = {
   crowd_edge_buffer_m: 'Vùng đệm cạnh đường từ report (m)',
   crowd_recency_half_life_hours: 'Bán rã theo thời gian report (giờ)',
   crowd_min_reliability: 'Độ tin cậy crowd report tối thiểu (%)',
-  crowd_max_boost: 'Mức tăng trọng số tối đa'
+  crowd_max_boost: 'Mức tăng trọng số tối đa',
+  sensor_flood_radius_m: 'Bán kính “bọng” nước quanh trạm sensor (m)',
+  sensor_flood_decay: 'Suy giảm nước theo khoảng cách (linear | plateau)'
 };
 
 const toNum = (x) => {
@@ -119,7 +121,8 @@ export default function RoutingPage() {
   const mapRef = useRef(null);
 
   const routeGeoJSON = useMemo(() => buildRouteGeoJSON(result), [result]);
-  const found = !!result?.found;
+  /** BE: HTTP 200 + data.found — chỉ vẽ route khi found === true */
+  const found = result?.found === true;
   const etaMin =
     result?.route?.total_cost_sec != null ? Math.max(1, Math.round(Number(result.route.total_cost_sec) / 60)) : null;
   const distanceKm =
@@ -165,6 +168,9 @@ export default function RoutingPage() {
         case 'crowd_max_boost':
           formatted = Number.isFinite(num) ? `x${num}` : String(v);
           break;
+        case 'sensor_flood_radius_m':
+          formatted = Number.isFinite(num) ? `${num} m` : String(v);
+          break;
         default:
           formatted = String(v);
       }
@@ -208,12 +214,27 @@ export default function RoutingPage() {
       setError('Trình duyệt không hỗ trợ định vị.');
       return;
     }
+    setError('');
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setStartLat(pos.coords.latitude);
-        setStartLng(pos.coords.longitude);
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        setStartLat(lat);
+        setStartLng(lng);
+        const coordLabel = `Vị trí của tôi (${lat.toFixed(5)}, ${lng.toFixed(5)})`;
+        setFromQuery(coordLabel);
+        setFromLocked(true);
+        setFromOptions([]);
+        fetchAddressFromCoords(lat, lng, { mapboxToken: MAPBOX_TOKEN })
+          .then((addr) => {
+            if (addr) {
+              setFromQuery(addr);
+            }
+          })
+          .catch(() => {});
       },
-      () => setError('Không lấy được vị trí hiện tại.')
+      () => setError('Không lấy được vị trí hiện tại. Kiểm tra quyền truy cập vị trí của trình duyệt.'),
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 60000 }
     );
   };
 
@@ -394,18 +415,30 @@ export default function RoutingPage() {
     }
     setLoading(true);
     setError('');
-    const res = await fetchSafePath({
+    const payload = {
       start_lng: startLng,
       start_lat: startLat,
       end_lng: endLng,
       end_lat: endLat,
       vehicle_type: vehicleType,
       nearest_node_max_m: nearestNodeMaxM
-    });
+    };
+    let res = await fetchSafePath(payload);
+    if (!res.success && res.status === 400 && nearestNodeMaxM < 5000) {
+      res = await fetchSafePath({ ...payload, nearest_node_max_m: 5000 });
+      if (res.success) {
+        setNearestNodeMaxM(5000);
+      }
+    }
     setLoading(false);
     if (!res.success) {
       setResult(null);
-      setError(res.error || 'Không gọi được API tìm đường an toàn.');
+      const base = res.error || 'Không gọi được API tìm đường an toàn.';
+      const hint400 =
+        res.status === 400
+          ? ' Nếu vẫn lỗi: điểm có thể nằm ngoài vùng đồ thị đường trên máy chủ — chọn điểm gần trung tâm TP.HCM hoặc chỗ đã có lưới đường.'
+          : '';
+      setError(`${base}${hint400}`);
       return;
     }
     setResult(res.data || null);
@@ -504,15 +537,24 @@ export default function RoutingPage() {
             </label>
 
             <label className="block text-sm">
-              Bán kính tìm nút gần nhất (m)
+              Bán kính snap điểm đi/đến vào đồ thị (m)
               <input
                 type="number"
-                min={100}
-                step={100}
+                min={150}
+                max={5000}
+                step={50}
                 value={nearestNodeMaxM}
-                onChange={(e) => setNearestNodeMaxM(Number(e.target.value))}
+                onChange={(e) => {
+                  const n = Number(e.target.value);
+                  if (!Number.isFinite(n)) return;
+                  setNearestNodeMaxM(Math.min(5000, Math.max(150, n)));
+                }}
                 className="mt-1 w-full rounded border border-slate-300 px-2 py-2"
               />
+              <span className="mt-0.5 block text-[11px] text-slate-500">
+                BE giới hạn 150–5000 (mặc định 1200). Snap start/end vào road_nodes. Nếu gặp lỗi 400, hệ thống sẽ tự
+                thử lại một lần với 5000 m trước khi báo lỗi.
+              </span>
             </label>
 
             <button
@@ -530,8 +572,16 @@ export default function RoutingPage() {
                   <input
                     type="number"
                     step="any"
-                    value={startLat}
-                    onChange={(e) => setStartLat(Number(e.target.value))}
+                    value={startLat ?? ''}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === '') {
+                        setStartLat(null);
+                        return;
+                      }
+                      const n = Number(v);
+                      setStartLat(Number.isFinite(n) ? n : null);
+                    }}
                     className="mt-1 w-full rounded border border-slate-300 px-2 py-2"
                   />
                 </label>
@@ -540,8 +590,16 @@ export default function RoutingPage() {
                   <input
                     type="number"
                     step="any"
-                    value={startLng}
-                    onChange={(e) => setStartLng(Number(e.target.value))}
+                    value={startLng ?? ''}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === '') {
+                        setStartLng(null);
+                        return;
+                      }
+                      const n = Number(v);
+                      setStartLng(Number.isFinite(n) ? n : null);
+                    }}
                     className="mt-1 w-full rounded border border-slate-300 px-2 py-2"
                   />
                 </label>
@@ -550,8 +608,16 @@ export default function RoutingPage() {
                   <input
                     type="number"
                     step="any"
-                    value={endLat}
-                    onChange={(e) => setEndLat(Number(e.target.value))}
+                    value={endLat ?? ''}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === '') {
+                        setEndLat(null);
+                        return;
+                      }
+                      const n = Number(v);
+                      setEndLat(Number.isFinite(n) ? n : null);
+                    }}
                     className="mt-1 w-full rounded border border-slate-300 px-2 py-2"
                   />
                 </label>
@@ -560,8 +626,16 @@ export default function RoutingPage() {
                   <input
                     type="number"
                     step="any"
-                    value={endLng}
-                    onChange={(e) => setEndLng(Number(e.target.value))}
+                    value={endLng ?? ''}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === '') {
+                        setEndLng(null);
+                        return;
+                      }
+                      const n = Number(v);
+                      setEndLng(Number.isFinite(n) ? n : null);
+                    }}
                     className="mt-1 w-full rounded border border-slate-300 px-2 py-2"
                   />
                 </label>
@@ -597,6 +671,10 @@ export default function RoutingPage() {
                 <FaLocationCrosshairs /> Dùng vị trí tôi
               </button>
             </div>
+            <p className="text-[11px] leading-snug text-slate-500">
+              GPS lấy từ trình duyệt và thiết bị đang dùng (API Geolocation), không lấy vị trí từ máy/tài khoản
+              khác qua mạng. Mỗi người mở site trên điện thoại/máy của họ sẽ thấy đúng vị trí thiết bị đó.
+            </p>
 
             <button
               type="button"
@@ -635,7 +713,9 @@ export default function RoutingPage() {
                     </div>
                   )}
                   <div className="mt-1 text-xs text-slate-600">
-                    Nguồn dữ liệu: cảm biến mực nước và crowd report đã duyệt.
+                    Nguồn ngập: sensor (theo bán kính quanh trạm + decay) và crowd đã duyệt; gộp max trên từng cạnh —{' '}
+                    <code className="text-[11px]">flood_depth_cm</code> có thể 0 dù cạnh còn{' '}
+                    <code className="text-[11px]">flood_sensor_id</code> trên DB.
                   </div>
 
                   <button
@@ -689,8 +769,23 @@ export default function RoutingPage() {
                   )}
                 </>
               ) : (
-                <div className="text-amber-800">
-                  Không có đường an toàn cho loại xe hiện tại. Gợi ý: đổi sang <strong>SUV</strong> hoặc chỉnh lại điểm đi/đến.
+                <div className="space-y-2 text-amber-900">
+                  <div>
+                    <strong>Không còn lộ trình</strong> thỏa ngưỡng an toàn cho loại xe (đây không phải lỗi API — HTTP 200).
+                  </div>
+                  {(() => {
+                    const t = [result?.reason, result?.message]
+                      .map((x) => (x == null ? '' : String(x).trim()))
+                      .find((s) => s.length > 0);
+                    return t ? (
+                      <div className="rounded border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs text-amber-950">
+                        {t}
+                      </div>
+                    ) : null;
+                  })()}
+                  <div className="text-xs text-amber-950">
+                    Gợi ý: thử <strong>SUV</strong>, tăng bán kính snap (nếu điểm xa lưới đường), hoặc đổi điểm đi/đến.
+                  </div>
                 </div>
               )}
             </div>

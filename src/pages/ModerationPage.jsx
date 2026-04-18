@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { fetchPendingReports, moderateReport } from '../services/api';
-import { isModerator } from '../utils/auth';
+import { isModerator, getLocationCacheStorageKey } from '../utils/auth';
 import { useReporterRanking } from '../context/ReporterRankingProvider';
 import { useNavigate } from 'react-router-dom';
 import { FaMagnifyingGlass, FaClock, FaCheck, FaXmark, FaStar, FaCircle, FaArrowsRotate, FaCircleQuestion, FaClock as FaClockIcon } from 'react-icons/fa6';
@@ -19,14 +19,26 @@ const ModerationPage = () => {
   const [hoveredCardId, setHoveredCardId] = useState(null);
   const [notification, setNotification] = useState(null);
   const [locationCache, setLocationCache] = useState(() => {
-    // Load cache từ localStorage khi khởi tạo
     try {
-      const saved = localStorage.getItem('locationCache');
+      const saved = localStorage.getItem(getLocationCacheStorageKey());
       return saved ? JSON.parse(saved) : {};
     } catch {
       return {};
     }
   });
+
+  useEffect(() => {
+    const reloadCache = () => {
+      try {
+        const saved = localStorage.getItem(getLocationCacheStorageKey());
+        setLocationCache(saved ? JSON.parse(saved) : {});
+      } catch {
+        setLocationCache({});
+      }
+    };
+    window.addEventListener('user-updated', reloadCache);
+    return () => window.removeEventListener('user-updated', reloadCache);
+  }, []);
 
   const loadReports = async () => {
     setLoading(true);
@@ -42,7 +54,7 @@ const ModerationPage = () => {
           if (report.location_description) return false;
           
           const cacheKey = `${report.lat.toFixed(6)},${report.lng.toFixed(6)}`;
-          const currentCache = JSON.parse(localStorage.getItem('locationCache') || '{}');
+          const currentCache = JSON.parse(localStorage.getItem(getLocationCacheStorageKey()) || '{}');
           if (currentCache[cacheKey]) {
             setReports(prevReports => 
               prevReports.map(r => 
@@ -237,7 +249,7 @@ const ModerationPage = () => {
     
     // Kiểm tra localStorage
     try {
-      const saved = localStorage.getItem('locationCache');
+      const saved = localStorage.getItem(getLocationCacheStorageKey());
       const savedCache = saved ? JSON.parse(saved) : {};
       if (savedCache[cacheKey]) {
         setLocationCache(savedCache);
@@ -268,11 +280,17 @@ const ModerationPage = () => {
       const formattedAddress = formatAddress(data);
       
       if (formattedAddress) {
-        const newCache = { ...locationCache, [cacheKey]: formattedAddress };
+        let base = {};
+        try {
+          base = JSON.parse(localStorage.getItem(getLocationCacheStorageKey()) || '{}');
+        } catch {
+          base = {};
+        }
+        const newCache = { ...base, [cacheKey]: formattedAddress };
         setLocationCache(newCache);
         
         try {
-          localStorage.setItem('locationCache', JSON.stringify(newCache));
+          localStorage.setItem(getLocationCacheStorageKey(), JSON.stringify(newCache));
         } catch {
           // Quota or private mode — state cache still holds the address
         }

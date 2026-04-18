@@ -6,7 +6,7 @@ import { fetchCrowdReports, fetchAllCrowdReports, fetchAllReportsAdmin } from '.
 import { POLLING_INTERVALS, CROWD_REPORT_MAP_DISPLAY_HOURS } from '../config/apiConfig';
 import { isReportExpired } from '../utils/reportHelpers';
 import { useNavigate } from 'react-router-dom';
-import { isModerator, isAdmin, getCurrentUser } from '../utils/auth';
+import { isModerator, isAdmin, getCurrentUser, getLocationCacheStorageKey } from '../utils/auth';
 import { useReporterRanking } from '../context/ReporterRankingProvider';
 import { 
   FaMobileScreen, 
@@ -74,14 +74,26 @@ const ReportsPage = () => {
         );
   
   const [locationCache, setLocationCache] = useState(() => {
-    // Load cache từ localStorage khi khởi tạo
     try {
-      const saved = localStorage.getItem('locationCache');
+      const saved = localStorage.getItem(getLocationCacheStorageKey());
       return saved ? JSON.parse(saved) : {};
     } catch {
       return {};
     }
   });
+
+  useEffect(() => {
+    const reloadCache = () => {
+      try {
+        const saved = localStorage.getItem(getLocationCacheStorageKey());
+        setLocationCache(saved ? JSON.parse(saved) : {});
+      } catch {
+        setLocationCache({});
+      }
+    };
+    window.addEventListener('user-updated', reloadCache);
+    return () => window.removeEventListener('user-updated', reloadCache);
+  }, []);
   const [hoveredCardId, setHoveredCardId] = useState(null); // Track card đang được hover
   const [fetchingLocations, setFetchingLocations] = useState(new Set()); // Track các location đang được fetch
 
@@ -168,13 +180,18 @@ const ReportsPage = () => {
       const formattedAddress = formatAddress(data);
       
       if (formattedAddress) {
-        // Lưu vào cache (cả state và localStorage)
-        const newCache = { ...locationCache, [cacheKey]: formattedAddress };
+        let base = {};
+        try {
+          base = JSON.parse(localStorage.getItem(getLocationCacheStorageKey()) || '{}');
+        } catch {
+          base = {};
+        }
+        const newCache = { ...base, [cacheKey]: formattedAddress };
         setLocationCache(newCache);
         
         // Lưu vào localStorage để persist
         try {
-          localStorage.setItem('locationCache', JSON.stringify(newCache));
+          localStorage.setItem(getLocationCacheStorageKey(), JSON.stringify(newCache));
         } catch {
           // Quota or private mode — state cache still holds the address
         }
@@ -247,7 +264,7 @@ const ReportsPage = () => {
               
               // Kiểm tra cache
               const cacheKey = `${report.lat.toFixed(6)},${report.lng.toFixed(6)}`;
-              const currentCache = JSON.parse(localStorage.getItem('locationCache') || '{}');
+              const currentCache = JSON.parse(localStorage.getItem(getLocationCacheStorageKey()) || '{}');
               if (currentCache[cacheKey]) {
                 // Có trong cache, cập nhật ngay
                 setReports(prevReports => 

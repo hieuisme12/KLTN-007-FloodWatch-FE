@@ -10,10 +10,37 @@ export const getCurrentUser = () => {
 };
 
 /**
- * Lấy token từ localStorage
+ * Khóa localStorage cho cache reverse-geocode (địa chỉ theo tọa độ).
+ * Tách theo user để nhiều tài khoản đăng nhập lần lượt trên cùng trình duyệt không dùng chung một object cache.
+ */
+export function getLocationCacheStorageKey() {
+  try {
+    const userStr = localStorage.getItem('user');
+    if (!userStr) return 'locationCache_guest';
+    const user = JSON.parse(userStr);
+    const id = user?.id ?? user?.user_id ?? user?.userId ?? user?.username;
+    if (id != null && String(id).length > 0) return `locationCache_u_${String(id)}`;
+    return 'locationCache_guest';
+  } catch {
+    return 'locationCache_guest';
+  }
+}
+
+/**
+ * sessionStorage: lần cuối POST /api/auth/location theo từng user (tránh user B kế thừa cờ “đã sync” của user A).
+ */
+export function getAuthLocationSyncSessionKey() {
+  const u = getCurrentUser();
+  const id = u?.id ?? u?.user_id ?? u?.userId ?? u?.username;
+  if (id != null && String(id).length > 0) return `userLocationSyncedAt:${String(id)}`;
+  return 'userLocationSyncedAt:guest';
+}
+
+/**
+ * Lấy access JWT từ localStorage (khóa legacy `authToken` + khóa theo tài liệu BE `access_token`).
  */
 export const getToken = () => {
-  return localStorage.getItem('authToken');
+  return localStorage.getItem('authToken') || localStorage.getItem('access_token');
 };
 
 /**

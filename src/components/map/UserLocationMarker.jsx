@@ -20,8 +20,8 @@ export default function UserLocationMarker({
 
   const title =
     source === 'gps'
-      ? 'Vị trí của bạn (GPS)'
-      : 'Vị trí đã lưu trên tài khoản';
+      ? 'Vị trí thiết bị này (GPS trình duyệt)'
+      : 'Vị trí đã lưu trên tài khoản (máy chủ)';
 
   return (
     <>
@@ -69,8 +69,8 @@ export default function UserLocationMarker({
             )}
             <div className="map-user-loc-popup-hint">
               {source === 'gps'
-                ? 'Cập nhật theo thiết bị của bạn.'
-                : 'Lần gần nhất đồng bộ từ máy chủ (chưa có GPS trực tiếp).'}
+                ? 'Geolocation của trình duyệt trên máy/điện thoại đang mở — không lấy từ máy người khác qua mạng.'
+                : 'Lần gần nhất đồng bộ từ máy chủ (chưa có GPS trực tiếp trên trình duyệt này).'}
             </div>
           </div>
         </Popup>

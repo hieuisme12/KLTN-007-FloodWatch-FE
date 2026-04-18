@@ -64,7 +64,8 @@ export default function EmergencyAlertsPage() {
     if (!telegramPoll) return undefined;
     const t = setInterval(async () => {
       const st = await getTelegramLinkStatus();
-      if (st.success && st.data?.linked) {
+      const linked = st.success && (st.data?.telegram_linked === true || st.data?.linked === true);
+      if (linked) {
         setTelegramPoll(false);
         setSuccess('Đã liên kết Telegram thành công.');
         await loadAll();
@@ -225,7 +226,8 @@ export default function EmergencyAlertsPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Cảnh báo khẩn theo vùng</h1>
           <p className="mt-1 text-sm text-slate-600">
-            Đăng ký nhận thông báo khi có nguy cơ ngập nghiêm trọng trong bán kính bạn chọn (C1 — người dùng).
+            Đăng ký nhận thông báo khi có nguy cơ ngập nghiêm trọng trong bán kính bạn chọn (C1 — người dùng). Nút
+            GPS dùng vị trí của trình duyệt trên thiết bị hiện tại, không lấy từ tài khoản hay máy khác.
           </p>
         </div>
       </div>
@@ -241,7 +243,14 @@ export default function EmergencyAlertsPage() {
         <h2 className="mb-3 text-lg font-semibold text-slate-800">Liên kết Telegram</h2>
         <p className="mb-4 text-sm text-slate-600">
           Để nhận cảnh báo qua Telegram, bạn cần liên kết bot một lần. Trạng thái:{' '}
-          <strong>{profile?.telegram_linked ? 'Đã liên kết' : 'Chưa liên kết'}</strong>.
+          <strong>{profile?.telegram_linked ? 'Đã liên kết' : 'Chưa liên kết'}</strong>
+          {profile?.telegram_linked && profile?.telegram_username ? (
+            <>
+              {' '}
+              (@{String(profile.telegram_username).replace(/^@/, '')})
+            </>
+          ) : null}
+          .
         </p>
         <div className="flex flex-wrap gap-2">
           <button

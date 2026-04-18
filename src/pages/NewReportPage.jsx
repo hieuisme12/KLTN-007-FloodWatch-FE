@@ -6,7 +6,7 @@ import { ChevronUpDownIcon } from '@heroicons/react/20/solid';
 import Map, { Marker, Popup } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { submitFloodReport, uploadReportImage, fetchFloodData } from '../services/api';
-import { isAuthenticated, getCurrentUser } from '../utils/auth';
+import { isAuthenticated, getCurrentUser, getLocationCacheStorageKey } from '../utils/auth';
 import { DEFAULT_CENTER, DEFAULT_ZOOM, statusColors } from '../utils/constants';
 import { getSensorDisplayPosition } from '../data/sensorOverrides';
 import SensorMarker from '../components/map/SensorMarker';
@@ -50,16 +50,6 @@ const NewReportPage = () => {
   const [searchResults, setSearchResults] = useState([]);
   const [content, setContent] = useState('');
   const [photoList, setPhotoList] = useState([]);
-  
-  // Load cache từ localStorage
-  const [locationCache] = useState(() => {
-    try {
-      const saved = localStorage.getItem('locationCache');
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  });
   
   // Flood level options for Combobox
   const floodLevelOptions = [
@@ -244,11 +234,16 @@ const NewReportPage = () => {
   // Hàm lấy địa chỉ từ tọa độ với cache
   const fetchLocationDescription = async (lat, lng) => {
     const cacheKey = `${lat.toFixed(6)},${lng.toFixed(6)}`;
-    
-    // Kiểm tra cache trước
-    if (locationCache[cacheKey]) {
-      setLocationDescription(locationCache[cacheKey]);
-      return locationCache[cacheKey];
+    const storageKey = getLocationCacheStorageKey();
+    let disk = {};
+    try {
+      disk = JSON.parse(localStorage.getItem(storageKey) || '{}');
+    } catch {
+      disk = {};
+    }
+    if (disk[cacheKey]) {
+      setLocationDescription(disk[cacheKey]);
+      return disk[cacheKey];
     }
     
     setFetchingLocation(true);
@@ -275,10 +270,15 @@ const NewReportPage = () => {
       const formattedAddress = formatAddress(data);
       
       if (formattedAddress) {
-        // Lưu vào cache (localStorage)
-        const newCache = { ...locationCache, [cacheKey]: formattedAddress };
+        let base = {};
         try {
-          localStorage.setItem('locationCache', JSON.stringify(newCache));
+          base = JSON.parse(localStorage.getItem(storageKey) || '{}');
+        } catch {
+          base = {};
+        }
+        const newCache = { ...base, [cacheKey]: formattedAddress };
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(newCache));
         } catch {
           // Quota or private mode — in-memory flow still works
         }

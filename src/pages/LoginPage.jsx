@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link, Navigate } from 'react-router-dom';
 import { FaUser } from 'react-icons/fa6';
 import { login } from '../services/api';
 import ErrorToast from '../components/common/ErrorToast';
+import { isAuthenticated } from '../utils/auth';
+
 const LoginPage = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -34,6 +36,7 @@ const LoginPage = () => {
       const result = await login(username, password);
 
       if (result.success) {
+        window.dispatchEvent(new CustomEvent('user-updated'));
         navigate('/dashboard');
       } else {
         setNeedsEmailVerifyCta(Boolean(result.needsEmailVerification));
@@ -45,6 +48,10 @@ const LoginPage = () => {
       setLoading(false);
     }
   };
+
+  if (isAuthenticated()) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   return (
     <div className="login-page">

@@ -23,12 +23,14 @@ import EmergencyAlertsPage from './pages/EmergencyAlertsPage';
 import AdminOperationsPage from './pages/AdminOperationsPage';
 import RoutingPage from './pages/RoutingPage';
 
-// Protected Route – chỉ cần đăng nhập (bất kỳ role)
+/**
+ * Global auth: có JWT mới vào shell app + Layout (theo tài liệu BE).
+ * Login, đăng ký, verify OTP vẫn mở không cần token.
+ */
 const ProtectedRoute = ({ children }) => {
   return isAuthenticated() ? children : <Navigate to="/login" replace />;
 };
 
-// Moderator Route – CHỈ role moderator (Admin không được vào trang kiểm duyệt)
 const ModeratorRoute = ({ children }) => {
   if (!isAuthenticated()) return <Navigate to="/login" replace />;
   if (!isModerator()) return <Navigate to="/" replace />;
@@ -41,7 +43,6 @@ const ResearchRoute = ({ children }) => {
   return children;
 };
 
-/** Chỉ admin — B1/C1 vận hành, không gộp moderator */
 const AdminRoute = ({ children }) => {
   if (!isAuthenticated()) return <Navigate to="/login" replace />;
   if (!isAdmin()) return <Navigate to="/" replace />;
@@ -52,158 +53,179 @@ function App() {
   return (
     <Router>
       <ReporterRankingProvider>
-      <Routes>
-        {/* Login và Register không có Navigation */}
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/register/verify" element={<VerifyRegisterOtpPage />} />
-        
-        {/* Các trang khác có Navigation */}
-        <Route 
-          path="/" 
-          element={
-            <Layout>
-              <DashboardPage />
-            </Layout>
-          } 
-        />
-        <Route 
-          path="/dashboard" 
-          element={
-            <Layout>
-              <DashboardPage />
-            </Layout>
-          } 
-        />
-        <Route 
-          path="/reports" 
-          element={
-            <Layout>
-              <ReportsPage />
-            </Layout>
-          } 
-        />
-        <Route 
-          path="/report/new" 
-          element={
-            <Layout>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/register/verify" element={<VerifyRegisterOtpPage />} />
+
+          <Route
+            path="/"
+            element={
               <ProtectedRoute>
-                <NewReportPage />
+                <Layout>
+                  <DashboardPage />
+                </Layout>
               </ProtectedRoute>
-            </Layout>
-          } 
-        />
-        <Route 
-          path="/profile" 
-          element={
-            <Layout>
+            }
+          />
+          <Route
+            path="/dashboard"
+            element={
               <ProtectedRoute>
-                <ProfilePage />
+                <Layout>
+                  <DashboardPage />
+                </Layout>
               </ProtectedRoute>
-            </Layout>
-          } 
-        />
-        <Route
-          path="/moderation"
-          element={
-            <Layout>
-              <ModeratorRoute>
-                <ModerationPage />
-              </ModeratorRoute>
-            </Layout>
-          }
-        />
-        <Route
-          path="/research"
-          element={
-            <Layout>
-              <ResearchRoute>
-                <ResearchAnalyticsPage />
-              </ResearchRoute>
-            </Layout>
-          }
-        />
-        <Route
-          path="/emergency-alerts"
-          element={
-            <Layout>
+            }
+          />
+          <Route
+            path="/reports"
+            element={
               <ProtectedRoute>
-                <EmergencyAlertsPage />
+                <Layout>
+                  <ReportsPage />
+                </Layout>
               </ProtectedRoute>
-            </Layout>
-          }
-        />
-        <Route
-          path="/admin/operations"
-          element={
-            <Layout>
-              <AdminRoute>
-                <AdminOperationsPage />
-              </AdminRoute>
-            </Layout>
-          }
-        />
-        <Route
-          path="/routing"
-          element={
-            <Layout>
-              <RoutingPage />
-            </Layout>
-          }
-        />
-        <Route 
-          path="/news/:id" 
-          element={
-            <Layout>
-              <NewsDetailPage />
-            </Layout>
-          } 
-        />
-        <Route 
-          path="/map" 
-          element={<MapPage />} 
-        />
-        <Route
-          path="/about"
-          element={
-            <Layout>
-              <AboutPage />
-            </Layout>
-          }
-        />
-        <Route
-          path="/privacy"
-          element={
-            <Layout>
-              <PrivacyPage />
-            </Layout>
-          }
-        />
-        <Route
-          path="/terms"
-          element={
-            <Layout>
-              <TermsPage />
-            </Layout>
-          }
-        />
-        <Route
-          path="/faq"
-          element={
-            <Layout>
-              <FaqPage />
-            </Layout>
-          }
-        />
-        <Route
-          path="/contact"
-          element={
-            <Layout>
-              <ContactPage />
-            </Layout>
-          }
-        />
-      </Routes>
+            }
+          />
+          <Route
+            path="/report/new"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <NewReportPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <ProfilePage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/moderation"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <ModeratorRoute>
+                    <ModerationPage />
+                  </ModeratorRoute>
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/research"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <ResearchRoute>
+                    <ResearchAnalyticsPage />
+                  </ResearchRoute>
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/emergency-alerts"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <EmergencyAlertsPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/operations"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <AdminRoute>
+                    <AdminOperationsPage />
+                  </AdminRoute>
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/routing"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <RoutingPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/news/:id"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <NewsDetailPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/map" element={<ProtectedRoute><MapPage /></ProtectedRoute>} />
+          <Route
+            path="/about"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <AboutPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/privacy"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <PrivacyPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/terms"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <TermsPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/faq"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <FaqPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/contact"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <ContactPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
       </ReporterRankingProvider>
     </Router>
   );

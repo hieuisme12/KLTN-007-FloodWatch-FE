@@ -64,6 +64,9 @@ export const API_ENDPOINTS = {
   // Admin (JWT role admin)
   ADMIN_DEVICES_HEALTH: '/api/v1/admin/devices/health',
   ADMIN_EMERGENCY_ALERTS_SUMMARY: '/api/v1/admin/emergency-alerts/summary',
+  /** Mô phỏng độ ngập trên cạnh đồ thị (routing); null = bỏ override */
+  ADMIN_ROUTING_MANUAL_FLOOD_DEPTHS_BATCH:
+    '/api/v1/admin/routing/manual-flood-depths/batch',
 
   // Telegram (user JWT)
   AUTH_TELEGRAM_LINK: '/api/auth/telegram/link',

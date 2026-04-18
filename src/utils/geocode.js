@@ -1,3 +1,5 @@
+import { getLocationCacheStorageKey } from './auth';
+
 /**
  * Các phường/địa điểm bị Nominatim gán nhầm "Thành phố Thủ Đức" → quận đúng (TP.HCM)
  * Key: chuỗi có trong địa chỉ (phường/ward), value: quận thay thế cho "Thành phố Thủ Đức"
@@ -51,12 +53,11 @@ export function formatAddressFromNominatim(data) {
     return formatted;
 }
 
-const CACHE_KEY = 'locationCache';
 const CACHE_VERSION = 2; // tăng khi đổi nguồn reverse geocoding (Mapbox/Nominatim) để bỏ cache cũ
 
 function getCache() {
     try {
-        const raw = localStorage.getItem(CACHE_KEY);
+        const raw = localStorage.getItem(getLocationCacheStorageKey());
         return raw ? JSON.parse(raw) : {};
     } catch {
         return {};
@@ -65,7 +66,7 @@ function getCache() {
 
 function setCache(cache) {
     try {
-        localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+        localStorage.setItem(getLocationCacheStorageKey(), JSON.stringify(cache));
     } catch {
         // Quota, private mode, or disabled storage — caller keeps in-memory cache if any
     }
