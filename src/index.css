@@ -1,3 +1,112 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* PrimeReact — dropdown bộ lọc */
+.filter-dropdown-root.p-dropdown {
+  border: 1px solid #dfe1e6;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: none;
+}
+.filter-dropdown-root.p-dropdown:not(.p-disabled):hover {
+  border-color: #c5cad3;
+}
+.filter-dropdown-root.p-dropdown.p-focus,
+.filter-dropdown-root.p-dropdown:not(.p-disabled).p-inputwrapper-focus {
+  border-color: #1976d2;
+  box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.15);
+}
+
+.filter-dropdown-toolbar.p-dropdown {
+  min-width: 200px;
+  min-height: 2.5rem;
+  font-size: 13px;
+}
+.filter-dropdown-toolbar.p-dropdown .p-dropdown-label {
+  font-size: 13px;
+}
+.filter-dropdown-compact.p-dropdown {
+  font-size: 12px;
+}
+.filter-dropdown-compact.p-dropdown .p-dropdown-label {
+  font-size: 12px;
+}
+
+/* Panel trùng độ rộng trigger (khi appendTo=self); không để ô filter kéo rộng panel */
+.filter-dropdown-root .p-dropdown-panel {
+  min-width: 100% !important;
+  max-width: 100% !important;
+  width: 100% !important;
+  box-sizing: border-box;
+  z-index: 1200;
+}
+.filter-dropdown-root .p-dropdown-filter-container {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 0.5rem 0.5rem 0;
+}
+.filter-dropdown-root .p-dropdown-filter {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
+}
+.filter-dropdown-root .p-dropdown-items {
+  padding: 0.25rem 0;
+}
+.filter-dropdown-root .p-dropdown-item {
+  padding: 0.45rem 0.65rem;
+  font-size: 13px;
+}
+
+/* PrimeReact AutoComplete — ô tìm kiếm / địa chỉ */
+.search-autocomplete-root.p-autocomplete {
+  width: 100%;
+}
+.search-autocomplete-root.p-autocomplete .p-inputtext,
+.search-autocomplete-root.p-autocomplete .p-autocomplete-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #dfe1e6;
+  border-radius: 8px;
+  font-size: 14px;
+}
+.search-autocomplete-root.p-autocomplete .p-inputtext:enabled:focus {
+  border-color: #1976d2;
+  box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.12);
+}
+.search-autocomplete-root .p-autocomplete-panel {
+  width: 100% !important;
+  min-width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  z-index: 1300;
+}
+.search-autocomplete-root .p-autocomplete-items .p-autocomplete-item {
+  white-space: normal;
+  word-break: break-word;
+}
+
+/* Trang báo cáo — ô tìm cùng chiều cao với FilterDropdown toolbar */
+.reports-toolbar-search.p-autocomplete .p-inputtext,
+.reports-toolbar-search.p-autocomplete .p-autocomplete-input {
+  min-height: 2.5rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 13px;
+  line-height: 1.25;
+  color: #172b4d;
+}
+
+/* Route hover tooltip: bỏ "vỏ" Popup mặc định, chỉ giữ nội dung custom bên trong */
+.route-eta-hover-popup .mapboxgl-popup-content {
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  border: 0;
+}
+
+.route-eta-hover-popup .mapboxgl-popup-tip {
+  display: none;
+}

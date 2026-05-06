@@ -1,5 +1,6 @@
 // API Configuration
 export const API_CONFIG = {
+  // FE luôn ưu tiên gọi theo VITE_API_BASE_URL trong .env.
   BASE_URL: import.meta.env.VITE_API_BASE_URL || 'https://api.floodsight.id.vn',
   TIMEOUT: 10000, // 10 seconds
   RETRY_ATTEMPTS: 3

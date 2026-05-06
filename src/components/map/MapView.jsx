@@ -20,7 +20,7 @@ import { useReporterRanking } from '../../context/ReporterRankingProvider';
 import { getCurrentUser, isAuthenticated } from '../../utils/auth';
 import SensorMarker from './SensorMarker';
 import UserLocationMarker from './UserLocationMarker';
-
+import { useMapboxGlResize } from '../../hooks/useMapboxGlResize';
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
 
 // Mapbox dùng [lng, lat]; DEFAULT_CENTER là [lat, lng]
@@ -693,27 +693,70 @@ const MapView = ({
   const [onlineCount, setOnlineCount] = useState(0);
   const [mapStyle, setMapStyle] = useState(MAP_STYLES.streets.url);
   const [mapStyleOpen, setMapStyleOpen] = useState(false);
+  const mapStyleMenuRef = useRef(null);
   const [openPopupId, setOpenPopupId] = useState(null);
-  /** Vị trí người dùng: GPS (ưu tiên) hoặc last_known từ profile */
-  const [userLocation, setUserLocation] = useState(() => {
+  /**
+   * Vị trí trên bản đồ: `gps` = Geolocation của **thiết bị/trình duyệt đang mở** (không lấy từ máy khác qua mạng).
+   * `profile` = last_known từ tài khoản đang đăng nhập (server). Đổi user → reset theo user hiện tại.
+   */
+  const [userLocation, setUserLocation] = useState(null);
+  const [authUserKey, setAuthUserKey] = useState(() => {
     const u = getCurrentUser();
-    if (!u) return null;
-    const lat = u.last_known_lat ?? u.last_known_latitude;
-    const lng = u.last_known_lng ?? u.last_known_longitude;
-    if (lat == null || lng == null) return null;
-    const acc = u.last_location_accuracy_m ?? u.last_location_accuracy;
-    return {
-      lat: Number(lat),
-      lng: Number(lng),
-      accuracy: acc != null ? Number(acc) : null,
-      source: 'profile'
-    };
+    return u ? `u:${u.id ?? u.user_id ?? u.username ?? ''}` : 'guest';
   });
+
+  useEffect(() => {
+    const syncKey = () => {
+      const u = getCurrentUser();
+      setAuthUserKey(u ? `u:${u.id ?? u.user_id ?? u.username ?? ''}` : 'guest');
+    };
+    window.addEventListener('user-updated', syncKey);
+    const onStorage = (e) => {
+      if (e.key === 'user' || e.key === 'authToken') syncKey();
+    };
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener('user-updated', syncKey);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated()) {
+      queueMicrotask(() => {
+        setUserLocation((prev) => (prev?.source === 'gps' ? prev : null));
+      });
+      return;
+    }
+    const u = getCurrentUser();
+    const lat = u?.last_known_lat ?? u?.last_known_latitude;
+    const lng = u?.last_known_lng ?? u?.last_known_longitude;
+    if (lat != null && lng != null) {
+      const acc = u.last_location_accuracy_m ?? u.last_location_accuracy;
+      queueMicrotask(() => {
+        setUserLocation((prev) => {
+          if (prev?.source === 'gps') return prev;
+          return {
+            lat: Number(lat),
+            lng: Number(lng),
+            accuracy: acc != null ? Number(acc) : null,
+            source: 'profile'
+          };
+        });
+      });
+      return;
+    }
+    queueMicrotask(() => {
+      setUserLocation((prev) => (prev?.source === 'gps' ? prev : null));
+    });
+  }, [authUserKey]);
   const [hoveredStackId, setHoveredStackId] = useState(null);
   const [hoveredStackIndex, setHoveredStackIndex] = useState(null);
   const stackLeaveTimeoutRef = useRef(null);
   const mapRef = useRef(null);
+  const mapContainerRef = useRef(null);
   const hasFittedSensorBounds = useRef(false);
+  useMapboxGlResize(mapRef, mapContainerRef);
 
   const handleStackSpreadEnter = (key) => {
     if (stackLeaveTimeoutRef.current) {
@@ -733,6 +776,17 @@ const MapView = ({
   useEffect(() => () => {
     if (stackLeaveTimeoutRef.current) clearTimeout(stackLeaveTimeoutRef.current);
   }, []);
+
+  useEffect(() => {
+    if (!mapStyleOpen) return undefined;
+    const onPointerDown = (e) => {
+      if (mapStyleMenuRef.current && !mapStyleMenuRef.current.contains(e.target)) {
+        setMapStyleOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    return () => document.removeEventListener('mousedown', onPointerDown);
+  }, [mapStyleOpen]);
 
   // Tự động zoom đến vùng có sensor khi load trang (lần đầu có floodData)
   useEffect(() => {
@@ -858,7 +912,7 @@ const MapView = ({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [authUserKey]);
 
   const displayCrowdReports = effectiveFusionEnabled ? [] : crowdReports;
   const markerTheme =
@@ -873,7 +927,7 @@ const MapView = ({
   }
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%', zIndex: 1 }}>
+    <div ref={mapContainerRef} style={{ position: 'relative', width: '100%', height: '100%', zIndex: 1 }}>
       <Map
         ref={mapRef}
         mapboxAccessToken={MAPBOX_TOKEN}
@@ -884,7 +938,13 @@ const MapView = ({
         }}
         style={{ width: '100%', height: '100%' }}
         mapStyle={mapStyle}
-        onClick={() => setOpenPopupId(null)}
+        onLoad={() => {
+          mapRef.current?.getMap?.()?.resize?.();
+        }}
+        onClick={() => {
+          setOpenPopupId(null);
+          setMapStyleOpen(false);
+        }}
       >
         {heatmapEnabled && heatGeoJSON.features.length > 0 && (
           <Source id="combined-heat" type="geojson" data={heatGeoJSON}>
@@ -1063,8 +1123,8 @@ const MapView = ({
       </div>
       )}
 
-      {/* Chế độ xem bản đồ – nút tròn + dropdown gọn */}
-      <div style={{ position: 'absolute', top: '20px', left: '20px', zIndex: 100 }}>
+      {/* Chế độ xem bản đồ — nút tròn + menu thả (design cũ, không dùng PrimeReact) */}
+      <div ref={mapStyleMenuRef} style={{ position: 'absolute', top: '20px', left: '20px', zIndex: 100 }}>
         <button
           type="button"
           onClick={() => setMapStyleOpen((v) => !v)}
@@ -1093,28 +1153,34 @@ const MapView = ({
             e.currentTarget.style.transform = 'scale(1)';
           }}
           title="Chế độ xem bản đồ"
+          aria-expanded={mapStyleOpen}
+          aria-haspopup="true"
         >
-          <FaLayerGroup style={{ fontSize: '24px', flexShrink: 0 }} />
+          <FaLayerGroup style={{ fontSize: '24px', flexShrink: 0 }} aria-hidden />
         </button>
         {mapStyleOpen && (
-          <div style={{
-            position: 'absolute',
-            top: '56px',
-            left: '0',
-            display: 'flex',
-            flexDirection: 'column',
-            width: 'max-content',
-            padding: '6px 0',
-            background: 'rgba(255,255,255,0.98)',
-            borderRadius: '10px',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.12), 0 0 1px rgba(0,0,0,0.08)',
-            border: '1px solid rgba(0,0,0,0.06)',
-            overflow: 'hidden'
-          }}>
+          <div
+            style={{
+              position: 'absolute',
+              top: '56px',
+              left: '0',
+              display: 'flex',
+              flexDirection: 'column',
+              width: 'max-content',
+              padding: '6px 0',
+              background: 'rgba(255,255,255,0.98)',
+              borderRadius: '10px',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.12), 0 0 1px rgba(0,0,0,0.08)',
+              border: '1px solid rgba(0,0,0,0.06)',
+              overflow: 'hidden'
+            }}
+            role="menu"
+          >
             {Object.values(MAP_STYLES).map((s) => (
               <button
                 key={s.id}
                 type="button"
+                role="menuitem"
                 onClick={() => {
                   setMapStyle(s.url);
                   setMapStyleOpen(false);
@@ -1122,7 +1188,10 @@ const MapView = ({
                 style={{
                   padding: '10px 18px',
                   border: 'none',
-                  background: mapStyle === s.url ? 'linear-gradient(90deg, #2563eb 0%, #3b82f6 100%)' : 'transparent',
+                  background:
+                    mapStyle === s.url
+                      ? 'linear-gradient(90deg, #2563eb 0%, #3b82f6 100%)'
+                      : 'transparent',
                   color: mapStyle === s.url ? '#fff' : '#334155',
                   fontSize: '13px',
                   fontWeight: '500',

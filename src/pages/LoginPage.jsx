@@ -6,7 +6,7 @@ import ErrorToast from '../components/common/ErrorToast';
 const LoginPage = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
   const [verifyHint, setVerifyHint] = useState('');
   const [needsEmailVerifyCta, setNeedsEmailVerifyCta] = useState(false);
@@ -31,7 +31,7 @@ const LoginPage = () => {
     setNeedsEmailVerifyCta(false);
 
     try {
-      const result = await login(username, password);
+      const result = await login(username, password, rememberMe);
 
       if (result.success) {
         navigate('/dashboard');

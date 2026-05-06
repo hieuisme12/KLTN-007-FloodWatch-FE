@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { MAP_LAYOUT_EVENT } from '../hooks/useMapboxGlResize';
 
 const SidebarContext = createContext(null);
 
@@ -31,6 +32,14 @@ export function SidebarProvider({ children }) {
   useEffect(() => {
     document.body.classList.remove('sidebar-collapsed');
   }, []);
+
+  /** Báo cho bản đồ Mapbox gọi resize sau khi margin sidebar (transition ~100ms) ổn định */
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent(MAP_LAYOUT_EVENT));
+    }, 130);
+    return () => window.clearTimeout(t);
+  }, [collapsed]);
 
   const value = useMemo(
     () => ({ collapsed, setCollapsed, toggleCollapse }),

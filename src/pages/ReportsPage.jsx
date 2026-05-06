@@ -1,7 +1,5 @@
-import React, { useEffect, useState, Fragment } from 'react';
-import { Combobox, Transition } from '@headlessui/react';
-import { CheckIcon } from '@heroicons/react/20/solid';
-import { ChevronUpDownIcon } from '@heroicons/react/20/solid';
+import React, { useEffect, useState, useCallback } from 'react';
+import FilterDropdown from '../components/common/FilterDropdown';
 import { fetchCrowdReports, fetchAllCrowdReports, fetchAllReportsAdmin } from '../services/api';
 import { POLLING_INTERVALS, CROWD_REPORT_MAP_DISPLAY_HOURS } from '../config/apiConfig';
 import { isReportExpired } from '../utils/reportHelpers';
@@ -17,13 +15,13 @@ import {
   FaStar,
   FaCircle,
   FaTriangleExclamation,
-  FaMagnifyingGlass,
   FaPenToSquare,
   FaClock as FaClockIcon
 } from 'react-icons/fa6';
 import { WiFlood } from 'react-icons/wi';
 import { MdLocationOn } from 'react-icons/md';
 import ConfidenceBadge from '../components/common/ConfidenceBadge';
+import SearchAutoComplete from '../components/common/SearchAutoComplete';
 const ReportsPage = () => {
   const navigate = useNavigate();
   const { getReporterReliability } = useReporterRanking();
@@ -32,6 +30,7 @@ const ReportsPage = () => {
   const [filter, setFilter] = useState('all'); // all, verified, pending
   const [expiryFilter, setExpiryFilter] = useState('active'); // all, active, expired
   const [searchText, setSearchText] = useState('');
+  const [reportSuggestions, setReportSuggestions] = useState([]);
   const [confidenceBand, setConfidenceBand] = useState('all');
   const [confidenceSort, setConfidenceSort] = useState('none');
   
@@ -47,32 +46,19 @@ const ReportsPage = () => {
     { id: 'active', name: 'Thời hạn: Còn hiệu lực' },
     { id: 'expired', name: 'Thời hạn: Đã hết hạn' },
   ];
-  
-  const selectedFilter = filterOptions.find(opt => opt.id === filter) || filterOptions[0];
-  const selectedExpiryFilter = expiryFilterOptions.find(opt => opt.id === expiryFilter) || expiryFilterOptions[1];
-  const [filterQuery, setFilterQuery] = useState('');
-  const [expiryFilterQuery, setExpiryFilterQuery] = useState('');
-  
-  const filteredOptions =
-    filterQuery === ''
-      ? filterOptions
-      : filterOptions.filter((option) =>
-          option.name
-            .toLowerCase()
-            .replace(/\s+/g, '')
-            .includes(filterQuery.toLowerCase().replace(/\s+/g, ''))
-        );
 
-  const filteredExpiryOptions =
-    expiryFilterQuery === ''
-      ? expiryFilterOptions
-      : expiryFilterOptions.filter((option) =>
-          option.name
-            .toLowerCase()
-            .replace(/\s+/g, '')
-            .includes(expiryFilterQuery.toLowerCase().replace(/\s+/g, ''))
-        );
-  
+  const confidenceBandOptions = [
+    { id: 'all', name: 'Độ tin: tất cả' },
+    { id: 'low', name: 'Độ tin: dưới 40' },
+    { id: 'mid', name: 'Độ tin: 40–69' },
+    { id: 'high', name: 'Độ tin: từ 70' },
+  ];
+  const confidenceSortOptions = [
+    { id: 'none', name: 'Sắp xếp tin cậy: không' },
+    { id: 'desc', name: 'Tin cậy: cao xuống thấp' },
+    { id: 'asc', name: 'Tin cậy: thấp lên cao' },
+  ];
+
   const [locationCache, setLocationCache] = useState(() => {
     // Load cache từ localStorage khi khởi tạo
     try {
@@ -380,6 +366,77 @@ const ReportsPage = () => {
     };
   };
 
+  /** Địa chỉ hiển thị/tìm: từ API hoặc cache reverse geocoding */
+  const getReportAddressForSearch = useCallback(
+    (report) => {
+      if (report?.location_description) return String(report.location_description);
+      if (report?.lat != null && report?.lng != null) {
+        const lat = Number(report.lat);
+        const lng = Number(report.lng);
+        if (Number.isFinite(lat) && Number.isFinite(lng)) {
+          const cacheKey = `${lat.toFixed(6)},${lng.toFixed(6)}`;
+          const cached = locationCache[cacheKey];
+          if (cached) return String(cached);
+        }
+      }
+      return '';
+    },
+    [locationCache]
+  );
+
+  const completeReportSearch = useCallback(
+    (event) => {
+      const q = event.query.trim().toLowerCase();
+      if (!q) {
+        setReportSuggestions([]);
+        return;
+      }
+      const out = [];
+      const seen = new Set();
+      const add = (s) => {
+        if (!s || seen.has(s)) return;
+        seen.add(s);
+        out.push(s);
+      };
+      const addSnippet = (text) => {
+        if (!text) return;
+        const t = String(text);
+        const tl = t.toLowerCase();
+        if (!tl.includes(q)) return;
+        if (t.length <= 120) add(t);
+        else {
+          const i = tl.indexOf(q);
+          const start = Math.max(0, i - 40);
+          add(t.slice(start, start + 120));
+        }
+      };
+      for (const r of reports) {
+        if (out.length >= 12) break;
+        const idStr = r.id != null ? String(r.id) : '';
+        if (idStr && idStr.toLowerCase().includes(q)) add(idStr);
+      }
+      for (const r of reports) {
+        if (out.length >= 12) break;
+        if (r.reporter_name && r.reporter_name.toLowerCase().includes(q)) add(r.reporter_name);
+      }
+      for (const r of reports) {
+        if (out.length >= 12) break;
+        addSnippet(getReportAddressForSearch(r));
+      }
+      for (const r of reports) {
+        if (out.length >= 12) break;
+        if (r.flood_level && r.flood_level.toLowerCase().includes(q)) add(r.flood_level);
+      }
+      for (const r of reports) {
+        if (out.length >= 12) break;
+        if (!r.description) continue;
+        addSnippet(r.description);
+      }
+      setReportSuggestions(out);
+    },
+    [reports, getReportAddressForSearch]
+  );
+
   const filteredReports = reports.filter(report => {
     // Filter by expiry (thời hạn)
     const expired = isReportExpired(report, CROWD_REPORT_MAP_DISPLAY_HOURS);
@@ -402,14 +459,16 @@ const ReportsPage = () => {
       if (confidenceBand === 'high' && n < 70) return false;
     }
 
-    // Filter by search text
+    // Filter by search text (gồm địa chỉ đã có hoặc trong cache)
     if (searchText.trim()) {
       const searchLower = searchText.toLowerCase();
+      const addr = getReportAddressForSearch(report);
       const matchesSearch = 
         (report.id && report.id.toString().toLowerCase().includes(searchLower)) ||
         (report.reporter_name && report.reporter_name.toLowerCase().includes(searchLower)) ||
         (report.flood_level && report.flood_level.toLowerCase().includes(searchLower)) ||
-        (report.description && report.description.toLowerCase().includes(searchLower));
+        (report.description && report.description.toLowerCase().includes(searchLower)) ||
+        (addr && addr.toLowerCase().includes(searchLower));
       
       return matchesFilter && matchesSearch;
     }
@@ -497,234 +556,75 @@ const ReportsPage = () => {
               gap: '8px',
               flexWrap: 'wrap'
             }}>
-              <div className="relative" style={{ minWidth: '200px', zIndex: 50 }}>
-                <Combobox value={selectedFilter} onChange={(option) => setFilter(option.id)}>
-                  <div className="relative mt-1">
-                    <div className="relative w-full cursor-default overflow-hidden rounded-lg bg-white text-left shadow-md border border-gray-300 focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-200 text-xs">
-                      <Combobox.Input
-                        className="w-full border-none py-2 pl-3 pr-10 text-xs leading-4 text-gray-900 focus:ring-0 focus:outline-none cursor-pointer"
-                        displayValue={(option) => option.name}
-                        onChange={(event) => setFilterQuery(event.target.value)}
-                        onClick={(e) => {
-                          e.target.select();
-                        }}
-                      />
-                      <Combobox.Button className="absolute inset-y-0 right-0 flex items-center pr-2 focus:outline-none outline-none border-none bg-transparent">
-                        <ChevronUpDownIcon
-                          className="h-5 w-5 text-gray-400 pointer-events-none"
-                          aria-hidden="true"
-                        />
-                      </Combobox.Button>
-                    </div>
-                    <Transition
-                      as={Fragment}
-                      leave="transition ease-in duration-100"
-                      leaveFrom="opacity-100"
-                      leaveTo="opacity-0"
-                      afterLeave={() => setFilterQuery('')}
-                    >
-                      <Combobox.Options className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-xs shadow-lg ring-1 ring-black/5 focus:outline-none">
-                        {filteredOptions.length === 0 && filterQuery !== '' ? (
-                          <div className="relative cursor-default select-none px-4 py-2 text-gray-700">
-                            Không tìm thấy.
-                          </div>
-                        ) : (
-                          filteredOptions.map((option) => (
-                            <Combobox.Option
-                              key={option.id}
-                              className={({ active }) =>
-                                `relative cursor-default select-none py-2 pl-10 pr-4 ${
-                                  active ? 'bg-blue-600 text-white' : 'text-gray-900'
-                                }`
-                              }
-                              value={option}
-                            >
-                              {({ selected, active }) => (
-                                <>
-                                  <span
-                                    className={`block truncate ${
-                                      selected ? 'font-medium' : 'font-normal'
-                                    }`}
-                                  >
-                                    {option.name}
-                                  </span>
-                                  {selected ? (
-                                    <span
-                                      className={`absolute inset-y-0 left-0 flex items-center pl-3 ${
-                                        active ? 'text-white' : 'text-blue-600'
-                                      }`}
-                                    >
-                                      <CheckIcon className="h-5 w-5" aria-hidden="true" />
-                                    </span>
-                                  ) : null}
-                                </>
-                              )}
-                            </Combobox.Option>
-                          ))
-                        )}
-                      </Combobox.Options>
-                    </Transition>
-                  </div>
-                </Combobox>
-              </div>
-
-              <div className="relative" style={{ minWidth: '200px', zIndex: 49 }}>
-                <Combobox value={selectedExpiryFilter} onChange={(option) => setExpiryFilter(option.id)}>
-                  <div className="relative mt-1">
-                    <div className="relative w-full cursor-default overflow-hidden rounded-lg bg-white text-left shadow-md border border-gray-300 focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-200 text-xs">
-                      <Combobox.Input
-                        className="w-full border-none py-2 pl-3 pr-10 text-xs leading-4 text-gray-900 focus:ring-0 focus:outline-none cursor-pointer"
-                        displayValue={(option) => option.name}
-                        onChange={(event) => setExpiryFilterQuery(event.target.value)}
-                        onClick={(e) => e.target.select()}
-                      />
-                      <Combobox.Button className="absolute inset-y-0 right-0 flex items-center pr-2 focus:outline-none outline-none border-none bg-transparent">
-                        <ChevronUpDownIcon
-                          className="h-5 w-5 text-gray-400 pointer-events-none"
-                          aria-hidden="true"
-                        />
-                      </Combobox.Button>
-                    </div>
-                    <Transition
-                      as={Fragment}
-                      leave="transition ease-in duration-100"
-                      leaveFrom="opacity-100"
-                      leaveTo="opacity-0"
-                      afterLeave={() => setExpiryFilterQuery('')}
-                    >
-                      <Combobox.Options className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-xs shadow-lg ring-1 ring-black/5 focus:outline-none">
-                        {filteredExpiryOptions.length === 0 && expiryFilterQuery !== '' ? (
-                          <div className="relative cursor-default select-none px-4 py-2 text-gray-700">
-                            Không tìm thấy.
-                          </div>
-                        ) : (
-                          filteredExpiryOptions.map((option) => (
-                            <Combobox.Option
-                              key={option.id}
-                              className={({ active }) =>
-                                `relative cursor-default select-none py-2 pl-10 pr-4 ${
-                                  active ? 'bg-blue-600 text-white' : 'text-gray-900'
-                                }`
-                              }
-                              value={option}
-                            >
-                              {({ selected, active }) => (
-                                <>
-                                  <span
-                                    className={`block truncate ${
-                                      selected ? 'font-medium' : 'font-normal'
-                                    }`}
-                                  >
-                                    {option.name}
-                                  </span>
-                                  {selected ? (
-                                    <span
-                                      className={`absolute inset-y-0 left-0 flex items-center pl-3 ${
-                                        active ? 'text-white' : 'text-blue-600'
-                                      }`}
-                                    >
-                                      <CheckIcon className="h-5 w-5" aria-hidden="true" />
-                                    </span>
-                                  ) : null}
-                                </>
-                              )}
-                            </Combobox.Option>
-                          ))
-                        )}
-                      </Combobox.Options>
-                    </Transition>
-                  </div>
-                </Combobox>
-              </div>
-              
-              <div style={{
-                flex: 1,
-                minWidth: '200px',
-                position: 'relative'
-              }}>
-                <input
-                  type="text"
-                  placeholder="Tìm kiếm báo cáo..."
-                  value={searchText}
-                  onChange={(e) => setSearchText(e.target.value)}
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter') {
-                      // Search is handled automatically by filteredReports
-                    }
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '6px 12px',
-                    border: '1px solid #dfe1e6',
-                    fontSize: '14px',
-                    borderRadius: '8px',
-                    outline: 'none',
-                    color: '#172b4d'
-                  }}
-                  onFocus={(e) => e.target.style.borderColor = '#1976d2'}
-                  onBlur={(e) => e.target.style.borderColor = '#dfe1e6'}
+              <div style={{ minWidth: '200px', zIndex: 50 }}>
+                <FilterDropdown
+                  value={filter}
+                  onChange={(e) => setFilter(e.value)}
+                  options={filterOptions}
+                  optionLabel="name"
+                  optionValue="id"
+                  placeholder="Trạng thái"
+                  className="filter-dropdown-toolbar w-full"
                 />
               </div>
 
-              <button
-                style={{
-                  padding: '6px 12px',
-                  border: '1px solid #dfe1e6',
-                  background: '#1976d2',
-                  color: 'white',
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                  borderRadius: '8px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  fontWeight: '500',
-                  transition: 'background 0.2s'
-                }}
-                onMouseEnter={(e) => e.target.style.background = '#1565c0'}
-                onMouseLeave={(e) => e.target.style.background = '#1976d2'}
-              >
-                <FaMagnifyingGlass style={{ fontSize: '14px' }} />
-                Tìm kiếm
-              </button>
+              <div style={{ minWidth: '200px', zIndex: 49 }}>
+                <FilterDropdown
+                  value={expiryFilter}
+                  onChange={(e) => setExpiryFilter(e.value)}
+                  options={expiryFilterOptions}
+                  optionLabel="name"
+                  optionValue="id"
+                  placeholder="Thời hạn"
+                  className="filter-dropdown-toolbar w-full"
+                />
+              </div>
 
-              <select
+              <div style={{
+                flex: 1,
+                minWidth: '200px',
+                position: 'relative',
+                zIndex: 48
+              }}>
+                <SearchAutoComplete
+                  value={searchText}
+                  suggestions={reportSuggestions}
+                  completeMethod={completeReportSearch}
+                  minLength={0}
+                  delay={200}
+                  placeholder="Tìm kiếm báo cáo..."
+                  className="w-full reports-toolbar-search"
+                  onChange={(ev) => {
+                    const v = ev.value;
+                    setSearchText(typeof v === 'string' ? v : '');
+                  }}
+                  onSelect={(ev) => {
+                    const v = ev.value;
+                    setSearchText(typeof v === 'string' ? v : searchText);
+                  }}
+                />
+              </div>
+
+              <FilterDropdown
                 value={confidenceBand}
-                onChange={(e) => setConfidenceBand(e.target.value)}
+                onChange={(e) => setConfidenceBand(e.value)}
+                options={confidenceBandOptions}
+                optionLabel="name"
+                optionValue="id"
+                placeholder="Độ tin"
                 aria-label="Lọc theo độ tin báo cáo"
-                style={{
-                  padding: '6px 10px',
-                  border: '1px solid #dfe1e6',
-                  borderRadius: '8px',
-                  fontSize: '13px',
-                  color: '#172b4d',
-                  background: 'white',
-                  maxWidth: '180px'
-                }}
-              >
-                <option value="all">Độ tin: tất cả</option>
-                <option value="low">Độ tin: dưới 40</option>
-                <option value="mid">Độ tin: 40–69</option>
-                <option value="high">Độ tin: từ 70</option>
-              </select>
-              <select
+                className="filter-dropdown-toolbar max-w-[200px]"
+              />
+              <FilterDropdown
                 value={confidenceSort}
-                onChange={(e) => setConfidenceSort(e.target.value)}
+                onChange={(e) => setConfidenceSort(e.value)}
+                options={confidenceSortOptions}
+                optionLabel="name"
+                optionValue="id"
+                placeholder="Sắp xếp tin cậy"
                 aria-label="Sắp xếp theo độ tin"
-                style={{
-                  padding: '6px 10px',
-                  border: '1px solid #dfe1e6',
-                  borderRadius: '8px',
-                  fontSize: '13px',
-                  color: '#172b4d',
-                  background: 'white',
-                  maxWidth: '200px'
-                }}
-              >
-                <option value="none">Sắp xếp tin cậy: không</option>
-                <option value="desc">Tin cậy: cao xuống thấp</option>
-                <option value="asc">Tin cậy: thấp lên cao</option>
-              </select>
+                className="filter-dropdown-toolbar max-w-[240px]"
+              />
             </div>
           </div>
 

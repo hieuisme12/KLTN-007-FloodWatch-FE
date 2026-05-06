@@ -1,8 +1,6 @@
-import React, { useState, useEffect, Fragment } from 'react';
-import { Combobox, Transition } from '@headlessui/react';
-import { CheckIcon } from '@heroicons/react/20/solid';
-import { ChevronUpDownIcon } from '@heroicons/react/20/solid';
+import React, { useState, useEffect } from 'react';
 import Map, { Marker } from 'react-map-gl/mapbox';
+import FilterDropdown from '../common/FilterDropdown';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { FaPenToSquare, FaCheck, FaXmark, FaClock, FaPaperPlane, FaXmark as FaClose } from 'react-icons/fa6';
 import { submitFloodReport } from '../../services/api';
@@ -48,19 +46,6 @@ const ReportFloodForm = ({ onSuccess, onClose }) => {
     { id: 'Nặng', name: 'Nặng - Ngập nửa xe (~50cm)' },
   ];
   
-  const selectedLevel = floodLevelOptions.find(opt => opt.id === formData.level) || floodLevelOptions[0];
-  const [levelQuery, setLevelQuery] = useState('');
-  
-  const filteredLevels =
-    levelQuery === ''
-      ? floodLevelOptions
-      : floodLevelOptions.filter((option) =>
-          option.name
-            .toLowerCase()
-            .replace(/\s+/g, '')
-            .includes(levelQuery.toLowerCase().replace(/\s+/g, ''))
-        );
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
@@ -312,78 +297,15 @@ const ReportFloodForm = ({ onSuccess, onClose }) => {
           <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
             Mức độ ngập <span style={{ color: 'red' }}>*</span>
           </label>
-          <div className="relative">
-            <Combobox value={selectedLevel} onChange={(option) => {
-              setFormData({ ...formData, level: option.id });
-            }}>
-              <div className="relative mt-1">
-                <div className="relative w-full cursor-default overflow-hidden rounded-lg bg-white text-left shadow-md border border-gray-300 focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-200 text-xs">
-                  <Combobox.Input
-                    className="w-full border-none py-2 pl-3 pr-10 text-xs leading-4 text-gray-900 focus:ring-0 focus:outline-none cursor-pointer"
-                    displayValue={(option) => option.name}
-                    onChange={(event) => setLevelQuery(event.target.value)}
-                    onClick={(e) => {
-                      e.target.select();
-                    }}
-                  />
-                  <Combobox.Button className="absolute inset-y-0 right-0 flex items-center pr-2 focus:outline-none outline-none border-none bg-transparent">
-                    <ChevronUpDownIcon
-                      className="h-5 w-5 text-gray-400 pointer-events-none"
-                      aria-hidden="true"
-                    />
-                  </Combobox.Button>
-                </div>
-                <Transition
-                  as={Fragment}
-                  leave="transition ease-in duration-100"
-                  leaveFrom="opacity-100"
-                  leaveTo="opacity-0"
-                  afterLeave={() => setLevelQuery('')}
-                >
-                  <Combobox.Options className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-xs shadow-lg ring-1 ring-black/5 focus:outline-none">
-                    {filteredLevels.length === 0 && levelQuery !== '' ? (
-                      <div className="relative cursor-default select-none px-4 py-2 text-gray-700">
-                        Không tìm thấy.
-                      </div>
-                    ) : (
-                      filteredLevels.map((option) => (
-                        <Combobox.Option
-                          key={option.id}
-                          className={({ active }) =>
-                            `relative cursor-default select-none py-2 pl-10 pr-4 ${
-                              active ? 'bg-blue-600 text-white' : 'text-gray-900'
-                            }`
-                          }
-                          value={option}
-                        >
-                          {({ selected, active }) => (
-                            <>
-                              <span
-                                className={`block truncate ${
-                                  selected ? 'font-medium' : 'font-normal'
-                                }`}
-                              >
-                                {option.name}
-                              </span>
-                              {selected ? (
-                                <span
-                                  className={`absolute inset-y-0 left-0 flex items-center pl-3 ${
-                                    active ? 'text-white' : 'text-blue-600'
-                                  }`}
-                                >
-                                  <CheckIcon className="h-5 w-5" aria-hidden="true" />
-                                </span>
-                              ) : null}
-                            </>
-                          )}
-                        </Combobox.Option>
-                      ))
-                    )}
-                  </Combobox.Options>
-                </Transition>
-              </div>
-            </Combobox>
-          </div>
+          <FilterDropdown
+            value={formData.level}
+            onChange={(e) => setFormData({ ...formData, level: e.value })}
+            options={floodLevelOptions}
+            optionLabel="name"
+            optionValue="id"
+            placeholder="Chọn mức độ ngập"
+            className="filter-dropdown-toolbar w-full"
+          />
         </div>
 
         {/* Bản đồ chọn vị trí */}

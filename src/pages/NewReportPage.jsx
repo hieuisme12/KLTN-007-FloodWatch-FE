@@ -1,9 +1,7 @@
-import React, { useState, Fragment, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Combobox, Transition } from '@headlessui/react';
-import { CheckIcon } from '@heroicons/react/20/solid';
-import { ChevronUpDownIcon } from '@heroicons/react/20/solid';
 import Map, { Marker, Popup } from 'react-map-gl/mapbox';
+import FilterDropdown from '../components/common/FilterDropdown';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { submitFloodReport, uploadReportImage, fetchFloodData } from '../services/api';
 import { isAuthenticated, getCurrentUser } from '../utils/auth';
@@ -24,6 +22,8 @@ import {
 import { WiFlood } from 'react-icons/wi';
 import { MdAddLocation, MdLocationOn, MdLightbulb } from 'react-icons/md';
 import ErrorToast from '../components/common/ErrorToast';
+import SearchAutoComplete from '../components/common/SearchAutoComplete';
+import { searchNominatimPlacesInHcm } from '../utils/geocode';
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
 // Mapbox: [lng, lat]; DEFAULT_CENTER là [lat, lng]
@@ -69,19 +69,6 @@ const NewReportPage = () => {
     { id: 'Nặng', name: 'Nặng (ngập nửa xe ~50cm)' },
   ];
   
-  const selectedLevel = floodLevelOptions.find(opt => opt.id === formData.level) || floodLevelOptions[0];
-  const [levelQuery, setLevelQuery] = useState('');
-  
-  const filteredLevels =
-    levelQuery === ''
-      ? floodLevelOptions
-      : floodLevelOptions.filter((option) =>
-          option.name
-            .toLowerCase()
-            .replace(/\s+/g, '')
-            .includes(levelQuery.toLowerCase().replace(/\s+/g, ''))
-        );
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
@@ -311,57 +298,20 @@ const NewReportPage = () => {
     setMapCenter(null);
   };
 
-  // Hàm tìm kiếm địa chỉ (forward geocoding)
-  const handleSearchAddress = async () => {
-    if (!searchAddress.trim()) {
-      setError('Vui lòng nhập địa chỉ cần tìm');
+  /** Gợi ý địa chỉ (Nominatim) — chỉ trong nội thành TP.HCM */
+  const completeAddressSearch = async (e) => {
+    const q = e.query.trim();
+    if (q.length < 3) {
+      setSearchResults([]);
       return;
     }
-
     setSearchingAddress(true);
     setError(null);
-    setSearchResults([]);
-
     try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchAddress)}&limit=5&addressdetails=1&accept-language=vi&countrycodes=vn`,
-        {
-          headers: {
-            'User-Agent': 'HCM-Flood-Frontend/1.0'
-          }
-        }
-      );
-
-      if (!response.ok) {
-        setError('Không thể tìm kiếm địa chỉ');
-        return;
-      }
-
-      const data = await response.json();
-
-      if (data.length === 0) {
-        setError('Không tìm thấy địa chỉ. Vui lòng thử lại với từ khóa khác.');
-        return;
-      }
-
-      // Nếu chỉ có 1 kết quả, tự động chọn luôn
-      if (data.length === 1) {
-        const result = data[0];
-        const lat = parseFloat(result.lat);
-        const lng = parseFloat(result.lon);
-        setFormData({ ...formData, lat, lng });
-        setSearchAddress('');
-        setSearchResults([]);
-        // Di chuyển map đến vị trí mới
-        setMapCenter([lat, lng]);
-        // Fetch địa chỉ chi tiết
-        await fetchLocationDescription(lat, lng);
-      } else {
-        // Nếu có nhiều kết quả, hiển thị để người dùng chọn
-        setSearchResults(data);
-      }
+      const data = await searchNominatimPlacesInHcm(q, { limit: 5 });
+      setSearchResults(data);
     } catch {
-      setError('Lỗi kết nối khi tìm kiếm địa chỉ');
+      setSearchResults([]);
     } finally {
       setSearchingAddress(false);
     }
@@ -564,78 +514,15 @@ const NewReportPage = () => {
                 }}>
                   Mức độ ngập *
                 </label>
-                <div className="relative">
-                  <Combobox value={selectedLevel} onChange={(option) => {
-                    setFormData({ ...formData, level: option.id });
-                  }}>
-                    <div className="relative mt-1">
-                      <div className="relative w-full cursor-default overflow-hidden rounded-lg bg-white text-left shadow-md border border-gray-300 focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-200 text-xs">
-                        <Combobox.Input
-                          className="w-full border-none py-2 pl-3 pr-10 text-xs leading-4 text-gray-900 focus:ring-0 focus:outline-none cursor-pointer"
-                          displayValue={(option) => option.name}
-                          onChange={(event) => setLevelQuery(event.target.value)}
-                          onClick={(e) => {
-                            e.target.select();
-                          }}
-                        />
-                        <Combobox.Button className="absolute inset-y-0 right-0 flex items-center pr-2 focus:outline-none outline-none border-none bg-transparent">
-                          <ChevronUpDownIcon
-                            className="h-5 w-5 text-gray-400 pointer-events-none"
-                            aria-hidden="true"
-                          />
-                        </Combobox.Button>
-                      </div>
-                      <Transition
-                        as={Fragment}
-                        leave="transition ease-in duration-100"
-                        leaveFrom="opacity-100"
-                        leaveTo="opacity-0"
-                        afterLeave={() => setLevelQuery('')}
-                      >
-                        <Combobox.Options className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-xs shadow-lg ring-1 ring-black/5 focus:outline-none">
-                          {filteredLevels.length === 0 && levelQuery !== '' ? (
-                            <div className="relative cursor-default select-none px-4 py-2 text-gray-700">
-                              Không tìm thấy.
-                            </div>
-                          ) : (
-                            filteredLevels.map((option) => (
-                              <Combobox.Option
-                                key={option.id}
-                                className={({ active }) =>
-                                  `relative cursor-default select-none py-2 pl-10 pr-4 ${
-                                    active ? 'bg-blue-600 text-white' : 'text-gray-900'
-                                  }`
-                                }
-                                value={option}
-                              >
-                                {({ selected, active }) => (
-                                  <>
-                                    <span
-                                      className={`block truncate ${
-                                        selected ? 'font-medium' : 'font-normal'
-                                      }`}
-                                    >
-                                      {option.name}
-                                    </span>
-                                    {selected ? (
-                                      <span
-                                        className={`absolute inset-y-0 left-0 flex items-center pl-3 ${
-                                          active ? 'text-white' : 'text-blue-600'
-                                        }`}
-                                      >
-                                        <CheckIcon className="h-5 w-5" aria-hidden="true" />
-                                      </span>
-                                    ) : null}
-                                  </>
-                                )}
-                              </Combobox.Option>
-                            ))
-                          )}
-                        </Combobox.Options>
-                      </Transition>
-                    </div>
-                  </Combobox>
-                </div>
+                <FilterDropdown
+                  value={formData.level}
+                  onChange={(e) => setFormData({ ...formData, level: e.value })}
+                  options={floodLevelOptions}
+                  optionLabel="name"
+                  optionValue="id"
+                  placeholder="Chọn mức độ ngập"
+                  className="filter-dropdown-toolbar w-full"
+                />
               </div>
 
               {/* Nội dung mô tả mức độ ngập (optional) */}
@@ -735,92 +622,25 @@ const NewReportPage = () => {
                   Vị trí *
                 </label>
                 
-                {/* Ô tìm kiếm địa chỉ */}
                 <div style={{ marginBottom: '10px' }}>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <input
-                      type="text"
-                      value={searchAddress}
-                      onChange={(e) => setSearchAddress(e.target.value)}
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter') {
-                          handleSearchAddress();
-                        }
-                      }}
-                      placeholder="Nhập địa chỉ để tìm kiếm (VD: Đường 3 tháng 2, Quận 10)"
-                      style={{
-                        flex: 1,
-                        padding: '8px 12px',
-                        fontSize: '13px',
-                        border: '1px solid #ddd',
-                        borderRadius: '4px',
-                        boxSizing: 'border-box'
-                      }}
-                      onFocus={(e) => e.target.style.borderColor = '#007bff'}
-                      onBlur={(e) => e.target.style.borderColor = '#ddd'}
-                    />
-                    <button
-                      type="button"
-                      onClick={handleSearchAddress}
-                      disabled={searchingAddress || !searchAddress.trim()}
-                      style={{
-                        padding: '8px 16px',
-                        fontSize: '13px',
-                        fontWeight: '600',
-                        color: 'white',
-                        background: searchingAddress || !searchAddress.trim() ? '#6c757d' : '#007bff',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: searchingAddress || !searchAddress.trim() ? 'not-allowed' : 'pointer',
-                        transition: 'background 0.2s',
-                        whiteSpace: 'nowrap'
-                      }}
-                    >
-                      {searchingAddress ? 'Đang tìm...' : 'Tìm kiếm'}
-                    </button>
-                  </div>
-                  
-                  {/* Hiển thị kết quả tìm kiếm */}
-                  {searchResults.length > 0 && (
-                    <div style={{
-                      marginTop: '8px',
-                      border: '1px solid #ddd',
-                      borderRadius: '4px',
-                      background: 'white',
-                      maxHeight: '200px',
-                      overflowY: 'auto',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                    }}>
-                      {searchResults.map((result, index) => (
-                        <div
-                          key={index}
-                          onClick={() => handleSelectSearchResult(result)}
-                          style={{
-                            padding: '10px 12px',
-                            cursor: 'pointer',
-                            borderBottom: index < searchResults.length - 1 ? '1px solid #e9ecef' : 'none',
-                            transition: 'background 0.2s'
-                          }}
-                          onMouseEnter={(e) => e.currentTarget.style.background = '#f8f9fa'}
-                          onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
-                        >
-                          <div style={{
-                            fontSize: '13px',
-                            color: '#333',
-                            fontWeight: '500',
-                            marginBottom: '4px'
-                          }}>
-                            {result.display_name.split(',').slice(0, 3).join(', ')}
-                          </div>
-                          <div style={{
-                            fontSize: '11px',
-                            color: '#666'
-                          }}>
-                            Lat: {parseFloat(result.lat).toFixed(6)}, Lng: {parseFloat(result.lon).toFixed(6)}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                  <SearchAutoComplete
+                    value={searchAddress}
+                    suggestions={searchResults}
+                    completeMethod={completeAddressSearch}
+                    field="display_name"
+                    minLength={3}
+                    delay={400}
+                    placeholder="Nhập địa chỉ để tìm (VD: Đường 3 tháng 2, Quận 10)"
+                    className="w-full text-sm"
+                    inputClassName="rounded border border-gray-300 px-2 py-2 text-sm"
+                    onChange={(ev) => {
+                      const v = ev.value;
+                      setSearchAddress(typeof v === 'string' ? v : '');
+                    }}
+                    onSelect={(ev) => handleSelectSearchResult(ev.value)}
+                  />
+                  {searchingAddress && (
+                    <div style={{ marginTop: '6px', fontSize: '12px', color: '#64748b' }}>Đang tìm gợi ý…</div>
                   )}
                 </div>
 

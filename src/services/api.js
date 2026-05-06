@@ -1,62 +1,25 @@
 import axios from 'axios';
 import { API_CONFIG, API_ENDPOINTS, DEFAULTS } from '../config/apiConfig';
+import {
+  persistAuthTokens,
+  clearAuthStorage,
+  getAccessToken,
+  refreshTokensViaApi,
+  setStoredUserJson
+} from '../utils/authSession';
 
-/** Khóa localStorage — access JWT (alias key cũ authToken), refresh opaque, session UUID */
-const LS_ACCESS = 'authToken';
-const LS_REFRESH = 'refreshToken';
-const LS_SESSION = 'sessionToken';
+export { persistAuthTokens, clearAuthStorage, bootstrapAuth } from '../utils/authSession';
 
-/**
- * Ghi đè token sau login / register / refresh (rotation: luôn cả access + refresh).
- * @param {object} data — từ BE: access_token | token, refresh_token, session_token, user?
- */
-export function persistAuthTokens(data) {
-  if (!data || typeof data !== 'object') return;
-  const access = data.access_token || data.token;
-  if (access) localStorage.setItem(LS_ACCESS, access);
-  if (data.refresh_token) localStorage.setItem(LS_REFRESH, data.refresh_token);
-  if (data.session_token) localStorage.setItem(LS_SESSION, data.session_token);
-  if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
-}
+/** Hàng đợi khi nhiều request 401 cùng lúc — chỉ một lần gọi refresh (theo hướng dẫn global auth). */
+let isRefreshing = false;
+let failedQueue = [];
 
-export function clearAuthStorage() {
-  localStorage.removeItem(LS_ACCESS);
-  localStorage.removeItem(LS_REFRESH);
-  localStorage.removeItem(LS_SESSION);
-  localStorage.removeItem('user');
-}
-
-/** Một promise refresh dùng chung — tránh nhiều request 401 gọi refresh song song */
-let refreshPromise = null;
-
-function attemptTokenRefresh() {
-  if (refreshPromise) return refreshPromise;
-
-  const refresh = localStorage.getItem(LS_REFRESH);
-  const session = localStorage.getItem(LS_SESSION);
-
-  if (!refresh || !session) {
-    return Promise.reject(new Error('Missing refresh or session token'));
-  }
-
-  refreshPromise = axios
-    .post(`${API_CONFIG.BASE_URL}${API_ENDPOINTS.AUTH_REFRESH}`, {
-      refresh_token: refresh,
-      session_token: session
-    })
-    .then((res) => {
-      const payload = res.data;
-      if (payload?.success && payload?.data) {
-        persistAuthTokens(payload.data);
-        return payload.data;
-      }
-      throw new Error('Invalid refresh response');
-    })
-    .finally(() => {
-      refreshPromise = null;
-    });
-
-  return refreshPromise;
+function processFailedQueue(error, token = null) {
+  failedQueue.forEach((p) => {
+    if (error) p.reject(error);
+    else p.resolve(token);
+  });
+  failedQueue = [];
 }
 
 function isAuthEndpointNoRefresh(url) {
@@ -79,7 +42,7 @@ const apiClient = axios.create({
 // Interceptor: Tự động thêm token vào header cho mọi request
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem(LS_ACCESS);
+    const token = getAccessToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -90,7 +53,7 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Interceptor: 401 → refresh (một lần) → retry; refresh/login/register path không retry refresh
+// Interceptor: 401 → refresh một lần + hàng đợi; login/register/refresh không vòng lặp
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -99,48 +62,83 @@ apiClient.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    if (isAuthEndpointNoRefresh(config.url || '')) {
+    const reqUrl = String(config.url || '');
+    if (isAuthEndpointNoRefresh(reqUrl)) {
       return Promise.reject(error);
     }
 
     if (config._authRetry) {
       clearAuthStorage();
-      if (window.location.pathname !== '/login') {
+      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
         window.location.href = '/login';
       }
       return Promise.reject(error);
     }
 
+    if (isRefreshing) {
+      return new Promise((resolve, reject) => {
+        failedQueue.push({ resolve, reject });
+      })
+        .then((token) => {
+          config.headers = config.headers || {};
+          if (token) config.headers.Authorization = `Bearer ${token}`;
+          return apiClient(config);
+        })
+        .catch((err) => Promise.reject(err));
+    }
+
+    config._authRetry = true;
+    isRefreshing = true;
+
     try {
-      await attemptTokenRefresh();
-      config._authRetry = true;
-      const access = localStorage.getItem(LS_ACCESS);
-      config.headers = config.headers || {};
-      if (access) {
-        config.headers.Authorization = `Bearer ${access}`;
+      const ok = await refreshTokensViaApi();
+      if (!ok) {
+        throw new Error('Refresh failed');
       }
+      const newToken = getAccessToken();
+      processFailedQueue(null, newToken);
+      config.headers = config.headers || {};
+      if (newToken) config.headers.Authorization = `Bearer ${newToken}`;
       return apiClient(config);
-    } catch {
+    } catch (refreshErr) {
+      processFailedQueue(refreshErr, null);
       clearAuthStorage();
-      if (window.location.pathname !== '/login') {
+      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
         window.location.href = '/login';
       }
-      return Promise.reject(error);
+      return Promise.reject(refreshErr);
+    } finally {
+      isRefreshing = false;
     }
   }
 );
 
 // Chuẩn hóa dữ liệu từ API
-const normalizeFloodData = (data, isRealtimeEndpoint = false) => {
+const normalizeFloodData = (data) => {
   return data.map(item => {
     const waterLevel = item.water_level || 0;
     const warningThreshold = item.warning_threshold || DEFAULTS.WARNING_THRESHOLD;
     const dangerThreshold = item.danger_threshold || DEFAULTS.DANGER_THRESHOLD;
-    
-    // Tính toán status nếu endpoint cũ không có
+
+    // Realtime thường gửi `sensor_status` (online/offline) mà không gửi `status`.
+    // Trước đây chỉ dùng `item.status` → thiếu thì fallback 'normal' → mọi cảm biến bị coi là online (sóng pulse).
     let status = item.status;
-    if (!status && isRealtimeEndpoint === false) {
-      // Tính toán status từ water_level và thresholds
+    if (status == null || status === '') {
+      status = item.sensor_status;
+    }
+    if (typeof status === 'string') {
+      const t = status.trim().toLowerCase();
+      if (t === 'offline' || t === 'disconnected' || t === 'inactive') {
+        status = 'offline';
+      } else if (t === 'online' || t === 'connected' || t === 'active' || t === 'live') {
+        status = null;
+      } else if (t === 'normal' || t === 'warning' || t === 'danger') {
+        status = t;
+      }
+    }
+
+    // Tính từ mực nước khi chưa có mức ngập (fallback cũ hoặc realtime chỉ gửi online/offline chung)
+    if (!status) {
       if (waterLevel >= dangerThreshold) {
         status = 'danger';
       } else if (waterLevel >= warningThreshold) {
@@ -177,50 +175,45 @@ const normalizeFloodData = (data, isRealtimeEndpoint = false) => {
 
 // Fetch dữ liệu flood: ưu tiên /api/flood-data/realtime (có temperature, humidity), fallback nếu 404
 export const fetchFloodData = async (endpointRef) => {
-  const base = API_CONFIG.BASE_URL.replace(/\/$/, '');
-  const tryRealtime = (url) =>
-    axios.get(`${url}?t=${Date.now()}`, { validateStatus: (s) => s < 500 });
+  const tryRealtime = (path) =>
+    apiClient.get(`${path}?t=${Date.now()}`, { validateStatus: (s) => s < 500 });
 
   try {
     let response;
-    let isRealtimeEndpoint = false;
 
     if (endpointRef.current === null) {
       try {
-        response = await tryRealtime(base + API_ENDPOINTS.FLOOD_DATA_REALTIME);
+        response = await tryRealtime(API_ENDPOINTS.FLOOD_DATA_REALTIME);
         if (response.status === 200) {
           endpointRef.current = 'realtime';
-          isRealtimeEndpoint = true;
         } else if (response.status === 404) {
-          response = await tryRealtime(base + API_ENDPOINTS.FLOOD_DATA_REALTIME_V1);
+          response = await tryRealtime(API_ENDPOINTS.FLOOD_DATA_REALTIME_V1);
           if (response.status === 200) {
             endpointRef.current = 'realtime_v1';
-            isRealtimeEndpoint = true;
           } else {
             endpointRef.current = 'fallback';
-            response = await axios.get(`${base}${API_ENDPOINTS.FLOOD_DATA}?t=${Date.now()}`);
+            response = await apiClient.get(`${API_ENDPOINTS.FLOOD_DATA}?t=${Date.now()}`);
           }
         } else {
           endpointRef.current = 'fallback';
-          response = await axios.get(`${base}${API_ENDPOINTS.FLOOD_DATA}?t=${Date.now()}`);
+          response = await apiClient.get(`${API_ENDPOINTS.FLOOD_DATA}?t=${Date.now()}`);
         }
       } catch {
         endpointRef.current = 'fallback';
-        response = await axios.get(`${base}${API_ENDPOINTS.FLOOD_DATA}?t=${Date.now()}`);
+        response = await apiClient.get(`${API_ENDPOINTS.FLOOD_DATA}?t=${Date.now()}`);
       }
     } else {
-      const url =
+      const path =
         endpointRef.current === 'realtime'
-          ? base + API_ENDPOINTS.FLOOD_DATA_REALTIME
+          ? API_ENDPOINTS.FLOOD_DATA_REALTIME
           : endpointRef.current === 'realtime_v1'
-            ? base + API_ENDPOINTS.FLOOD_DATA_REALTIME_V1
-            : base + API_ENDPOINTS.FLOOD_DATA;
-      isRealtimeEndpoint = endpointRef.current === 'realtime' || endpointRef.current === 'realtime_v1';
-      response = await axios.get(`${url}?t=${Date.now()}`);
+            ? API_ENDPOINTS.FLOOD_DATA_REALTIME_V1
+            : API_ENDPOINTS.FLOOD_DATA;
+      response = await apiClient.get(`${path}?t=${Date.now()}`);
     }
 
     if (response.data && response.data.success && Array.isArray(response.data.data)) {
-      const normalizedData = normalizeFloodData(response.data.data, isRealtimeEndpoint);
+      const normalizedData = normalizeFloodData(response.data.data);
       return { success: true, data: normalizedData };
     }
     return { success: false, data: [] };
@@ -302,13 +295,13 @@ export const submitFloodReport = async (reportData) => {
   }
 };
 
-// Lấy danh sách báo cáo từ người dân (24h qua)
-// Public endpoint - không cần auth
+// Lấy danh sách báo cáo từ người dân (24h qua) — global auth: cần JWT qua apiClient
 export const fetchCrowdReports = async (params = {}) => {
   try {
     const queryString = new URLSearchParams(params).toString();
-    // Dùng endpoint public /api/crowd-reports (24h) - không cần auth
-    const response = await axios.get(`${API_CONFIG.BASE_URL}${API_ENDPOINTS.CROWD_REPORTS}${queryString ? `?${queryString}` : ''}`);
+    const response = await apiClient.get(
+      `${API_ENDPOINTS.CROWD_REPORTS}${queryString ? `?${queryString}` : ''}`
+    );
     
     if (response.data && response.data.success) {
       return { 
@@ -348,7 +341,7 @@ const normalizeFusionCrowdPoint = (p) => {
 };
 
 /**
- * Điểm trộn sensor–crowd (public). Query: crowd_hours, sensor_hours, include_sensors, bbox min_lng…
+ * Điểm trộn sensor–crowd. Query: crowd_hours, sensor_hours, include_sensors, bbox min_lng…
  */
 export const fetchFusionPoints = async (params = {}) => {
   try {
@@ -362,8 +355,7 @@ export const fetchFusionPoints = async (params = {}) => {
     Object.entries(merged).forEach(([k, v]) => {
       if (v !== undefined && v !== null && v !== '') usp.set(k, String(v));
     });
-    const url = `${API_CONFIG.BASE_URL}${API_ENDPOINTS.FUSION_POINTS}?${usp}`;
-    const response = await axios.get(url, { timeout: API_CONFIG.TIMEOUT });
+    const response = await apiClient.get(`${API_ENDPOINTS.FUSION_POINTS}?${usp}`, { timeout: API_CONFIG.TIMEOUT });
     if (response.data && response.data.success) {
       const raw = response.data.data || {};
       const crowdRaw = Array.isArray(raw.crowd) ? raw.crowd : [];
@@ -390,7 +382,7 @@ export const fetchFusionPoints = async (params = {}) => {
 };
 
 /**
- * Dự báo ngắn hạn theo trạm (public). Query: horizon (phút), sample_minutes
+ * Dự báo ngắn hạn theo trạm. Query: horizon (phút), sample_minutes
  */
 export const fetchForecastForSensor = async (sensorId, params = {}) => {
   try {
@@ -400,8 +392,7 @@ export const fetchForecastForSensor = async (sensorId, params = {}) => {
     Object.entries(merged).forEach(([k, v]) => {
       if (v !== undefined && v !== null && v !== '') usp.set(k, String(v));
     });
-    const url = `${API_CONFIG.BASE_URL}${path}?${usp}`;
-    const response = await axios.get(url, { timeout: API_CONFIG.TIMEOUT });
+    const response = await apiClient.get(`${path}?${usp}`, { timeout: API_CONFIG.TIMEOUT });
     if (response.data && response.data.success) {
       return { success: true, data: response.data.data || null };
     }
@@ -431,8 +422,7 @@ export const fetchWeatherHcm = async (params = {}) => {
     Object.entries(merged).forEach(([k, v]) => {
       if (v !== undefined && v !== null && v !== '') usp.set(k, String(v));
     });
-    const url = `${API_CONFIG.BASE_URL}${API_ENDPOINTS.WEATHER_HCM}?${usp}`;
-    const response = await axios.get(url, { timeout: 20000 });
+    const response = await apiClient.get(`${API_ENDPOINTS.WEATHER_HCM}?${usp}`, { timeout: 20000 });
     if (response.data && response.data.success) {
       return { success: true, data: response.data.data || null };
     }
@@ -479,15 +469,30 @@ export const fetchAllCrowdReports = async (params = {}) => {
 };
 
 // Authentication APIs
-export const login = async (username, password) => {
+export const login = async (username, password, rememberMe = true) => {
   try {
-    const response = await axios.post(`${API_CONFIG.BASE_URL}${API_ENDPOINTS.AUTH_LOGIN}`, {
-      username,
-      password
-    });
+    const loginId = typeof username === 'string' ? username.trim() : String(username || '');
+    const primaryPayload = loginId.includes('@')
+      ? { email: loginId.toLowerCase(), password }
+      : { username: loginId, password };
+    let response;
+    try {
+      response = await axios.post(`${API_CONFIG.BASE_URL}${API_ENDPOINTS.AUTH_LOGIN}`, primaryPayload);
+    } catch (error) {
+      // Một số bản BE validate schema login khác nhau (email vs username).
+      // Chỉ fallback khi 400 (schema), không fallback khi 401 (sai thông tin/tài khoản).
+      if (error?.response?.status === 400) {
+        const fallbackPayload = loginId.includes('@')
+          ? { username: loginId, password }
+          : { email: loginId.toLowerCase(), password };
+        response = await axios.post(`${API_CONFIG.BASE_URL}${API_ENDPOINTS.AUTH_LOGIN}`, fallbackPayload);
+      } else {
+        throw error;
+      }
+    }
 
     if (response.data && response.data.success) {
-      persistAuthTokens(response.data.data);
+      persistAuthTokens(response.data.data, rememberMe);
       return {
         success: true,
         data: response.data.data
@@ -500,6 +505,14 @@ export const login = async (username, password) => {
   } catch (error) {
     const status = error.response?.status;
     const data = error.response?.data;
+    const rawMsg = String(data?.error || data?.message || '').toLowerCase();
+    if (rawMsg.includes('relation') && rawMsg.includes('users') && rawMsg.includes('does not exist')) {
+      return {
+        success: false,
+        error:
+          'Máy chủ đăng nhập đang lỗi cấu hình CSDL (thiếu bảng users). Vui lòng báo BE chạy migration/khởi tạo DB rồi thử lại.'
+      };
+    }
     if (status === 403) {
       return {
         success: false,
@@ -512,12 +525,12 @@ export const login = async (username, password) => {
     if (status === 401) {
       return {
         success: false,
-        error: data?.error || 'Sai tên đăng nhập hoặc mật khẩu'
+        error: data?.error || data?.message || 'Sai tên đăng nhập hoặc mật khẩu'
       };
     }
     return {
       success: false,
-      error: data?.error || error.message
+      error: data?.error || data?.message || error.message
     };
   }
 };
@@ -682,9 +695,8 @@ export const getProfile = async () => {
     const response = await apiClient.get(API_ENDPOINTS.AUTH_PROFILE);
     
     if (response.data && response.data.success) {
-      // Cập nhật thông tin user trong localStorage
       if (response.data.data) {
-        localStorage.setItem('user', JSON.stringify(response.data.data));
+        setStoredUserJson(response.data.data);
       }
       return { 
         success: true, 
@@ -728,9 +740,8 @@ export const updateProfile = async (profileData) => {
     const response = await apiClient.put(API_ENDPOINTS.AUTH_PROFILE, profileData);
     
     if (response.data && response.data.success) {
-      // Cập nhật thông tin user trong localStorage và báo cho UI (sidebar, header) cập nhật realtime
       if (response.data.data) {
-        localStorage.setItem('user', JSON.stringify(response.data.data));
+        setStoredUserJson(response.data.data);
         window.dispatchEvent(new CustomEvent('user-updated'));
       }
       return { 
@@ -782,7 +793,7 @@ export const changePassword = async (oldPassword, newPassword) => {
 };
 
 export const logout = async () => {
-  const token = localStorage.getItem(LS_ACCESS);
+  const token = getAccessToken();
   if (token) {
     try {
       await apiClient.post(API_ENDPOINTS.AUTH_LOGOUT);
@@ -791,6 +802,9 @@ export const logout = async () => {
     }
   }
   clearAuthStorage();
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('user-updated'));
+  }
 };
 
 // Re-export auth helpers from utils/auth.js for backward compatibility
@@ -1129,13 +1143,12 @@ export const getReportEvaluationAverage = async (reportId) => {
 // ==================== STATS APIs ====================
 
 /**
- * Lấy số user đang online – cho mọi người (admin, user, khách). Không cần đăng nhập.
+ * Lấy số user đang online — global auth: gửi JWT khi có.
  * GET /api/stats/online-users/count
- * Response: { success: true, data: { count: N } }
  */
 export const getOnlineUsersCount = async () => {
   try {
-    const response = await axios.get(`${API_CONFIG.BASE_URL}${API_ENDPOINTS.STATS_ONLINE_USERS_COUNT}`, {
+    const response = await apiClient.get(API_ENDPOINTS.STATS_ONLINE_USERS_COUNT, {
       timeout: 5000,
       validateStatus: (status) => status === 200 || status === 404
     });
@@ -1150,12 +1163,11 @@ export const getOnlineUsersCount = async () => {
 };
 
 /**
- * Lấy lượt truy cập tháng (nếu BE có endpoint). Không cần token.
- * GET /api/stats/monthly-visits → { success: true, data: { count: N } } hoặc tương tự
+ * Lấy lượt truy cập tháng (nếu BE có endpoint).
  */
 export const getMonthlyVisitsCount = async () => {
   try {
-    const response = await axios.get(`${API_CONFIG.BASE_URL}${API_ENDPOINTS.STATS_MONTHLY_VISITS}`, {
+    const response = await apiClient.get(API_ENDPOINTS.STATS_MONTHLY_VISITS, {
       timeout: 5000,
       validateStatus: (status) => status === 200 || status === 404
     });
@@ -1580,7 +1592,7 @@ export const deleteEmergencySubscription = async (subscriptionId) => {
 export const fetchHeatmap = async (params) => {
   try {
     const queryString = new URLSearchParams(params).toString();
-    const response = await axios.get(`${API_CONFIG.BASE_URL}${API_ENDPOINTS.HEATMAP}?${queryString}`);
+    const response = await apiClient.get(`${API_ENDPOINTS.HEATMAP}?${queryString}`);
     
     if (response.data && response.data.success) {
       return { success: true, data: response.data.data || [] };
@@ -1601,7 +1613,7 @@ export const fetchHeatmap = async (params) => {
 export const fetchCombinedHeatmap = async (params) => {
   try {
     const queryString = new URLSearchParams(params).toString();
-    const response = await axios.get(`${API_CONFIG.BASE_URL}${API_ENDPOINTS.HEATMAP_COMBINED}?${queryString}`);
+    const response = await apiClient.get(`${API_ENDPOINTS.HEATMAP_COMBINED}?${queryString}`);
     
     if (response.data && response.data.success) {
       const raw = response.data.data;
@@ -1619,7 +1631,7 @@ export const fetchCombinedHeatmap = async (params) => {
 };
 
 /**
- * C2: Chuỗi theo giờ 24h gần nhất (sensor + crowd đã duyệt). Public.
+ * C2: Chuỗi theo giờ 24h gần nhất (sensor + crowd đã duyệt).
  */
 export const fetchHeatmapTimeline24h = async (params = {}) => {
   try {
@@ -1628,8 +1640,9 @@ export const fetchHeatmapTimeline24h = async (params = {}) => {
       if (v !== undefined && v !== null && v !== '') usp.set(k, String(v));
     });
     const qs = usp.toString();
-    const url = `${API_CONFIG.BASE_URL}${API_ENDPOINTS.HEATMAP_TIMELINE_24H}${qs ? `?${qs}` : ''}`;
-    const response = await axios.get(url, { timeout: API_CONFIG.TIMEOUT });
+    const response = await apiClient.get(`${API_ENDPOINTS.HEATMAP_TIMELINE_24H}${qs ? `?${qs}` : ''}`, {
+      timeout: API_CONFIG.TIMEOUT
+    });
     if (response.data?.success) {
       const raw = response.data.data;
       const series = Array.isArray(raw) ? raw : raw?.series || raw?.hours || raw?.timeline || [];
@@ -1653,6 +1666,27 @@ export const fetchHeatmapTimeline24h = async (params = {}) => {
 
 // ==================== ROUTING (AMC-A*) ====================
 
+/** Làm tròn WGS84 trước khi gửi routing — đủ mm, tránh chuỗi query quá dài / float lạ */
+const roundRoutingCoord = (v) => {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return v;
+  return Math.round(n * 1e6) / 1e6;
+};
+
+function pickRoutingErrorMessage(payload) {
+  if (!payload || typeof payload !== 'object') return null;
+  if (typeof payload.error === 'string' && payload.error.trim()) return payload.error.trim();
+  if (typeof payload.message === 'string' && payload.message.trim()) return payload.message.trim();
+  if (payload.errors && typeof payload.errors === 'object') {
+    const parts = Object.values(payload.errors)
+      .flat()
+      .map((x) => (typeof x === 'string' ? x : x != null ? String(x) : ''))
+      .filter(Boolean);
+    if (parts.length) return parts.join(' ');
+  }
+  return null;
+}
+
 /**
  * User: tìm đường an toàn theo AMC-A*.
  * GET /api/v1/routing/safe-path
@@ -1665,32 +1699,113 @@ export const fetchSafePath = async (params) => {
         return { success: false, data: null, error: `Thiếu tham số ${key}` };
       }
     }
-    const query = new URLSearchParams();
-    query.set('start_lng', String(params.start_lng));
-    query.set('start_lat', String(params.start_lat));
-    query.set('end_lng', String(params.end_lng));
-    query.set('end_lat', String(params.end_lat));
-    if (params.vehicle_type) query.set('vehicle_type', String(params.vehicle_type));
-    if (params.nearest_node_max_m != null) query.set('nearest_node_max_m', String(params.nearest_node_max_m));
-    const url = `${API_CONFIG.BASE_URL}${API_ENDPOINTS.ROUTING_SAFE_PATH}?${query.toString()}`;
-    const response = await axios.get(url, {
-      timeout: Math.max(15000, API_CONFIG.TIMEOUT),
-      validateStatus: (s) => s >= 200 && s < 500
-    });
-    if (response.status >= 200 && response.status < 300 && response.data?.success) {
+    const buildRoutingQuery = (vehicleType) => {
+      const query = new URLSearchParams();
+      query.set('start_lng', String(roundRoutingCoord(params.start_lng)));
+      query.set('start_lat', String(roundRoutingCoord(params.start_lat)));
+      query.set('end_lng', String(roundRoutingCoord(params.end_lng)));
+      query.set('end_lat', String(roundRoutingCoord(params.end_lat)));
+      if (vehicleType) query.set('vehicle_type', String(vehicleType));
+      if (params.nearest_node_max_m != null) query.set('nearest_node_max_m', String(params.nearest_node_max_m));
+      return query;
+    };
+    const runRoutingRequest = (vehicleType) =>
+      apiClient.get(`${API_ENDPOINTS.ROUTING_SAFE_PATH}?${buildRoutingQuery(vehicleType).toString()}`, {
+        timeout: 120000,
+        // 502/503/504: gateway/proxy — axios mặc định reject nếu chỉ chấp nhận ≤500, gây "Network Error" khó hiểu
+        validateStatus: (s) => s >= 200 && s < 600
+      });
+
+    const vehicleType = String(params.vehicle_type || '').toLowerCase();
+    const candidateVehicleTypes = [];
+    if (params.vehicle_type) candidateVehicleTypes.push(String(params.vehicle_type));
+    if (vehicleType === 'motorbike') candidateVehicleTypes.push('motorcycle');
+    if (vehicleType === 'motorcycle') candidateVehicleTypes.push('motorbike');
+    if (!candidateVehicleTypes.length) candidateVehicleTypes.push(undefined);
+
+    let response = null;
+    for (let i = 0; i < candidateVehicleTypes.length; i += 1) {
+      const vt = candidateVehicleTypes[i];
+      const current = await runRoutingRequest(vt);
+      response = current;
+      if (current.status === 200 && current.data?.success) break;
+      const shouldTryNextAlias =
+        i < candidateVehicleTypes.length - 1 &&
+        (current.status === 400 ||
+          current.status === 500 ||
+          current.status === 502 ||
+          current.status === 503 ||
+          current.status === 504);
+      if (!shouldTryNextAlias) break;
+    }
+
+    if (!response) {
+      return { success: false, data: null, status: null, error: 'Không nhận được phản hồi từ API tìm đường.' };
+    }
+    if (response.status === 200 && response.data?.success) {
       return { success: true, data: response.data.data ?? response.data, status: response.status };
+    }
+    const errBody =
+      pickRoutingErrorMessage(response.data) ||
+      (() => {
+        const rawErr = response.data?.error ?? response.data?.message;
+        if (typeof rawErr === 'string') return rawErr.trim() || null;
+        if (rawErr != null && typeof rawErr === 'object') {
+          return rawErr.message || rawErr.msg || JSON.stringify(rawErr);
+        }
+        return null;
+      })();
+    let errorMsg = errBody || 'Không tìm được đường an toàn';
+    if (response.status === 502) {
+      errorMsg =
+        errBody ||
+        'Cổng API trả 502 (Bad Gateway): máy chủ tìm đường không phản hồi kịp hoặc đang lỗi — thử lại sau, hoặc kiểm tra backend/Railway (timeout proxy, crash, tài nguyên).';
+    }
+    if (response.status === 503) {
+      errorMsg = errBody || 'Dịch vụ tạm không sẵn sàng (503). Vui lòng thử lại sau.';
+    }
+    if (response.status === 504) {
+      errorMsg = errBody || 'Hết thời gian chờ từ cổng (504). Máy chủ xử lý lâu — thử lại hoặc rút ngắn tuyến.';
+    }
+    if (response.status === 400) {
+      errorMsg =
+        errBody ||
+        'Yêu cầu không hợp lệ (400). Điểm có thể nằm ngoài lưới đường hoặc quá xa nút gần nhất — thử tăng bán kính snap (tối đa 5000 m), chọn điểm trong khu vực có dữ liệu đồ thị, hoặc đổi loại xe.';
+    }
+    if (response.status === 500) {
+      errorMsg =
+        errBody ||
+        'Tham số không hợp lệ hoặc lỗi máy chủ (ví dụ vehicle_type). Kiểm tra loại xe và tọa độ.';
     }
     return {
       success: false,
       data: response.data?.data ?? null,
       status: response.status,
-      error: response.data?.error || response.data?.message || 'Không tìm được đường an toàn'
+      error: errorMsg
     };
   } catch (error) {
+    const status = error.response?.status;
+    if (error.code === 'ECONNABORTED') {
+      return {
+        success: false,
+        data: null,
+        status,
+        error: 'Hết thời gian chờ khi tìm đường (quá 120 giây). Thử lại hoặc chọn tuyến ngắn hơn.'
+      };
+    }
+    if (!error.response && (error.message === 'Network Error' || error.code === 'ERR_NETWORK')) {
+      return {
+        success: false,
+        data: null,
+        status: null,
+        error:
+          'Lỗi mạng: không kết nối được tới máy chủ (kiểm tra Internet, firewall, hoặc API đang sập).'
+      };
+    }
     return {
       success: false,
       data: null,
-      status: error.response?.status,
+      status,
       error: error.response?.data?.error || error.response?.data?.message || error.message
     };
   }
@@ -1752,6 +1867,37 @@ export const fetchAdminEmergencyAlertsSummary = async (hours = 24) => {
       success: false,
       data: null,
       error: error.response?.data?.error || error.message
+    };
+  }
+};
+
+/**
+ * Admin: ghi đè độ ngập thủ công trên cạnh (demo routing). Body BE: { updates: [{ edge_id, manual_flood_depth_cm | null }] }.
+ * `null` = bỏ override, quay về sensor + crowd.
+ */
+export const putAdminManualFloodDepthsBatch = async (updates) => {
+  try {
+    const body = Array.isArray(updates) ? { updates } : updates;
+    if (!body?.updates || !Array.isArray(body.updates)) {
+      return { success: false, error: 'Thiếu mảng updates hợp lệ' };
+    }
+    const response = await apiClient.put(API_ENDPOINTS.ADMIN_ROUTING_MANUAL_FLOOD_DEPTHS_BATCH, body, {
+      validateStatus: (s) => s === 200 || s === 400 || s === 403 || s === 500
+    });
+    if (response.status === 200 && response.data?.success) {
+      return { success: true, data: response.data.data ?? response.data, message: response.data.message };
+    }
+    return {
+      success: false,
+      error:
+        response.data?.error ||
+        response.data?.message ||
+        (response.status === 403 ? 'Cần quyền quản trị viên' : 'Cập nhật manual flood thất bại')
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.response?.data?.error || error.response?.data?.message || error.message
     };
   }
 };

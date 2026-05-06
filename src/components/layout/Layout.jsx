@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { cn } from '@/lib/cn';
 import { SidebarProvider } from '@/context/SidebarProvider';
 import { useSidebar } from '@/context/SidebarProvider';
@@ -25,12 +26,22 @@ function MainContent({ children }) {
 
 function LayoutShell({ children }) {
   useSyncAuthLocation();
+  const location = useLocation();
+  const { setCollapsed } = useSidebar();
+  const isRoutingPage = location.pathname.startsWith('/routing');
+
+  useEffect(() => {
+    if (isRoutingPage) {
+      setCollapsed(true);
+    }
+  }, [isRoutingPage, setCollapsed]);
+
   return (
     <div className="flex min-h-screen flex-col overflow-x-hidden bg-[#f5f5f5] pt-[61px]">
       <Header />
       <Sidebar />
       <MainContent>{children}</MainContent>
-      <Footer />
+      {!isRoutingPage && <Footer />}
     </div>
   );
 }

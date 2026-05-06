@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { bootstrapAuth } from './utils/authSession';
 import { ReporterRankingProvider } from './context/ReporterRankingProvider';
 import DashboardPage from './pages/DashboardPage';
 import ReportsPage from './pages/ReportsPage';
@@ -48,9 +49,36 @@ const AdminRoute = ({ children }) => {
   return children;
 };
 
+/** Chạy refresh khi mở app (trong refresh_expires_at) trước khi kiểm tra route. */
+function AuthBootstrap({ children }) {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    bootstrapAuth().finally(() => setReady(true));
+  }, []);
+  if (!ready) {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: '#f8fafc',
+          color: '#64748b',
+          fontSize: '14px'
+        }}
+      >
+        Đang tải phiên đăng nhập…
+      </div>
+    );
+  }
+  return children;
+}
+
 function App() {
   return (
     <Router>
+      <AuthBootstrap>
       <ReporterRankingProvider>
       <Routes>
         {/* Login và Register không có Navigation */}
@@ -205,6 +233,7 @@ function App() {
         />
       </Routes>
       </ReporterRankingProvider>
+      </AuthBootstrap>
     </Router>
   );
 }
