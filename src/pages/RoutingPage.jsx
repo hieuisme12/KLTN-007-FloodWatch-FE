@@ -24,8 +24,9 @@ import { filterNonExpiredReports } from '../utils/reportHelpers';
 import SensorMarker from '../components/map/SensorMarker';
 import UserLocationMarker from '../components/map/UserLocationMarker';
 import { useMapboxGlResize } from '../hooks/useMapboxGlResize';
+import { getMapboxToken } from '../utils/mapboxToken';
 
-const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
+const MAPBOX_TOKEN = getMapboxToken();
 const defaultLng = DEFAULT_CENTER[1];
 const defaultLat = DEFAULT_CENTER[0];
 const ROUTING_SEARCH_HISTORY_KEY = 'routingSearchHistory';

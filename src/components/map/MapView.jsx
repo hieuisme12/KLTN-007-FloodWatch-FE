@@ -21,7 +21,8 @@ import { getCurrentUser, isAuthenticated } from '../../utils/auth';
 import SensorMarker from './SensorMarker';
 import UserLocationMarker from './UserLocationMarker';
 import { useMapboxGlResize } from '../../hooks/useMapboxGlResize';
-const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
+import { getMapboxToken } from '../../utils/mapboxToken';
+const MAPBOX_TOKEN = getMapboxToken();
 
 // Mapbox dùng [lng, lat]; DEFAULT_CENTER là [lat, lng]
 const defaultLng = DEFAULT_CENTER[1];
@@ -921,7 +922,7 @@ const MapView = ({
   if (!MAPBOX_TOKEN) {
     return (
       <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f0f0f0', color: '#666' }}>
-        <p>Chưa cấu hình Mapbox token (VITE_MAPBOX_TOKEN trong file .env)</p>
+        <p>Chưa cấu hình Mapbox token (VITE_MAPBOX_TOKEN hoặc VITE_MAPBOX_ACCESS_TOKEN)</p>
       </div>
     );
   }

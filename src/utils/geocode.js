@@ -1,4 +1,5 @@
 import { getLocationCacheStorageKey } from './auth';
+import { getMapboxToken } from './mapboxToken';
 
 /**
  * Khung giới hạn TP.HCM (WGS84) — chỉ gợi ý địa chỉ trong khu vực này.
@@ -155,10 +156,7 @@ export async function fetchAddressFromCoords(lat, lng, options = {}) {
         return corrected;
     }
 
-    const mapboxToken = (options && options.mapboxToken) || (typeof
-        import.meta !== 'undefined' &&
-        import.meta.env &&
-        import.meta.env.VITE_MAPBOX_TOKEN) || '';
+    const mapboxToken = (options && options.mapboxToken) || getMapboxToken();
 
     if (mapboxToken) {
         try {
@@ -203,13 +201,7 @@ export async function searchPlaces(query, options = {}) {
     const q = typeof query === 'string' ? query.trim() : '';
     if (!q || q.length < 3) return [];
 
-    const mapboxToken =
-        (options && options.mapboxToken) ||
-        (typeof
-            import.meta !== 'undefined' &&
-            import.meta.env &&
-            import.meta.env.VITE_MAPBOX_TOKEN) ||
-        '';
+    const mapboxToken = (options && options.mapboxToken) || getMapboxToken();
 
     if (!mapboxToken) return [];
 

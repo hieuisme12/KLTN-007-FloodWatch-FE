@@ -15,8 +15,9 @@ import { DEFAULT_CENTER, DEFAULT_ZOOM } from '../utils/constants';
 import ErrorToast from '../components/common/ErrorToast';
 import { cn } from '@/lib/cn';
 import { FaBell, FaLink, FaTrash, FaPen, FaLocationCrosshairs } from 'react-icons/fa6';
+import { getMapboxToken } from '../utils/mapboxToken';
 
-const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
+const MAPBOX_TOKEN = getMapboxToken();
 const defaultLng = DEFAULT_CENTER[1];
 const defaultLat = DEFAULT_CENTER[0];
 
