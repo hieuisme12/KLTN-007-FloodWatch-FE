@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import Map, { Marker, Source, Layer, Popup } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { DEFAULT_CENTER, DEFAULT_ZOOM, statusColors } from '../utils/constants';
@@ -25,6 +26,7 @@ import SensorMarker from '../components/map/SensorMarker';
 import UserLocationMarker from '../components/map/UserLocationMarker';
 import { useMapboxGlResize } from '../hooks/useMapboxGlResize';
 import { getMapboxToken } from '../utils/mapboxToken';
+import { Slab } from 'react-loading-indicators';
 
 const MAPBOX_TOKEN = getMapboxToken();
 const defaultLng = DEFAULT_CENTER[1];
@@ -929,54 +931,63 @@ export default function RoutingPage() {
     setRouteHoverTooltip({ visible: false, lng: 0, lat: 0 });
     setLoading(true);
     setError('');
-    const chain = [{ lat: startLat, lng: startLng }, { lat: endLat, lng: endLng }];
-    extraStops.forEach((s) => {
-      if (s.lat != null && s.lng != null) chain.push({ lat: s.lat, lng: s.lng });
-    });
-    const legsData = [];
-    let nearestM = nearestNodeMaxM;
-    for (let i = 0; i < chain.length - 1; i += 1) {
-      const a = chain[i];
-      const b = chain[i + 1];
-      const payload = {
-        start_lng: a.lng,
-        start_lat: a.lat,
-        end_lng: b.lng,
-        end_lat: b.lat,
-        vehicle_type: vehicleType,
-        nearest_node_max_m: nearestM
-      };
-      let res = await fetchSafePath(payload);
-      if (!res.success && res.status === 400 && nearestM < 5000) {
-        res = await fetchSafePath({ ...payload, nearest_node_max_m: 5000 });
-        if (res.success) {
-          nearestM = 5000;
-          setNearestNodeMaxM(5000);
+    try {
+      const chain = [{ lat: startLat, lng: startLng }, { lat: endLat, lng: endLng }];
+      extraStops.forEach((s) => {
+        if (s.lat != null && s.lng != null) chain.push({ lat: s.lat, lng: s.lng });
+      });
+      const legsData = [];
+      let nearestM = nearestNodeMaxM;
+      for (let i = 0; i < chain.length - 1; i += 1) {
+        const a = chain[i];
+        const b = chain[i + 1];
+        const payload = {
+          start_lng: a.lng,
+          start_lat: a.lat,
+          end_lng: b.lng,
+          end_lat: b.lat,
+          vehicle_type: vehicleType,
+          nearest_node_max_m: nearestM
+        };
+        let res = await fetchSafePath(payload);
+        if (!res.success && res.status === 400 && nearestM < 5000) {
+          res = await fetchSafePath({ ...payload, nearest_node_max_m: 5000 });
+          if (res.success) {
+            nearestM = 5000;
+            setNearestNodeMaxM(5000);
+          }
         }
+        if (!res.success) {
+          // Gỡ overlay trước khi setResult — tránh React 18 batch chung một paint với bản đồ nặng
+          flushSync(() => setLoading(false));
+          setResult(legsData.length ? mergeSafePathLegs(legsData) : null);
+          const base = res.error || 'Không gọi được API tìm đường an toàn.';
+          const hint400 =
+            res.status === 400
+              ? ' Nếu vẫn lỗi: điểm có thể nằm ngoài vùng đồ thị đường trên máy chủ — chọn điểm gần trung tâm TP.HCM hoặc chỗ đã có lưới đường.'
+              : '';
+          setError(`Chặng ${i + 1}: ${base}${hint400}`);
+          return;
+        }
+        const data = res.data || null;
+        legsData.push(data);
       }
-      if (!res.success) {
-        setLoading(false);
-        setResult(legsData.length ? mergeSafePathLegs(legsData) : null);
-        const base = res.error || 'Không gọi được API tìm đường an toàn.';
-        const hint400 =
-          res.status === 400
-            ? ' Nếu vẫn lỗi: điểm có thể nằm ngoài vùng đồ thị đường trên máy chủ — chọn điểm gần trung tâm TP.HCM hoặc chỗ đã có lưới đường.'
-            : '';
-        setError(`Chặng ${i + 1}: ${base}${hint400}`);
-        return;
+      const merged = mergeSafePathLegs(legsData);
+      flushSync(() => setLoading(false));
+      setResult(merged);
+      if (merged?.found === true) {
+        setShowRouteToast(true);
+        routeToastTimeoutRef.current = setTimeout(() => {
+          setShowRouteToast(false);
+          routeToastTimeoutRef.current = null;
+        }, 5000);
       }
-      const data = res.data || null;
-      legsData.push(data);
-    }
-    setLoading(false);
-    const merged = mergeSafePathLegs(legsData);
-    setResult(merged);
-    if (merged?.found === true) {
-      setShowRouteToast(true);
-      routeToastTimeoutRef.current = setTimeout(() => {
-        setShowRouteToast(false);
-        routeToastTimeoutRef.current = null;
-      }, 5000);
+    } catch (e) {
+      flushSync(() => setLoading(false));
+      setResult(null);
+      setError(e instanceof Error ? e.message : 'Lỗi khi xử lý tuyến đường.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -997,7 +1008,19 @@ export default function RoutingPage() {
   */
 
   return (
-    <div className="h-[calc(100vh-60px)] w-full overflow-hidden bg-[#f1f3f4]">
+    <div className="relative h-[calc(100vh-60px)] w-full overflow-hidden bg-[#f1f3f4]">
+      {loading && (
+        <div
+          className="absolute inset-0 z-[10000] flex items-center justify-center bg-slate-900/[0.18] backdrop-blur-[10px] backdrop-saturate-150 transition-[backdrop-filter] duration-200"
+          role="status"
+          aria-live="polite"
+          aria-busy="true"
+        >
+          <div className="rounded-2xl bg-white/92 px-10 py-9 shadow-[0_12px_40px_rgba(15,23,42,0.18)]">
+            <Slab color="#318dcc" size="medium" text="Đang tìm lộ trình phù hợp..." textColor="" />
+          </div>
+        </div>
+      )}
       {error && <ErrorToast message={error} onClose={() => setError('')} />}
       {showRouteToast && found && (
         <div className="pointer-events-none fixed left-1/2 top-20 z-[2000] -translate-x-1/2 rounded-md bg-[#333] px-4 py-2 text-sm text-white shadow-lg transition-opacity duration-300">
