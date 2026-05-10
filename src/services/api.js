@@ -5,7 +5,8 @@ import {
   clearAuthStorage,
   getAccessToken,
   refreshTokensViaApi,
-  setStoredUserJson
+  setStoredUserJson,
+  hasStoredRefreshCredentials
 } from '../utils/authSession';
 
 export { persistAuthTokens, clearAuthStorage, bootstrapAuth } from '../utils/authSession';
@@ -64,6 +65,12 @@ apiClient.interceptors.response.use(
 
     const reqUrl = String(config.url || '');
     if (isAuthEndpointNoRefresh(reqUrl)) {
+      return Promise.reject(error);
+    }
+
+    // Khách: chưa từng có refresh+session → không thử refresh; tránh redirect /login khi API trả 401
+    // (Khác với phiên hết hạn: vẫn có credential trong storage → vẫn chạy refresh + redirect khi fail)
+    if (!hasStoredRefreshCredentials()) {
       return Promise.reject(error);
     }
 

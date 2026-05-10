@@ -23,6 +23,8 @@ import { isAuthenticated, hasRole, isModerator, isAdmin } from './utils/auth';
 import EmergencyAlertsPage from './pages/EmergencyAlertsPage';
 import AdminOperationsPage from './pages/AdminOperationsPage';
 import RoutingPage from './pages/RoutingPage';
+import AuthLoadingScreen from './components/common/AuthLoadingScreen';
+import { SkeletonTheme } from 'react-loading-skeleton';
 
 // Protected Route – chỉ cần đăng nhập (bất kỳ role)
 const ProtectedRoute = ({ children }) => {
@@ -56,21 +58,7 @@ function AuthBootstrap({ children }) {
     bootstrapAuth().finally(() => setReady(true));
   }, []);
   if (!ready) {
-    return (
-      <div
-        style={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: '#f8fafc',
-          color: '#64748b',
-          fontSize: '14px'
-        }}
-      >
-        Đang tải phiên đăng nhập…
-      </div>
-    );
+    return <AuthLoadingScreen />;
   }
   return children;
 }
@@ -79,6 +67,7 @@ function App() {
   return (
     <Router>
       <AuthBootstrap>
+      <SkeletonTheme baseColor="#e2e8f0" highlightColor="#f8fafc">
       <ReporterRankingProvider>
       <Routes>
         {/* Login và Register không có Navigation */}
@@ -233,6 +222,7 @@ function App() {
         />
       </Routes>
       </ReporterRankingProvider>
+      </SkeletonTheme>
       </AuthBootstrap>
     </Router>
   );

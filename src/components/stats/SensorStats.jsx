@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { FaLock } from 'react-icons/fa6';
 import UserDropdown from '../common/UserDropdown';
 import { getCurrentUser } from '../../services/api';
+import Skeleton from 'react-loading-skeleton';
 
 const SensorStats = ({ floodData, loading }) => {
   const navigate = useNavigate();
@@ -74,7 +75,13 @@ const SensorStats = ({ floodData, loading }) => {
         </div>
       </div>
       {loading ? (
-        <p style={{ margin: '0', fontSize: '0.9rem', textAlign: 'center' }}>Đang tải dữ liệu...</p>
+        <div style={{ margin: '0 auto', maxWidth: 520, padding: '4px 0 8px' }}>
+          <Skeleton
+            height={18}
+            baseColor="rgba(255,255,255,0.15)"
+            highlightColor="rgba(255,255,255,0.28)"
+          />
+        </div>
       ) : (
         <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', flexWrap: 'wrap', marginTop: '5px' }}>
           <span style={{ fontSize: '0.9rem' }}>

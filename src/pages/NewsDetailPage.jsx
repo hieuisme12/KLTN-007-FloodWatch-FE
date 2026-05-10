@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { FaArrowLeft, FaClock } from 'react-icons/fa6';
 import ErrorToast from '../components/common/ErrorToast';
+import Skeleton from 'react-loading-skeleton';
 const NewsDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -409,10 +410,9 @@ const NewsDetailPage = () => {
     return (
       <div className="news-detail-page">
         <div className="news-detail-container">
-          <div className="news-detail-loading">
-            <div className="loading-spinner"></div>
-            <p>Đang tải nội dung...</p>
-          </div>
+          <Skeleton height={32} width="55%" style={{ marginBottom: 20 }} />
+          <Skeleton count={14} style={{ marginBottom: 10 }} />
+          <Skeleton height={180} borderRadius={8} style={{ marginTop: 16 }} />
         </div>
       </div>
     );

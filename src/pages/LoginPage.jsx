@@ -3,6 +3,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { FaUser } from 'react-icons/fa6';
 import { login } from '../services/api';
 import ErrorToast from '../components/common/ErrorToast';
+import AuthLoadingScreen from '../components/common/AuthLoadingScreen';
 const LoginPage = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -48,6 +49,7 @@ const LoginPage = () => {
 
   return (
     <div className="login-page">
+      {loading && <AuthLoadingScreen overlay />}
       {verifyHint && (
         <div className="login-success-hint" role="status">
           {verifyHint}

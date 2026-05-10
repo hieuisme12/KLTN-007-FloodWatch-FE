@@ -7,6 +7,7 @@ import { FaMagnifyingGlass, FaClock, FaCheck, FaXmark, FaStar, FaCircle, FaArrow
 import ConfidenceBadge from '../components/common/ConfidenceBadge';
 import { WiFlood } from 'react-icons/wi';
 import { MdLocationOn } from 'react-icons/md';
+import Skeleton from 'react-loading-skeleton';
 const ModerationPage = () => {
   const navigate = useNavigate();
   const { getReporterReliability } = useReporterRanking();
@@ -393,7 +394,9 @@ const ModerationPage = () => {
       </div>
 
       {loading ? (
-        <div className="loading">Đang tải...</div>
+        <div style={{ padding: '12px 20px 24px' }}>
+          <Skeleton count={8} height={132} style={{ marginBottom: 15 }} borderRadius={12} />
+        </div>
       ) : reports.length === 0 ? (
         <div className="empty-state">
           <div className="empty-icon"><FaCheck /></div>

@@ -3,6 +3,7 @@ import { fetchWeatherHcm } from '../../services/api';
 import { WiHumidity, WiStrongWind } from 'react-icons/wi';
 import { FaCloudSun } from 'react-icons/fa6';
 import { cn } from '../../lib/cn';
+import Skeleton from 'react-loading-skeleton';
 
 const pick = (obj, keys) => {
   for (const k of keys) {
@@ -77,7 +78,12 @@ export default function WeatherHcmWidget() {
         <FaCloudSun className="shrink-0 text-[28px] opacity-95" aria-hidden />
         <h3 className="m-0 flex-1 text-lg font-bold">Thời tiết TP.HCM</h3>
       </div>
-      {loading && !data && <p className="m-0 text-sm">Đang tải…</p>}
+      {loading && !data && (
+        <div className="space-y-3">
+          <Skeleton height={40} width="55%" baseColor="rgba(255,255,255,0.14)" highlightColor="rgba(255,255,255,0.28)" />
+          <Skeleton count={3} height={16} baseColor="rgba(255,255,255,0.12)" highlightColor="rgba(255,255,255,0.22)" />
+        </div>
+      )}
       {error && <p className="m-0 text-sm text-red-200">{String(error)}</p>}
       {data && (
         <>

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { getResearchColdStartHotspots, getResearchEvaluation } from '../services/api';
 import { hasRole } from '../utils/auth';
 import { useNavigate } from 'react-router-dom';
+import Skeleton from 'react-loading-skeleton';
 
 const toNumber = (value, fallback = 0) => {
   const n = Number(value);
@@ -165,7 +166,17 @@ const ResearchAnalyticsPage = () => {
         </div>
       )}
 
-      {loading && <div>Đang tải dữ liệu research...</div>}
+      {loading && (
+        <div style={{ marginBottom: 16 }}>
+          <Skeleton height={26} width={260} style={{ marginBottom: 14 }} />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
+            {[1, 2, 3, 4].map((k) => (
+              <Skeleton key={k} height={96} borderRadius={10} />
+            ))}
+          </div>
+          <Skeleton height={240} style={{ marginTop: 16 }} borderRadius={10} />
+        </div>
+      )}
       {hasNoData && !error && (
         <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '14px' }}>
           Chưa đủ dữ liệu trong khoảng thời gian đã chọn.

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { getProfile, getProfileIcons, updateProfile } from '../services/api';
 import { API_CONFIG } from '../config/apiConfig';
 import ErrorToast from '../components/common/ErrorToast';
+import Skeleton from 'react-loading-skeleton';
 const ProfilePage = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
@@ -130,7 +131,13 @@ const ProfilePage = () => {
     return (
       <div className="profile-page">
         <div className="profile-container">
-          <div className="loading">Đang tải thông tin...</div>
+          <div style={{ display: 'flex', gap: 28, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+            <Skeleton circle width={96} height={96} />
+            <div style={{ flex: 1, minWidth: 260 }}>
+              <Skeleton height={30} width="50%" style={{ marginBottom: 18 }} />
+              <Skeleton count={5} height={16} style={{ marginBottom: 12 }} />
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -308,7 +315,19 @@ const ProfilePage = () => {
               </div>
               <p className="profile-avatar-modal-hint">Chọn một icon bên dưới (không tải ảnh từ máy).</p>
               {profileIcons.length === 0 ? (
-                <div className="profile-avatar-modal-loading">Đang tải danh sách ảnh...</div>
+                <div
+                  className="profile-avatar-modal-loading"
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(56px, 1fr))',
+                    gap: 12,
+                    padding: '8px 0'
+                  }}
+                >
+                  {Array.from({ length: 12 }).map((_, i) => (
+                    <Skeleton key={i} circle width={56} height={56} />
+                  ))}
+                </div>
               ) : (
                 <div className="profile-avatar-grid">
                   {profileIcons.map((icon) => {

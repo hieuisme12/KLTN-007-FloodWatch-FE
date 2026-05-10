@@ -16,6 +16,7 @@ import ErrorToast from '../components/common/ErrorToast';
 import { cn } from '@/lib/cn';
 import { FaBell, FaLink, FaTrash, FaPen, FaLocationCrosshairs } from 'react-icons/fa6';
 import { getMapboxToken } from '../utils/mapboxToken';
+import Skeleton from 'react-loading-skeleton';
 
 const MAPBOX_TOKEN = getMapboxToken();
 const defaultLng = DEFAULT_CENTER[1];
@@ -213,8 +214,11 @@ export default function EmergencyAlertsPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-3xl p-6">
-        <p className="text-slate-600">Đang tải…</p>
+      <div className="mx-auto max-w-3xl space-y-4 p-6">
+        <Skeleton height={40} width="72%" />
+        <Skeleton count={4} height={18} />
+        <Skeleton height={220} borderRadius={12} />
+        <Skeleton height={48} borderRadius={8} />
       </div>
     );
   }

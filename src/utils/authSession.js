@@ -92,6 +92,12 @@ export function isAccessExpired() {
   return Date.now() >= exp;
 }
 
+/** Đã từng đăng nhập (có refresh + session trong storage), kể cả khi refresh_expires đã hết */
+export function hasStoredRefreshCredentials() {
+  const s = getAuthStorage();
+  return Boolean(s.getItem(LS_REFRESH) && s.getItem(LS_SESSION));
+}
+
 /** Còn refresh_token + session_token và chưa quá refresh_expires_at (nếu BE có gửi). */
 export function isRefreshSessionValid() {
   const s = getAuthStorage();

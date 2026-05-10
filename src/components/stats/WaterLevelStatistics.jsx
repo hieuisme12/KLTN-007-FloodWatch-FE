@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { fetchFloodData } from '../../services/api';
 import { POLLING_INTERVALS } from '../../config/apiConfig';
 import { FaChartColumn } from 'react-icons/fa6';
+import Skeleton from 'react-loading-skeleton';
 const WaterLevelStatistics = () => {
   const [waterLevelData, setWaterLevelData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -90,7 +91,10 @@ const WaterLevelStatistics = () => {
       </h3>
       
       {loading ? (
-        <div className="statistics-loading">Đang tải dữ liệu...</div>
+        <div className="statistics-loading" style={{ padding: '8px 0' }}>
+          <Skeleton height={180} borderRadius={10} style={{ marginBottom: 16 }} />
+          <Skeleton count={4} height={14} />
+        </div>
       ) : waterLevelData.length === 0 ? (
         <div className="statistics-empty">Chưa có dữ liệu mực nước</div>
       ) : (

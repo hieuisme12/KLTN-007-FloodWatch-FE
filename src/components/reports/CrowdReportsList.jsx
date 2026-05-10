@@ -13,6 +13,7 @@ import { WiFlood } from 'react-icons/wi';
 import { MdLocationOn } from 'react-icons/md';
 import { useReporterRanking } from '../../context/ReporterRankingProvider';
 import ConfidenceBadge from '../common/ConfidenceBadge';
+import Skeleton from 'react-loading-skeleton';
 
 const CrowdReportsList = ({ reports, loading }) => {
   const { getReporterReliability } = useReporterRanking();
@@ -75,8 +76,8 @@ const CrowdReportsList = ({ reports, loading }) => {
 
   if (loading) {
     return (
-      <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
-        <p>Đang tải báo cáo...</p>
+      <div style={{ padding: '12px 4px' }}>
+        <Skeleton count={5} height={72} style={{ marginBottom: 12 }} borderRadius={8} />
       </div>
     );
   }

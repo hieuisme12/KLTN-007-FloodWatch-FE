@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import ErrorToast from '../components/common/ErrorToast';
 import FilterDropdown from '../components/common/FilterDropdown';
 import { FaServer, FaChartColumn, FaDroplet } from 'react-icons/fa6';
+import Skeleton from 'react-loading-skeleton';
 
 const statusBadgeClass = (status) => {
   const s = String(status || '').toLowerCase();
@@ -121,7 +122,13 @@ export default function AdminOperationsPage() {
 
       {error && <ErrorToast message={error} onClose={() => setError('')} />}
 
-      {loading && <p className="text-slate-600">Đang tải…</p>}
+      {loading && (
+        <div className="space-y-6">
+          <Skeleton height={160} borderRadius={12} />
+          <Skeleton height={200} borderRadius={12} />
+          <Skeleton height={140} borderRadius={12} />
+        </div>
+      )}
 
       {!loading && (
         <>

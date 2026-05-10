@@ -22,6 +22,7 @@ import { WiFlood } from 'react-icons/wi';
 import { MdLocationOn } from 'react-icons/md';
 import ConfidenceBadge from '../components/common/ConfidenceBadge';
 import SearchAutoComplete from '../components/common/SearchAutoComplete';
+import Skeleton from 'react-loading-skeleton';
 const ReportsPage = () => {
   const navigate = useNavigate();
   const { getReporterReliability } = useReporterRanking();
@@ -630,14 +631,16 @@ const ReportsPage = () => {
 
           {/* Reports List */}
           {loading ? (
-            <div style={{ 
-              textAlign: 'center', 
-              padding: '60px',
-              background: 'white',
-              borderRadius: '8px',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
-            }}>
-              <p style={{ color: '#666', fontSize: '16px' }}>Đang tải báo cáo...</p>
+            <div
+              style={{
+                padding: '24px',
+                background: 'white',
+                borderRadius: '8px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+              }}
+            >
+              <Skeleton height={28} width={280} style={{ marginBottom: 20 }} />
+              <Skeleton count={8} height={56} style={{ marginBottom: 12 }} />
             </div>
           ) : sortedReports.length === 0 ? (
             <div style={{
