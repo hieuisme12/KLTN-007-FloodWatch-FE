@@ -2,22 +2,24 @@ import React, { Fragment, useEffect, useState } from 'react';
 import { Transition } from '@headlessui/react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { isAdmin, isAuthenticated, isModerator, getCurrentUser } from '../../utils/auth';
+import { isGuestBrowseMode, clearGuestExploreMode } from '../../utils/guestSession';
+import { FLOODSIGHT_ADMIN_PORTAL_URL } from '@/config/adminPortal';
 import { API_CONFIG } from '../../config/apiConfig';
 import { logout } from '../../services/api';
+import { useGuestExplore } from '../../hooks/useGuestExplore';
 import { useSidebar } from '@/context/SidebarProvider';
 import { cn } from '@/lib/cn';
 import {
   FaHouse,
   FaClipboardList,
   FaPlus,
-  FaClipboardCheck,
   FaCrown,
   FaUser,
   FaBars,
   FaRightFromBracket,
   FaBell,
-  FaServer,
   FaRoute,
+  FaArrowUpRightFromSquare,
 } from 'react-icons/fa6';
 
 const scrollbarAside =
@@ -27,21 +29,39 @@ const Sidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { collapsed, toggleCollapse } = useSidebar();
+  const { openRequireLogin, goLogin } = useGuestExplore();
   const [currentUser, setCurrentUser] = useState(() => getCurrentUser());
+  /** Đổi khi có user-updated để ép <img> tải lại avatar (tránh cache trình duyệt). */
+  const [avatarNonce, setAvatarNonce] = useState(0);
   const authenticated = isAuthenticated();
+  const guestBrowse = isGuestBrowseMode();
   const moderator = isModerator();
   const admin = isAdmin();
 
   useEffect(() => {
-    const handleUserUpdated = () => setCurrentUser(getCurrentUser());
+    const handleUserUpdated = () => {
+      setCurrentUser(getCurrentUser());
+      setAvatarNonce((n) => n + 1);
+    };
     window.addEventListener('user-updated', handleUserUpdated);
     return () => window.removeEventListener('user-updated', handleUserUpdated);
   }, []);
+
+  /** Sau bootstrap refresh có thể ghi user vào storage trước khi mount — đồng bộ lại khi đã đăng nhập. */
+  useEffect(() => {
+    if (authenticated) {
+      setCurrentUser(getCurrentUser());
+    } else if (!guestBrowse) {
+      setCurrentUser(null);
+    }
+  }, [authenticated, guestBrowse]);
 
   const sidebarAvatarUrl = currentUser?.avatar
     ? API_CONFIG.BASE_URL.replace(/\/$/, '') +
       (currentUser.avatar.startsWith('/') ? currentUser.avatar : `/profile-icons/${currentUser.avatar}`)
     : null;
+  const sidebarAvatarSrc =
+    sidebarAvatarUrl != null ? `${sidebarAvatarUrl}${sidebarAvatarUrl.includes('?') ? '&' : '?'}_av=${avatarNonce}` : null;
 
   const isActive = (path) => {
     if (path === '/') {
@@ -61,19 +81,27 @@ const Sidebar = () => {
     { path: '/reports', label: 'Báo cáo', icon: FaClipboardList, badge: null, public: true },
     { path: '/report/new', label: 'Báo cáo mới', icon: FaPlus, badge: null, requireAuth: true },
     { path: '/emergency-alerts', label: 'Cảnh báo khẩn', icon: FaBell, badge: null, requireAuth: true },
-    { path: '/moderation', label: 'Kiểm duyệt', icon: FaClipboardCheck, badge: null, requireModerator: true },
-    { path: '/research', label: 'Research', icon: FaClipboardList, badge: null, requireResearch: true },
-    { path: '/admin/operations', label: 'Vận hành', icon: FaServer, badge: null, requireAdmin: true },
   ];
 
+  const staffPortal = authenticated && (admin || moderator);
+  const staffPortalLabel = admin ? 'Trang quản trị' : 'Trang điều hành';
+
+  const itemNeedsAccount = (item) => Boolean(item.requireAuth);
+
   const visibleNavItems = mainNavItems.filter((item) => {
+    if (guestBrowse) return true;
     if (item.public) return true;
-    if (item.requireModerator) return moderator;
-    if (item.requireResearch) return moderator || admin;
-    if (item.requireAdmin) return admin;
     if (item.requireAuth) return authenticated;
     return false;
   });
+
+  const handleNavClick = (item) => {
+    if (guestBrowse && itemNeedsAccount(item)) {
+      openRequireLogin({ featureLabel: item.label });
+      return;
+    }
+    navigate(item.path);
+  };
 
   return (
     <aside
@@ -90,14 +118,20 @@ const Sidebar = () => {
           collapsed ? 'justify-center px-2' : 'justify-between'
         )}
       >
-        {!collapsed && currentUser ? (
+        {!collapsed && guestBrowse ? (
+          <div className="min-w-0 flex-1 rounded-lg border border-white/20 bg-white/5 px-2 py-1.5">
+            <div className="truncate text-[11px] font-semibold uppercase tracking-wide text-white/90">
+              Chế độ khách
+            </div>
+          </div>
+        ) : !collapsed && currentUser ? (
           <div
             className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 rounded-lg p-1 transition-colors hover:bg-white/10"
             onClick={() => navigate('/profile')}
           >
             <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white/30 bg-white/20 text-sm font-bold text-white">
-              {sidebarAvatarUrl ? (
-                <img src={sidebarAvatarUrl} alt="" className="h-full w-full object-cover" />
+              {sidebarAvatarSrc ? (
+                <img src={sidebarAvatarSrc} alt="" className="h-full w-full object-cover" />
               ) : (
                 currentUser.username?.charAt(0).toUpperCase()
               )}
@@ -157,7 +191,7 @@ const Sidebar = () => {
                 isActive(item.path) &&
                   "bg-white/20 font-semibold text-white before:absolute before:left-0 before:top-1/2 before:h-0 before:w-0 before:-translate-y-1/2 before:border-t-[6px] before:border-b-[6px] before:border-l-[8px] before:border-t-transparent before:border-b-transparent before:border-l-white before:content-['']"
               )}
-              onClick={() => navigate(item.path)}
+              onClick={() => handleNavClick(item)}
             >
               <span className="w-6 text-center text-lg">
                 <item.icon />
@@ -172,6 +206,26 @@ const Sidebar = () => {
           ))}
         </nav>
       </div>
+
+      {staffPortal && (
+        <div className="border-t border-white/10 py-1">
+          <a
+            href={FLOODSIGHT_ADMIN_PORTAL_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn(
+              'flex w-full min-w-0 items-center gap-3 rounded-none border-none bg-transparent py-3 text-left text-sm font-medium text-white/90 no-underline transition-colors hover:bg-white/10 hover:text-white focus:outline-none',
+              collapsed ? 'justify-center px-0' : 'justify-start px-4'
+            )}
+            title={`${staffPortalLabel} (mở tab mới)`}
+          >
+            <span className="w-6 text-center text-lg">
+              <FaArrowUpRightFromSquare />
+            </span>
+            {!collapsed && <span className="min-w-0 flex-1 truncate">{staffPortalLabel}</span>}
+          </a>
+        </div>
+      )}
 
       {authenticated && (
         <div className="border-t border-white/10 py-1">
@@ -188,6 +242,42 @@ const Sidebar = () => {
               <FaRightFromBracket />
             </span>
             {!collapsed && <span className="min-w-0 flex-1 truncate whitespace-nowrap">Đăng xuất</span>}
+          </button>
+        </div>
+      )}
+
+      {guestBrowse && (
+        <div className="border-t border-white/10 py-1">
+          <button
+            type="button"
+            className={cn(
+              'flex w-full min-w-0 cursor-pointer items-center gap-3 rounded-none border-none bg-transparent py-3 text-left text-sm font-medium text-white/90 transition-colors hover:bg-white/10 hover:text-white focus:outline-none',
+              collapsed ? 'justify-center px-0' : 'justify-start px-4'
+            )}
+            onClick={() => goLogin()}
+            title="Đăng nhập"
+          >
+            <span className="w-6 text-center text-lg">
+              <FaUser />
+            </span>
+            {!collapsed && <span className="min-w-0 flex-1 truncate whitespace-nowrap">Đăng nhập</span>}
+          </button>
+          <button
+            type="button"
+            className={cn(
+              'flex w-full min-w-0 cursor-pointer items-center gap-3 rounded-none border-none bg-transparent py-3 text-left text-sm font-medium text-white/90 transition-colors hover:bg-white/10 hover:text-white focus:outline-none',
+              collapsed ? 'justify-center px-0' : 'justify-start px-4'
+            )}
+            onClick={() => {
+              clearGuestExploreMode();
+              navigate('/login');
+            }}
+            title="Thoát chế độ khách"
+          >
+            <span className="w-6 text-center text-lg">
+              <FaRightFromBracket />
+            </span>
+            {!collapsed && <span className="min-w-0 flex-1 truncate whitespace-nowrap">Thoát chế độ khách</span>}
           </button>
         </div>
       )}

@@ -364,7 +364,9 @@ const NewReportPage = () => {
         ]
       });
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Mapbox: fly to mapCenter khi chọn vị trí hoặc tìm kiếm địa chỉ

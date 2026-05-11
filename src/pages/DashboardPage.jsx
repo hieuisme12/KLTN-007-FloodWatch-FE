@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useGuestExplore } from '../hooks/useGuestExplore';
 import { fetchFloodData, fetchCrowdReports } from '../services/api';
 import { POLLING_INTERVALS, CROWD_REPORT_MAP_DISPLAY_HOURS } from '../config/apiConfig';
 import { filterNonExpiredReports } from '../utils/reportHelpers';
@@ -10,11 +11,20 @@ import WeatherNewsSection from '../components/news/WeatherNewsSection';
 import { FaMap } from 'react-icons/fa6';
 const DashboardPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { openWelcome } = useGuestExplore();
   const [floodData, setFloodData] = useState([]);
   const [crowdReports, setCrowdReports] = useState([]);
   const [selectedSensor, setSelectedSensor] = useState(null);
   const [selectedCrowdReport, setSelectedCrowdReport] = useState(null);
   const endpointRef = useRef(null);
+
+  const guestWelcome = Boolean(location.state?.guestWelcome);
+  useEffect(() => {
+    if (!guestWelcome) return;
+    openWelcome();
+    navigate(location.pathname, { replace: true, state: {} });
+  }, [guestWelcome, location.pathname, navigate, openWelcome]);
 
   // Tự động chọn sensor đầu tiên khi có dữ liệu (tránh setState đồng bộ trong effect)
   useEffect(() => {

@@ -1,10 +1,12 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import FilterDropdown from '../components/common/FilterDropdown';
-import { fetchCrowdReports, fetchAllCrowdReports, fetchAllReportsAdmin } from '../services/api';
+import { fetchCrowdReports, fetchAllCrowdReports } from '../services/api';
 import { POLLING_INTERVALS, CROWD_REPORT_MAP_DISPLAY_HOURS } from '../config/apiConfig';
 import { isReportExpired } from '../utils/reportHelpers';
 import { useNavigate } from 'react-router-dom';
-import { isModerator, isAdmin, getCurrentUser } from '../utils/auth';
+import { getCurrentUser } from '../utils/auth';
+import { isGuestBrowseMode } from '../utils/guestSession';
+import { useGuestExplore } from '../hooks/useGuestExplore';
 import { useReporterRanking } from '../context/ReporterRankingProvider';
 import { 
   FaMobileScreen, 
@@ -25,6 +27,7 @@ import SearchAutoComplete from '../components/common/SearchAutoComplete';
 import Skeleton from 'react-loading-skeleton';
 const ReportsPage = () => {
   const navigate = useNavigate();
+  const { openRequireLogin } = useGuestExplore();
   const { getReporterReliability } = useReporterRanking();
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -188,24 +191,19 @@ const ReportsPage = () => {
       try {
         // Lấy user hiện tại
         const currentUser = getCurrentUser();
-        const isStaff = isModerator() || isAdmin();
 
         let result;
-        // User thường: /api/crowd-reports/all — lọc theo reporter_id
-        // Admin/Moderator: /api/reports/all — đủ field (confidence, …)
+        // Đã đăng nhập: /api/crowd-reports/all — lọc theo reporter_id (cả user / admin / moderator trên FE công khai)
         // Khách: /api/crowd-reports (24h, public)
-        if (currentUser && !isStaff) {
+        if (currentUser) {
           result = await fetchAllCrowdReports({ limit: 1000 });
-        } else if (isStaff) {
-          result = await fetchAllReportsAdmin({ limit: 1000 });
         } else {
           result = await fetchCrowdReports();
         }
 
         if (result.success && result.data) {
-          // Filter reports dựa trên role
           let filteredReports = result.data;
-          if (!isStaff && currentUser) {
+          if (currentUser) {
             // User thường: chỉ hiển thị báo cáo của chính họ (kể cả đang chờ xem xét)
             filteredReports = result.data.filter(report => {
               // Chỉ filter dựa trên reporter_id (không dùng fallback)
@@ -221,8 +219,7 @@ const ReportsPage = () => {
                      Number(reportReporterId) === Number(userId);
             });
           }
-          // Admin/Moderator: hiển thị tất cả (không filter)
-          
+
           setReports(filteredReports);
           
           // Lấy địa chỉ cho các báo cáo không có location_description (tối ưu với cache)
@@ -653,7 +650,13 @@ const ReportsPage = () => {
             }}>
               <p style={{ fontSize: '18px', margin: '0 0 10px 0', fontWeight: '500' }}>Không có báo cáo nào</p>
               <button
-                onClick={() => navigate('/report/new')}
+                onClick={() => {
+                  if (isGuestBrowseMode()) {
+                    openRequireLogin('Đăng nhập để tạo và gửi báo cáo ngập lụt.');
+                    return;
+                  }
+                  navigate('/report/new');
+                }}
                 style={{
                   marginTop: '15px',
                   padding: '12px 24px',

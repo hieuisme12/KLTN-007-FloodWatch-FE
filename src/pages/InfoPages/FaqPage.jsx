@@ -80,13 +80,13 @@ const FAQ_ITEMS = [
     )
   },
   {
-    q: 'Ai có quyền vào trang “Kiểm duyệt”?',
+    q: 'Ai có quyền kiểm duyệt hoặc quản trị hệ thống?',
     a: (
       <>
         <p>
-          Chỉ tài khoản được cấp vai trò <strong>điều phối viên (moderator)</strong> mới truy cập được
-          luồng kiểm duyệt báo cáo. Tài khoản quản trị viên (admin) có thể có quyền khác theo cấu hình
-          hệ thống — nếu bạn cần quyền này cho công việc chính thức, hãy liên hệ đơn vị vận hành.
+          Tài khoản <strong>điều hành viên (moderator)</strong> và <strong>quản trị viên (admin)</strong> sử
+          dụng <strong>cổng quản trị riêng</strong> (mở từ menu sau khi đăng nhập). Nếu bạn cần quyền
+          cho công việc chính thức, hãy liên hệ đơn vị vận hành.
         </p>
       </>
     )

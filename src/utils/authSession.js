@@ -119,11 +119,15 @@ export function getAccessToken() {
 /**
  * Lưu token sau login / refresh / register có JWT.
  * @param {object} data — access_token|token, refresh_token, session_token, expires_in?, refresh_expires_at?, user?
- * @param {boolean} [rememberMe=true] — false → sessionStorage (đóng tab mất phiên).
+ * @param {boolean} [rememberMe=false] — false → sessionStorage (đóng tab / hết phiên trình duyệt).
  */
-export function persistAuthTokens(data, rememberMe = true) {
+export function persistAuthTokens(data, rememberMe = false) {
   if (!data || typeof data !== 'object') return;
   const storage = rememberMe ? localStorage : sessionStorage;
+  /** Refresh thường không trả `user` — giữ JSON user hiện có để lần mở app đầu không mất tên/avatar. */
+  const priorUserJson =
+    localStorage.getItem(USER_KEY) || sessionStorage.getItem(USER_KEY) || null;
+
   clearAuthKeysIn(localStorage);
   clearAuthKeysIn(sessionStorage);
 
@@ -134,7 +138,11 @@ export function persistAuthTokens(data, rememberMe = true) {
   }
   if (data.refresh_token) storage.setItem(LS_REFRESH, data.refresh_token);
   if (data.session_token) storage.setItem(LS_SESSION, data.session_token);
-  if (data.user) storage.setItem(USER_KEY, JSON.stringify(data.user));
+  if (data.user) {
+    storage.setItem(USER_KEY, JSON.stringify(data.user));
+  } else if (priorUserJson) {
+    storage.setItem(USER_KEY, priorUserJson);
+  }
 
   const expiresInRaw = data.expires_in ?? data.expiresIn;
   if (expiresInRaw != null && Number.isFinite(Number(expiresInRaw))) {
@@ -213,6 +221,18 @@ export async function refreshTokensViaApi() {
  */
 export async function bootstrapAuth() {
   if (typeof window === 'undefined') return;
+
+  /** Một lần: bỏ phiên cũ lưu localStorage (ghi nhớ) để mặc định chỉ còn sessionStorage. */
+  const SESSION_DEFAULT_MIGRATION_KEY = '_hcm_flood_auth_session_default_v1';
+  try {
+    if (!localStorage.getItem(SESSION_DEFAULT_MIGRATION_KEY)) {
+      clearAuthKeysIn(localStorage);
+      localStorage.setItem(SESSION_DEFAULT_MIGRATION_KEY, '1');
+    }
+  } catch {
+    /* ignore quota / private mode */
+  }
+
   if (!isRefreshSessionValid()) {
     if (getAccessToken() || getAuthStorage().getItem(LS_REFRESH)) {
       clearAuthStorage();
@@ -231,4 +251,7 @@ export async function bootstrapAuth() {
 export function setStoredUserJson(userObj) {
   if (!userObj) return;
   getAuthStorage().setItem(USER_KEY, JSON.stringify(userObj));
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('user-updated'));
+  }
 }

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import GuestAwareLink from '../common/GuestAwareLink';
 import { FaFacebook, FaTwitter, FaYoutube, FaLinkedin, FaEnvelope, FaPhone } from 'react-icons/fa6';
 import { MdLocationOn } from 'react-icons/md';
 import { useSidebar } from '@/context/SidebarProvider';
@@ -71,7 +72,7 @@ const Footer = () => {
             <ul className="m-0 flex list-none flex-col gap-3 p-0">
               <li className="m-0">
                 <Link
-                  to="/"
+                  to="/dashboard"
                   className="inline-block text-sm text-white/90 no-underline transition-all duration-200 ease-in-out hover:pl-1 hover:text-white max-md:text-[13px]"
                 >
                   Trang chủ
@@ -86,20 +87,22 @@ const Footer = () => {
                 </Link>
               </li>
               <li className="m-0">
-                <Link
+                <GuestAwareLink
                   to="/report/new"
+                  requiresAuth
                   className="inline-block text-sm text-white/90 no-underline transition-all duration-200 ease-in-out hover:pl-1 hover:text-white max-md:text-[13px]"
                 >
                   Báo cáo mới
-                </Link>
+                </GuestAwareLink>
               </li>
               <li className="m-0">
-                <Link
+                <GuestAwareLink
                   to="/profile"
+                  requiresAuth
                   className="inline-block text-sm text-white/90 no-underline transition-all duration-200 ease-in-out hover:pl-1 hover:text-white max-md:text-[13px]"
                 >
                   Tài khoản
-                </Link>
+                </GuestAwareLink>
               </li>
             </ul>
           </div>

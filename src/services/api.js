@@ -8,6 +8,7 @@ import {
   setStoredUserJson,
   hasStoredRefreshCredentials
 } from '../utils/authSession';
+import { clearGuestExploreMode } from '../utils/guestSession';
 
 export { persistAuthTokens, clearAuthStorage, bootstrapAuth } from '../utils/authSession';
 
@@ -122,7 +123,7 @@ apiClient.interceptors.response.use(
 
 // Chuẩn hóa dữ liệu từ API
 const normalizeFloodData = (data) => {
-  return data.map(item => {
+  return data.map((item) => {
     const waterLevel = item.water_level || 0;
     const warningThreshold = item.warning_threshold || DEFAULTS.WARNING_THRESHOLD;
     const dangerThreshold = item.danger_threshold || DEFAULTS.DANGER_THRESHOLD;
@@ -156,7 +157,6 @@ const normalizeFloodData = (data) => {
     }
     status = status || 'normal';
 
-    // Tính toán velocity nếu không có (endpoint cũ)
     const velocity = item.velocity || 0;
 
     return {
@@ -167,7 +167,7 @@ const normalizeFloodData = (data) => {
       sensor_status: item.sensor_status || status,
       water_level: waterLevel,
       velocity: velocity,
-      status: status, // normal/warning/danger/offline
+      status,
       lng: item.lng || DEFAULTS.DEFAULT_LNG,
       lat: item.lat || DEFAULTS.DEFAULT_LAT,
       warning_threshold: warningThreshold,
@@ -476,7 +476,7 @@ export const fetchAllCrowdReports = async (params = {}) => {
 };
 
 // Authentication APIs
-export const login = async (username, password, rememberMe = true) => {
+export const login = async (username, password, rememberMe = false) => {
   try {
     const loginId = typeof username === 'string' ? username.trim() : String(username || '');
     const primaryPayload = loginId.includes('@')
@@ -749,7 +749,6 @@ export const updateProfile = async (profileData) => {
     if (response.data && response.data.success) {
       if (response.data.data) {
         setStoredUserJson(response.data.data);
-        window.dispatchEvent(new CustomEvent('user-updated'));
       }
       return { 
         success: true, 
@@ -809,6 +808,7 @@ export const logout = async () => {
     }
   }
   clearAuthStorage();
+  clearGuestExploreMode();
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('user-updated'));
   }

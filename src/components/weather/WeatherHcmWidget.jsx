@@ -71,7 +71,7 @@ export default function WeatherHcmWidget() {
   return (
     <div
       className={cn(
-        'h-full min-h-0 rounded-xl bg-gradient-to-br from-sky-950 via-sky-700 to-sky-600 p-5 text-sky-50 shadow-lg shadow-sky-900/25'
+        'flex h-full min-h-0 w-full flex-1 flex-col rounded-xl bg-gradient-to-br from-sky-950 via-sky-700 to-sky-600 p-5 text-sky-50 shadow-lg shadow-sky-900/25'
       )}
     >
       <div className="mb-3 flex items-center gap-2.5">
@@ -87,7 +87,8 @@ export default function WeatherHcmWidget() {
       {error && <p className="m-0 text-sm text-red-200">{String(error)}</p>}
       {data && (
         <>
-          <div className="mb-3.5 flex flex-wrap items-center gap-4 md:gap-6">
+          <div className="mb-3.5 flex flex-1 flex-col justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-4 md:gap-6">
             {temp != null && (
               <div className="flex items-baseline gap-1">
                 <span className="text-4xl font-extrabold leading-none tracking-tight">
@@ -113,7 +114,7 @@ export default function WeatherHcmWidget() {
             </div>
           </div>
           {nextHours.length > 0 && (
-            <div className="mb-2.5 rounded-lg bg-black/15 px-3 py-2.5">
+            <div className="mb-2.5 flex-1 rounded-lg bg-black/15 px-3 py-2.5">
               <div className="mb-2 text-[11px] font-medium uppercase tracking-wide opacity-85">
                 Xác suất mưa (giờ tới)
               </div>
@@ -132,8 +133,9 @@ export default function WeatherHcmWidget() {
             </div>
           )}
           {attributionText && (
-            <p className="m-0 text-[10px] leading-snug opacity-75">{attributionText}</p>
+            <p className="m-0 mt-auto shrink-0 text-[10px] leading-snug opacity-75">{attributionText}</p>
           )}
+          </div>
         </>
       )}
     </div>

@@ -11,45 +11,28 @@ import VerifyRegisterOtpPage from './pages/VerifyRegisterOtpPage';
 import ProfilePage from './pages/ProfilePage';
 import NewsDetailPage from './pages/NewsDetailPage';
 import MapPage from './pages/MapPage';
-import ModerationPage from './pages/ModerationPage';
-import ResearchAnalyticsPage from './pages/ResearchAnalyticsPage';
 import AboutPage from './pages/InfoPages/AboutPage';
 import PrivacyPage from './pages/InfoPages/PrivacyPage';
 import TermsPage from './pages/InfoPages/TermsPage';
 import FaqPage from './pages/InfoPages/FaqPage';
 import ContactPage from './pages/InfoPages/ContactPage';
 import Layout from './components/layout/Layout';
-import { isAuthenticated, hasRole, isModerator, isAdmin } from './utils/auth';
+import { isAuthenticated } from './utils/auth';
+import { isGuestBrowseMode } from './utils/guestSession';
 import EmergencyAlertsPage from './pages/EmergencyAlertsPage';
-import AdminOperationsPage from './pages/AdminOperationsPage';
 import RoutingPage from './pages/RoutingPage';
 import AuthLoadingScreen from './components/common/AuthLoadingScreen';
 import { SkeletonTheme } from 'react-loading-skeleton';
+import { GuestExploreProvider } from './context/GuestExploreProvider';
+import { ProtectedRoute } from './components/auth/ProtectedRoute';
 
-// Protected Route – chỉ cần đăng nhập (bất kỳ role)
-const ProtectedRoute = ({ children }) => {
-  return isAuthenticated() ? children : <Navigate to="/login" replace />;
-};
-
-// Moderator Route – CHỈ role moderator (Admin không được vào trang kiểm duyệt)
-const ModeratorRoute = ({ children }) => {
-  if (!isAuthenticated()) return <Navigate to="/login" replace />;
-  if (!isModerator()) return <Navigate to="/" replace />;
-  return children;
-};
-
-const ResearchRoute = ({ children }) => {
-  if (!isAuthenticated()) return <Navigate to="/login" replace />;
-  if (!hasRole(['admin', 'moderator'])) return <Navigate to="/" replace />;
-  return children;
-};
-
-/** Chỉ admin — B1/C1 vận hành, không gộp moderator */
-const AdminRoute = ({ children }) => {
-  if (!isAuthenticated()) return <Navigate to="/login" replace />;
-  if (!isAdmin()) return <Navigate to="/" replace />;
-  return children;
-};
+/** Mở site: đã đăng nhập hoặc chế độ khách → dashboard; còn lại → login. */
+function RootRedirect() {
+  if (isAuthenticated() || isGuestBrowseMode()) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  return <Navigate to="/login" replace />;
+}
 
 /** Chạy refresh khi mở app (trong refresh_expires_at) trước khi kiểm tra route. */
 function AuthBootstrap({ children }) {
@@ -67,6 +50,7 @@ function App() {
   return (
     <Router>
       <AuthBootstrap>
+      <GuestExploreProvider>
       <SkeletonTheme baseColor="#e2e8f0" highlightColor="#f8fafc">
       <ReporterRankingProvider>
       <Routes>
@@ -74,31 +58,29 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/register/verify" element={<VerifyRegisterOtpPage />} />
-        
-        {/* Các trang khác có Navigation */}
-        <Route 
-          path="/" 
+
+        <Route path="/moderation" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/research" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/admin/operations" element={<Navigate to="/dashboard" replace />} />
+
+        <Route path="/" element={<RootRedirect />} />
+
+        {/* Các trang khác có Navigation — cốt lõi yêu cầu đăng nhập */}
+        <Route
+          path="/dashboard"
           element={
             <Layout>
               <DashboardPage />
             </Layout>
-          } 
+          }
         />
-        <Route 
-          path="/dashboard" 
-          element={
-            <Layout>
-              <DashboardPage />
-            </Layout>
-          } 
-        />
-        <Route 
-          path="/reports" 
+        <Route
+          path="/reports"
           element={
             <Layout>
               <ReportsPage />
             </Layout>
-          } 
+          }
         />
         <Route 
           path="/report/new" 
@@ -121,42 +103,12 @@ function App() {
           } 
         />
         <Route
-          path="/moderation"
-          element={
-            <Layout>
-              <ModeratorRoute>
-                <ModerationPage />
-              </ModeratorRoute>
-            </Layout>
-          }
-        />
-        <Route
-          path="/research"
-          element={
-            <Layout>
-              <ResearchRoute>
-                <ResearchAnalyticsPage />
-              </ResearchRoute>
-            </Layout>
-          }
-        />
-        <Route
           path="/emergency-alerts"
           element={
             <Layout>
               <ProtectedRoute>
                 <EmergencyAlertsPage />
               </ProtectedRoute>
-            </Layout>
-          }
-        />
-        <Route
-          path="/admin/operations"
-          element={
-            <Layout>
-              <AdminRoute>
-                <AdminOperationsPage />
-              </AdminRoute>
             </Layout>
           }
         />
@@ -168,13 +120,15 @@ function App() {
             </Layout>
           }
         />
-        <Route 
-          path="/news/:id" 
+        <Route
+          path="/news/:id"
           element={
             <Layout>
-              <NewsDetailPage />
+              <ProtectedRoute>
+                <NewsDetailPage />
+              </ProtectedRoute>
             </Layout>
-          } 
+          }
         />
         <Route 
           path="/map" 
@@ -223,6 +177,7 @@ function App() {
       </Routes>
       </ReporterRankingProvider>
       </SkeletonTheme>
+      </GuestExploreProvider>
       </AuthBootstrap>
     </Router>
   );

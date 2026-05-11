@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { isAuthenticated } from '../../utils/auth';
+import { isGuestBrowseMode } from '../../utils/guestSession';
 import { FaLock, FaPenToSquare } from 'react-icons/fa6';
 import { getOnlineUsersCount, getMonthlyVisitsCount } from '../../services/api';
 import { cn } from '@/lib/cn';
@@ -8,6 +9,7 @@ import { cn } from '@/lib/cn';
 const Header = () => {
   const navigate = useNavigate();
   const authenticated = isAuthenticated();
+  const guestBrowse = isGuestBrowseMode();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [totalVisits, setTotalVisits] = useState(0);
   const [monthlyVisits, setMonthlyVisits] = useState(0);
@@ -18,6 +20,9 @@ const Header = () => {
   }, []);
 
   useEffect(() => {
+    if (guestBrowse) {
+      return undefined;
+    }
     const fetchStats = async () => {
       const [onlineRes, monthlyRes] = await Promise.all([
         getOnlineUsersCount(),
@@ -29,7 +34,7 @@ const Header = () => {
     fetchStats();
     const interval = setInterval(fetchStats, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [guestBrowse]);
 
   const formatDate = (date) => {
     const days = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
@@ -77,23 +82,27 @@ const Header = () => {
               </div>
             </div>
 
-            <div className="flex flex-col gap-0.5">
-              <div className="text-xs font-normal leading-tight text-[#666] max-lg:text-[11px] max-md:text-[10px]">
-                Lượt truy cập
-              </div>
-              <div className="font-[Arial] text-lg font-bold leading-tight text-[#1976d2] max-lg:text-base max-md:text-sm">
-                {formatNumber(totalVisits)}
-              </div>
-            </div>
+            {!guestBrowse && (
+              <>
+                <div className="flex flex-col gap-0.5">
+                  <div className="text-xs font-normal leading-tight text-[#666] max-lg:text-[11px] max-md:text-[10px]">
+                    Lượt truy cập
+                  </div>
+                  <div className="font-[Arial] text-lg font-bold leading-tight text-[#1976d2] max-lg:text-base max-md:text-sm">
+                    {formatNumber(totalVisits)}
+                  </div>
+                </div>
 
-            <div className="flex flex-col gap-0.5">
-              <div className="text-xs font-normal leading-tight text-[#666] max-lg:text-[11px] max-md:text-[10px]">
-                Lượt truy cập tháng
-              </div>
-              <div className="font-[Arial] text-lg font-bold leading-tight text-[#1976d2] max-lg:text-base max-md:text-sm">
-                {formatNumber(monthlyVisits)}
-              </div>
-            </div>
+                <div className="flex flex-col gap-0.5">
+                  <div className="text-xs font-normal leading-tight text-[#666] max-lg:text-[11px] max-md:text-[10px]">
+                    Lượt truy cập tháng
+                  </div>
+                  <div className="font-[Arial] text-lg font-bold leading-tight text-[#1976d2] max-lg:text-base max-md:text-sm">
+                    {formatNumber(monthlyVisits)}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           {!authenticated && (
@@ -101,7 +110,7 @@ const Header = () => {
               <button
                 type="button"
                 className={cn(
-                  'inline-flex items-center gap-2 whitespace-nowrap rounded-full border-2 border-[#1976d2] bg-white px-4 py-2 text-sm font-medium text-[#1976d2] shadow-[0_1px_3px_rgba(0,0,0,0.1)] transition-all',
+                  'inline-flex items-center gap-2 whitespace-nowrap rounded-lg border-2 border-[#1976d2] bg-white px-4 py-2 text-sm font-medium text-[#1976d2] shadow-[0_1px_3px_rgba(0,0,0,0.1)] transition-all',
                   'hover:-translate-y-px hover:bg-[#1976d2] hover:text-white hover:shadow-[0_2px_6px_rgba(25,118,210,0.4)]',
                   'focus:outline-none'
                 )}
@@ -112,7 +121,7 @@ const Header = () => {
               <button
                 type="button"
                 className={cn(
-                  'inline-flex items-center gap-2 whitespace-nowrap rounded-full border-2 border-[#1976d2] bg-[#1976d2] px-4 py-2 text-sm font-medium text-white shadow-[0_1px_3px_rgba(0,0,0,0.1)] transition-all',
+                  'inline-flex items-center gap-2 whitespace-nowrap rounded-lg border-2 border-[#1976d2] bg-[#1976d2] px-4 py-2 text-sm font-medium text-white shadow-[0_1px_3px_rgba(0,0,0,0.1)] transition-all',
                   'hover:-translate-y-px hover:border-[#1565c0] hover:bg-[#1565c0] hover:shadow-[0_2px_6px_rgba(25,118,210,0.4)]',
                   'focus:outline-none'
                 )}

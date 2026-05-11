@@ -1,201 +1,99 @@
 import React, { useState, useEffect } from 'react';
-import { fetchFloodData } from '../../services/api';
-import { POLLING_INTERVALS } from '../../config/apiConfig';
-import { FaChartColumn } from 'react-icons/fa6';
+import { VOV_GT_RSS_PROXY_PATH } from '../../config/rssConfig';
+import { FaClock } from 'react-icons/fa6';
 import Skeleton from 'react-loading-skeleton';
+
+const RSS_POLL_MS = 15 * 60 * 1000;
+
+/** Khối tin RSS 24h (dashboard) — không còn thống kê mực nước trong card này. */
 const WaterLevelStatistics = () => {
-  const [waterLevelData, setWaterLevelData] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [rssItems, setRssItems] = useState([]);
+  const [rssLoading, setRssLoading] = useState(true);
+  const [rssError, setRssError] = useState(null);
+  const [rssTried, setRssTried] = useState(null);
 
   useEffect(() => {
-    const loadData = async () => {
+    let cancelled = false;
+
+    const loadRss = async () => {
       try {
-        setLoading(true);
-        const result = await fetchFloodData(null);
-        
-        if (result.success && result.data) {
-          // Nhóm dữ liệu theo ngày và tính trung bình mực nước
-          const groupedByDate = {};
-          
-          result.data.forEach(sensor => {
-            if (sensor.water_level !== undefined && sensor.last_data_time) {
-              const date = new Date(sensor.last_data_time).toISOString().split('T')[0];
-              
-              if (!groupedByDate[date]) {
-                groupedByDate[date] = {
-                  date: date,
-                  values: [],
-                  sensors: []
-                };
-              }
-              
-              groupedByDate[date].values.push(sensor.water_level);
-              groupedByDate[date].sensors.push({
-                name: sensor.location_name,
-                level: sensor.water_level
-              });
-            }
-          });
-          
-          // Tính trung bình mực nước cho mỗi ngày
-          const dailyData = Object.values(groupedByDate)
-            .map(group => ({
-              date: group.date,
-              averageLevel: group.values.reduce((a, b) => a + b, 0) / group.values.length,
-              maxLevel: Math.max(...group.values),
-              minLevel: Math.min(...group.values),
-              sensorCount: group.sensors.length,
-              sensors: group.sensors
-            }))
-            .sort((a, b) => new Date(b.date) - new Date(a.date))
-            .slice(0, 7); // Lấy 7 ngày gần nhất
-          
-          setWaterLevelData(dailyData);
+        setRssLoading(true);
+        setRssError(null);
+        const res = await fetch(VOV_GT_RSS_PROXY_PATH, { credentials: 'same-origin' });
+        const json = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (!json.ok) {
+          setRssItems([]);
+          setRssTried(null);
+          setRssError(json.error || 'Không tải được RSS');
+          return;
         }
-      } catch {
-        // Bỏ qua lỗi API; UI vẫn tắt loading ở finally
+        setRssItems(Array.isArray(json.items) ? json.items : []);
+        setRssTried(Array.isArray(json.tried) ? json.tried : null);
+      } catch (e) {
+        if (!cancelled) {
+          setRssItems([]);
+          setRssTried(null);
+          setRssError(e?.message || 'Lỗi mạng khi tải tin');
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setRssLoading(false);
       }
     };
 
-    loadData();
-    const interval = setInterval(loadData, POLLING_INTERVALS.FLOOD_DATA);
-    return () => clearInterval(interval);
+    loadRss();
+    const iv = setInterval(loadRss, RSS_POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(iv);
+    };
   }, []);
 
-  // Tính toán chiều cao cho biểu đồ cột
-  const getMaxLevel = () => {
-    if (waterLevelData.length === 0) return 100;
-    return Math.max(...waterLevelData.map(d => d.maxLevel), 100);
-  };
-
-  const maxLevel = getMaxLevel();
-
-  // Format ngày
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    const day = date.getDate();
-    const month = date.getMonth() + 1;
-    return `${day}/${month}`;
-  };
-
-  // Lấy dữ liệu cho ngày được chọn
-  const selectedDayData = waterLevelData.find(d => d.date === selectedDate);
-
   return (
-    <div className="water-level-statistics">
+    <div className="water-level-statistics water-level-statistics--news-only">
       <h3 className="statistics-title">
-        <FaChartColumn /> THỐNG KÊ NỘI DUNG
+        <FaClock aria-hidden /> Tin tức 24h
       </h3>
-      
-      {loading ? (
-        <div className="statistics-loading" style={{ padding: '8px 0' }}>
-          <Skeleton height={180} borderRadius={10} style={{ marginBottom: 16 }} />
-          <Skeleton count={4} height={14} />
-        </div>
-      ) : waterLevelData.length === 0 ? (
-        <div className="statistics-empty">Chưa có dữ liệu mực nước</div>
-      ) : (
-        <>
-          {/* Biểu đồ cột */}
-          <div className="statistics-chart">
-            <div className="chart-container">
-              <div className="chart-bars">
-                {waterLevelData.map((data, index) => {
-                  const height = (data.averageLevel / maxLevel) * 100;
-                  const isSelected = data.date === selectedDate;
-                  
-                  return (
-                    <div
-                      key={index}
-                      className={`chart-bar-wrapper ${isSelected ? 'selected' : ''}`}
-                      onClick={() => setSelectedDate(data.date)}
-                      title={`Ngày ${formatDate(data.date)}: ${data.averageLevel.toFixed(1)} cm`}
-                    >
-                      <div className="chart-bar-container">
-                        <div
-                          className="chart-bar"
-                          style={{ height: `${height}%` }}
-                        >
-                          <span className="chart-bar-value">
-                            {data.averageLevel.toFixed(1)}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="chart-bar-label">
-                        {formatDate(data.date)}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              
-              {/* Trục Y */}
-              <div className="chart-y-axis">
-                <div className="y-axis-label">{maxLevel.toFixed(0)}</div>
-                <div className="y-axis-label">{(maxLevel * 0.75).toFixed(0)}</div>
-                <div className="y-axis-label">{(maxLevel * 0.5).toFixed(0)}</div>
-                <div className="y-axis-label">{(maxLevel * 0.25).toFixed(0)}</div>
-                <div className="y-axis-label">0</div>
-              </div>
-            </div>
-            
-            <div className="chart-legend">
-              <span className="legend-item">
-                <span className="legend-color" style={{ background: '#2196f3' }}></span>
-                Mực nước trung bình (cm)
-              </span>
-            </div>
-          </div>
 
-          {/* Chi tiết ngày được chọn */}
-          {selectedDayData && (
-            <div className="statistics-details">
-              <h4 className="details-title">
-                Chi tiết ngày {formatDate(selectedDayData.date)}
-              </h4>
-              <div className="details-grid">
-                <div className="detail-item">
-                  <span className="detail-label">Mực nước trung bình:</span>
-                  <span className="detail-value">{selectedDayData.averageLevel.toFixed(1)} cm</span>
-                </div>
-                <div className="detail-item">
-                  <span className="detail-label">Mực nước cao nhất:</span>
-                  <span className="detail-value">{selectedDayData.maxLevel.toFixed(1)} cm</span>
-                </div>
-                <div className="detail-item">
-                  <span className="detail-label">Mực nước thấp nhất:</span>
-                  <span className="detail-value">{selectedDayData.minLevel.toFixed(1)} cm</span>
-                </div>
-                <div className="detail-item">
-                  <span className="detail-label">Số lượng sensor:</span>
-                  <span className="detail-value">{selectedDayData.sensorCount}</span>
-                </div>
-              </div>
-              
-              {/* Danh sách sensor */}
-              {selectedDayData.sensors.length > 0 && (
-                <div className="sensors-list">
-                  <h5 className="sensors-list-title">Mực nước theo sensor:</h5>
-                  <div className="sensors-grid">
-                    {selectedDayData.sensors.map((sensor, idx) => (
-                      <div key={idx} className="sensor-item">
-                        <span className="sensor-name">{sensor.name}</span>
-                        <span className="sensor-level">{sensor.level.toFixed(1)} cm</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </>
-      )}
+      <div className="vov-rss-section vov-rss-section--solo">
+        {rssLoading ? (
+          <div className="vov-rss-loading">
+            <Skeleton count={6} height={14} style={{ marginBottom: 10 }} />
+          </div>
+        ) : rssError ? (
+          <div className="vov-rss-error">{rssError}</div>
+        ) : rssItems.length === 0 ? (
+          <div className="vov-rss-empty">
+            <p>Chưa có tin trong feed. Thử lại sau.</p>
+            {rssTried && rssTried.length > 0 ? (
+              <ul className="vov-rss-tried" title="Chi tiết thử từng nguồn">
+                {rssTried.map((line, i) => (
+                  <li key={i}>{line}</li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : (
+          <ul className="vov-rss-list">
+            {rssItems.map((it, idx) => (
+              <li key={`${it.link}-${idx}`} className="vov-rss-item">
+                <a
+                  className="vov-rss-link"
+                  href={it.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={it.description || it.title}
+                >
+                  {it.title}
+                </a>
+                {it.pubDate ? <div className="vov-rss-meta">{it.pubDate}</div> : null}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 };
 
 export default WaterLevelStatistics;
-
