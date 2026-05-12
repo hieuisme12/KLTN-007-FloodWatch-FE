@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { FaWater } from 'react-icons/fa6';
+import { FaUser, FaLock, FaEnvelope, FaPhone } from 'react-icons/fa6';
 import { register } from '../services/api';
 import ErrorToast from '../components/common/ErrorToast';
+import AuthLoadingScreen from '../components/common/AuthLoadingScreen';
+import AuthSplitShell from '../components/auth/AuthSplitShell';
+
 const RegisterPage = () => {
   const [formData, setFormData] = useState({
     username: '',
@@ -27,7 +30,6 @@ const RegisterPage = () => {
     e.preventDefault();
     setError('');
 
-    // Validate
     if (formData.password !== formData.confirmPassword) {
       setError('Mật khẩu xác nhận không khớp');
       return;
@@ -70,104 +72,153 @@ const RegisterPage = () => {
   };
 
   return (
-    <div className="register-page">
+    <div className="auth-page">
+      {loading && <AuthLoadingScreen overlay />}
       {error && (
         <ErrorToast message={error} onClose={() => setError('')} />
       )}
-      <div className="register-container">
-        <form className="register-form" onSubmit={handleSubmit}>
-          <h2 className="register-title">Đăng ký</h2>
 
-          <div className="form-group">
-            <label htmlFor="username">Tên đăng nhập *</label>
-            <input
-              type="text"
-              id="username"
-              name="username"
-              value={formData.username}
-              onChange={handleChange}
-              placeholder=""
-              required
-              autoFocus
-            />
+      <AuthSplitShell panelInnerClassName="login-panel-inner--scroll">
+        <form className="login-split-form" onSubmit={handleSubmit}>
+          <div className="login-split-title-row">
+            <img src="/iuh.png" alt="" className="login-split-brand-logo" width={56} height={56} />
+            <h2 className="login-split-title">Đăng ký</h2>
           </div>
 
-          <div className="form-group">
-            <label htmlFor="email">Email *</label>
-            <input
-              type="email"
-              id="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              placeholder=""
-              required
-            />
+          <div className="login-field">
+            <label className="login-field-label" htmlFor="reg-username">
+              Tên đăng nhập <span className="login-field-req">*</span>
+            </label>
+            <div className="login-input-shell login-input-shell--user">
+              <FaUser className="login-input-icon" aria-hidden />
+              <input
+                type="text"
+                id="reg-username"
+                name="username"
+                className="login-input"
+                value={formData.username}
+                onChange={handleChange}
+                placeholder="Tên đăng nhập"
+                required
+                autoFocus
+                autoComplete="username"
+              />
+            </div>
           </div>
 
-          <div className="form-group">
-            <label htmlFor="full_name">Họ và tên</label>
-            <input
-              type="text"
-              id="full_name"
-              name="full_name"
-              value={formData.full_name}
-              onChange={handleChange}
-              placeholder=""
-            />
+          <div className="login-field">
+            <label className="login-field-label" htmlFor="reg-email">
+              Email <span className="login-field-req">*</span>
+            </label>
+            <div className="login-input-shell login-input-shell--user">
+              <FaEnvelope className="login-input-icon" aria-hidden />
+              <input
+                type="email"
+                id="reg-email"
+                name="email"
+                className="login-input"
+                value={formData.email}
+                onChange={handleChange}
+                placeholder="email@example.com"
+                required
+                autoComplete="email"
+              />
+            </div>
           </div>
 
-          <div className="form-group">
-            <label htmlFor="phone">Số điện thoại</label>
-            <input
-              type="tel"
-              id="phone"
-              name="phone"
-              value={formData.phone}
-              onChange={handleChange}
-              placeholder=""
-            />
+          <div className="login-field">
+            <label className="login-field-label" htmlFor="reg-full_name">
+              Họ và tên
+            </label>
+            <div className="login-input-shell login-input-shell--pass">
+              <FaUser className="login-input-icon" aria-hidden />
+              <input
+                type="text"
+                id="reg-full_name"
+                name="full_name"
+                className="login-input"
+                value={formData.full_name}
+                onChange={handleChange}
+                placeholder="Nguyễn Văn A"
+                autoComplete="name"
+              />
+            </div>
           </div>
 
-          <div className="form-group">
-            <label htmlFor="password">Mật khẩu *</label>
-            <input
-              type="password"
-              id="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              placeholder=""
-              required
-            />
+          <div className="login-field">
+            <label className="login-field-label" htmlFor="reg-phone">
+              Số điện thoại
+            </label>
+            <div className="login-input-shell login-input-shell--pass">
+              <FaPhone className="login-input-icon" aria-hidden />
+              <input
+                type="tel"
+                id="reg-phone"
+                name="phone"
+                className="login-input"
+                value={formData.phone}
+                onChange={handleChange}
+                placeholder="0xxx xxx xxx"
+                autoComplete="tel"
+              />
+            </div>
           </div>
 
-          <div className="form-group">
-            <label htmlFor="confirmPassword">Xác nhận mật khẩu *</label>
-            <input
-              type="password"
-              id="confirmPassword"
-              name="confirmPassword"
-              value={formData.confirmPassword}
-              onChange={handleChange}
-              placeholder=""
-              required
-            />
+          <div className="login-field">
+            <label className="login-field-label" htmlFor="reg-password">
+              Mật khẩu <span className="login-field-req">*</span>
+            </label>
+            <div className="login-input-shell login-input-shell--pass">
+              <FaLock className="login-input-icon" aria-hidden />
+              <input
+                type="password"
+                id="reg-password"
+                name="password"
+                className="login-input"
+                value={formData.password}
+                onChange={handleChange}
+                placeholder="Tối thiểu 6 ký tự"
+                required
+                autoComplete="new-password"
+              />
+            </div>
           </div>
 
-          <button 
-            type="submit" 
-            className="btn-register"
+          <div className="login-field">
+            <label className="login-field-label" htmlFor="reg-confirmPassword">
+              Xác nhận mật khẩu <span className="login-field-req">*</span>
+            </label>
+            <div className="login-input-shell login-input-shell--pass">
+              <FaLock className="login-input-icon" aria-hidden />
+              <input
+                type="password"
+                id="reg-confirmPassword"
+                name="confirmPassword"
+                className="login-input"
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                placeholder="Nhập lại mật khẩu"
+                required
+                autoComplete="new-password"
+              />
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            className="login-btn-primary login-btn-primary--spaced"
             disabled={loading}
           >
-            {loading ? 'Đang đăng ký...' : 'Đăng ký'}
+            {loading ? 'Đang đăng ký…' : 'Đăng ký'}
           </button>
 
-          <div className="register-footer">
-            <p>Đã có tài khoản? <Link to="/login">Đăng nhập</Link></p>
+          <div className="login-footer-split">
+            <p>
+              Đã có tài khoản? <Link to="/login">Đăng nhập</Link>
+            </p>
           </div>
         </form>
-      </div>
+      </AuthSplitShell>
     </div>
   );
 };

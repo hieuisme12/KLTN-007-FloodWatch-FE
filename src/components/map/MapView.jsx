@@ -22,6 +22,7 @@ import SensorMarker from './SensorMarker';
 import UserLocationMarker from './UserLocationMarker';
 import { useMapboxGlResize } from '../../hooks/useMapboxGlResize';
 import { getMapboxToken } from '../../utils/mapboxToken';
+import { getReporterAvatarUrl } from '../../utils/reporterAvatarUrl';
 const MAPBOX_TOKEN = getMapboxToken();
 
 // Mapbox dùng [lng, lat]; DEFAULT_CENTER là [lat, lng]
@@ -50,16 +51,6 @@ const getCrowdMarkerColor = (report) => {
   if (report.verified_by_sensor || displayStatus === 'cross_verified') return '#28a745';
   if (displayStatus === 'verified') return '#17a2b8';
   return '#6c757d';
-};
-
-const getReporterAvatarUrl = (avatarFileName) => {
-  if (!avatarFileName || typeof avatarFileName !== 'string') return null;
-  const trimmed = avatarFileName.trim();
-  if (!trimmed) return null;
-  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
-  const base = API_CONFIG.BASE_URL.replace(/\/$/, '');
-  const path = trimmed.startsWith('/') ? trimmed : `/profile-icons/${trimmed}`;
-  return base + path;
 };
 
 const getReportReporterAvatar = (report) => {
@@ -677,7 +668,9 @@ const MapView = ({
   /** Trang chủ (dashboard): false — ẩn lớp trộn. Trang /map: true (mặc định) */
   showFusionLayer = true,
   /** C2: lớp nhiệt kết hợp sensor + crowd (public API) */
-  heatmapEnabled = false
+  heatmapEnabled = false,
+  /** Popup sensor: "hover" (dashboard) hoặc "click" (mặc định, vd /map) */
+  sensorPopupTrigger = 'click'
 }) => {
   const { getReporterReliability } = useReporterRanking();
   const [fusionInternal, setFusionInternal] = useState(false);
@@ -987,6 +980,7 @@ const MapView = ({
               item={item}
               color={color}
               isOnline={isOnline}
+              sensorPopupTrigger={sensorPopupTrigger}
               onClick={onSensorSelect}
               isPopupOpen={openPopupId === `sensor-${sensorId}`}
               onOpenPopup={() => setOpenPopupId(`sensor-${sensorId}`)}

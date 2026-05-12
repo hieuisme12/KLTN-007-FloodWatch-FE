@@ -32,6 +32,8 @@ function isAuthEndpointNoRefresh(url) {
     url.includes('/api/auth/verify-otp') ||
     url.includes('/api/auth/send-otp') ||
     url.includes('/api/auth/resend-otp') ||
+    url.includes('/api/auth/forgot-password') ||
+    url.includes('/api/auth/reset-password') ||
     url.includes('/api/auth/refresh')
   );
 }
@@ -638,6 +640,110 @@ export const sendOtp = async (email) => {
       error: data?.error || error.message
     };
   }
+};
+
+/**
+ * Quên mật khẩu — gửi OTP purpose password_reset (email đã đăng ký, đã xác minh, active).
+ */
+export const forgotPassword = async (email) => {
+  try {
+    const response = await axios.post(
+      `${API_CONFIG.BASE_URL}${API_ENDPOINTS.AUTH_FORGOT_PASSWORD}`,
+      { email: String(email).trim().toLowerCase() }
+    );
+
+    if (response.data?.success) {
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    }
+    return {
+      success: false,
+      error: response.data?.error || 'Không gửi được mã đặt lại mật khẩu'
+    };
+  } catch (error) {
+    const data = error.response?.data;
+    return {
+      success: false,
+      error: data?.error || data?.message || error.message
+    };
+  }
+};
+
+function resetPasswordErrorLooksLikeSchemaIssue(message) {
+  const m = String(message || '').toLowerCase();
+  if (!m) return false;
+  const otpBiz =
+    (m.includes('otp') || m.includes('mã')) &&
+    (m.includes('không tồn tại') ||
+      m.includes('khong ton tai') ||
+      m.includes('đã được') ||
+      m.includes('da duoc') ||
+      m.includes('het han') ||
+      m.includes('hết hạn') ||
+      m.includes('expired') ||
+      m.includes('invalid') ||
+      m.includes('wrong') ||
+      m.includes('sai'));
+  if (otpBiz) return false;
+  if (m.includes('already been used') || m.includes('already used')) return false;
+  return true;
+}
+
+/**
+ * Đặt lại mật khẩu bằng OTP password_reset (mã mới nhất).
+ * Khi BE trả 400 do schema (tên trường khác), thử payload thay thế — không lặp khi lỗi nghiệp vụ OTP.
+ */
+export const resetPassword = async ({ email, otp_code, new_password }) => {
+  const em = String(email).trim().toLowerCase();
+  const otpRaw = String(otp_code).replace(/\s+/g, '').trim();
+  const pwd = String(new_password);
+  const url = `${API_CONFIG.BASE_URL}${API_ENDPOINTS.AUTH_RESET_PASSWORD}`;
+
+  const payloads = [
+    { email: em, otp_code: otpRaw, new_password: pwd },
+    { email: em, otp: otpRaw, new_password: pwd },
+    { email: em, code: otpRaw, new_password: pwd },
+    { email: em, otp_code: otpRaw, password: pwd }
+  ];
+
+  let lastFail = { success: false, error: 'Đặt lại mật khẩu thất bại' };
+
+  for (let i = 0; i < payloads.length; i += 1) {
+    const body = payloads[i];
+    try {
+      const response = await axios.post(url, body);
+
+      if (response.data?.success) {
+        return {
+          success: true,
+          data: response.data.data,
+          message: response.data.message
+        };
+      }
+      lastFail = {
+        success: false,
+        error: response.data?.error || response.data?.message || 'Đặt lại mật khẩu thất bại'
+      };
+      break;
+    } catch (error) {
+      const status = error.response?.status;
+      const data = error.response?.data;
+      const errMsg = data?.error || data?.message || error.message;
+      lastFail = {
+        success: false,
+        error: errMsg
+      };
+      if (status === 400 && i < payloads.length - 1 && resetPasswordErrorLooksLikeSchemaIssue(errMsg)) {
+        continue;
+      }
+      return lastFail;
+    }
+  }
+
+  return lastFail;
 };
 
 /** Gửi lại OTP (cùng logic giới hạn với send-otp). */

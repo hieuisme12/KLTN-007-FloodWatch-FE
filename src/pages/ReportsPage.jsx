@@ -25,6 +25,7 @@ import { MdLocationOn } from 'react-icons/md';
 import ConfidenceBadge from '../components/common/ConfidenceBadge';
 import SearchAutoComplete from '../components/common/SearchAutoComplete';
 import Skeleton from 'react-loading-skeleton';
+import { fetchAddressFromCoords, formatAddressForUiDisplay } from '../utils/geocode';
 const ReportsPage = () => {
   const navigate = useNavigate();
   const { openRequireLogin } = useGuestExplore();
@@ -75,57 +76,24 @@ const ReportsPage = () => {
   const [hoveredCardId, setHoveredCardId] = useState(null); // Track card đang được hover
   const [fetchingLocations, setFetchingLocations] = useState(new Set()); // Track các location đang được fetch
 
-  // Hàm format địa chỉ từ reverse geocoding
-  const formatAddress = (data) => {
-    if (!data || !data.address) return null;
-    
-    const addr = data.address;
-    const parts = [];
-    
-    // Ưu tiên: tên đường > tên địa điểm > quận/huyện > thành phố
-    if (addr.road) {
-      parts.push(addr.road);
-    }
-    if (addr.house_number) {
-      parts.unshift(addr.house_number); // Số nhà đặt trước tên đường
-    }
-    if (addr.suburb || addr.neighbourhood) {
-      parts.push(addr.suburb || addr.neighbourhood);
-    }
-    if (addr.ward) {
-      parts.push(`Phường ${addr.ward}`);
-    }
-    if (addr.district || addr.city_district) {
-      parts.push(`Quận ${addr.district || addr.city_district}`);
-    }
-    if (addr.city && !addr.district) {
-      parts.push(addr.city);
-    }
-    
-    // Nếu có đủ thông tin, trả về địa chỉ đã format
-    if (parts.length > 0) {
-      return parts.join(', ');
-    }
-    
-    // Fallback: dùng display_name nhưng format lại
-    if (data.display_name) {
-      const displayName = data.display_name
-        .split(',')
-        .slice(0, 4) // Lấy 4 phần đầu (thường là địa chỉ cụ thể)
-        .join(', ')
-        .trim();
-      return displayName;
-    }
-    
-    return null;
-  };
-
-  // Hàm lấy địa chỉ từ tọa độ với cache và debounce
+  // Hàm lấy địa chỉ từ tọa độ với cache và debounce (BE Google → Mapbox → Nominatim; không hiển thị mã bưu chính)
   const fetchLocationDescription = async (lat, lng) => {
     const cacheKey = `${lat.toFixed(6)},${lng.toFixed(6)}`;
     
     // Kiểm tra cache trước (cả trong state và localStorage)
     if (locationCache[cacheKey]) {
+      const normalized =
+        formatAddressForUiDisplay(locationCache[cacheKey]) || locationCache[cacheKey];
+      if (normalized !== locationCache[cacheKey]) {
+        const newCache = { ...locationCache, [cacheKey]: normalized };
+        setLocationCache(newCache);
+        try {
+          localStorage.setItem('locationCache', JSON.stringify(newCache));
+        } catch {
+          /* ignore */
+        }
+        return normalized;
+      }
       return locationCache[cacheKey];
     }
     
@@ -139,39 +107,25 @@ const ReportsPage = () => {
     
     try {
       // Thêm delay nhỏ để tránh rate limiting
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=vi`,
-        {
-          headers: {
-            'User-Agent': 'HCM-Flood-Frontend/1.0'
-          }
-        }
-      );
-      
-      if (!response.ok) {
-        return null;
-      }
-      
-      const data = await response.json();
-      const formattedAddress = formatAddress(data);
-      
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      const formattedAddress = await fetchAddressFromCoords(lat, lng);
+
       if (formattedAddress) {
         // Lưu vào cache (cả state và localStorage)
         const newCache = { ...locationCache, [cacheKey]: formattedAddress };
         setLocationCache(newCache);
-        
+
         // Lưu vào localStorage để persist
         try {
           localStorage.setItem('locationCache', JSON.stringify(newCache));
         } catch {
           // Quota or private mode — state cache still holds the address
         }
-        
+
         return formattedAddress;
       }
-      
+
       return null;
     } catch {
       return null;

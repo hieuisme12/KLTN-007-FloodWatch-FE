@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Marker, Popup } from 'react-map-gl/mapbox';
-import { getSensorDisplayAddress, getSensorDisplayPosition } from '../../data/sensorOverrides';
+import { getSensorDisplayAddress, getSensorDisplayPosition, getSensorDisplayName } from '../../data/sensorOverrides';
 import { fetchAddressFromCoords } from '../../utils/geocode';
 import { MdLocationOn } from 'react-icons/md';
 /**
  * Marker cảm biến dùng chung: trang Map (home) và trang New Report (mini map).
- * - mode="map": click mở popup, onClick(item) cho parent.
+ * - mode="map" + sensorPopupTrigger="click": click mở popup, onClick(item) cho parent.
+ * - mode="map" + sensorPopupTrigger="hover": hover mở popup; click chỉ gọi onClick(item).
  * - mode="report": click zoom to sensor (onZoomTo), hover hiển thị thông tin sensor.
  * - isOnline: true thì hiển thị hiệu ứng sóng tỏa từ viền marker (không còn nhấp nháy cảnh báo).
  */
@@ -14,6 +15,8 @@ const SensorMarker = ({
   color,
   isOnline = true,
   mode = 'map',
+  /** Chỉ khi mode="map": "click" | "hover" */
+  sensorPopupTrigger = 'click',
   onClick,
   isPopupOpen,
   onOpenPopup,
@@ -25,6 +28,7 @@ const SensorMarker = ({
 }) => {
   const { lat, lng } = getSensorDisplayPosition(item);
   const overrideAddress = getSensorDisplayAddress(item);
+  const displayName = getSensorDisplayName(item);
   const [geocodeAddress, setGeocodeAddress] = useState(null);
   const [hoveredMarker, setHoveredMarker] = useState(false);
   const [hoveredPopup, setHoveredPopup] = useState(false);
@@ -33,9 +37,14 @@ const SensorMarker = ({
 
   const address = overrideAddress ?? geocodeAddress;
   const isControlledReport = mode === 'report' && onHoverChange != null;
-  const showPopup = mode === 'report'
-    ? (hoveredMarker || hoveredPopup) && (hoveredSensorId == null || hoveredSensorId === sensorId)
+  const isHoverTrigger =
+    mode === 'report' || (mode === 'map' && sensorPopupTrigger === 'hover');
+  const showPopup = isHoverTrigger
+    ? (hoveredMarker || hoveredPopup) &&
+      (mode !== 'report' || hoveredSensorId == null || hoveredSensorId === sensorId)
     : isPopupOpen;
+
+  const isClickMapPopup = mode === 'map' && !isHoverTrigger;
 
   const clearLeaveTimer = () => {
     if (leaveTimerRef.current) {
@@ -54,7 +63,10 @@ const SensorMarker = ({
     clearLeaveTimer();
     leaveTimerRef.current = setTimeout(() => {
       if (mode === 'report') closeHoverPopup();
-      else setter(false);
+      else if (isHoverTrigger) {
+        setHoveredMarker(false);
+        setHoveredPopup(false);
+      } else setter(false);
     }, 150);
   };
 
@@ -83,6 +95,8 @@ const SensorMarker = ({
     e.originalEvent.stopPropagation();
     if (mode === 'report') {
       onZoomTo && onZoomTo(item);
+    } else if (isHoverTrigger) {
+      onClick && onClick(item);
     } else {
       onOpenPopup && onOpenPopup();
       onClick && onClick(item);
@@ -110,8 +124,8 @@ const SensorMarker = ({
         <div
           className="sensor-marker-wrapper"
           style={{ cursor: 'pointer', lineHeight: 1.2 }}
-          onMouseEnter={() => mode === 'report' && handleShow()}
-          onMouseLeave={() => mode === 'report' && scheduleHide(setHoveredMarker)}
+          onMouseEnter={() => isHoverTrigger && handleShow()}
+          onMouseLeave={() => isHoverTrigger && scheduleHide(setHoveredMarker)}
         >
           <div className="sensor-marker-body">
             <div className="sensor-marker-circle-wrap">
@@ -146,22 +160,22 @@ const SensorMarker = ({
           latitude={lat}
           anchor="bottom"
           offset={[0, -40]}
-          onClose={mode === 'map' ? () => onClosePopup && onClosePopup() : undefined}
-          closeButton={mode === 'map'}
+          onClose={isClickMapPopup ? () => onClosePopup && onClosePopup() : undefined}
+          closeButton={isClickMapPopup}
           closeOnClick={false}
           style={{ borderRadius: '12px', overflow: 'hidden' }}
         >
           <div
             style={{ textAlign: 'left', minWidth: '220px', padding: '14px 16px', boxSizing: 'border-box' }}
-            onMouseEnter={() => mode === 'report' && handlePopupEnter()}
-            onMouseLeave={() => mode === 'report' && scheduleHide(setHoveredPopup)}
+            onMouseEnter={() => isHoverTrigger && handlePopupEnter()}
+            onMouseLeave={() => isHoverTrigger && scheduleHide(setHoveredPopup)}
           >
             <h3 style={{ margin: '0 0 8px 0', color, fontSize: '16px', fontWeight: 'bold' }}>
-              {item.location_name}
+              {displayName}
             </h3>
             <div style={{ fontSize: '12px', color: '#333', display: 'flex', alignItems: 'flex-start', gap: '4px' }}>
               <MdLocationOn style={{ flexShrink: 0, marginTop: '2px' }} />
-              <span>{address === null && !overrideAddress ? 'Đang tải địa chỉ...' : (address || item.location_name || `${lat.toFixed(6)}, ${lng.toFixed(6)}`)}</span>
+              <span>{address === null && !overrideAddress ? 'Đang tải địa chỉ...' : (address || displayName || `${lat.toFixed(6)}, ${lng.toFixed(6)}`)}</span>
             </div>
             <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
               Nhiệt độ: {item.temperature != null ? `${item.temperature.toFixed(1)} °C` : '—'}

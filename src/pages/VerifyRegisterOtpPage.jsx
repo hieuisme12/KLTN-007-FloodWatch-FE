@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { FaEnvelope, FaKey } from 'react-icons/fa6';
 import { verifyOtp, resendOtp } from '../services/api';
 import ErrorToast from '../components/common/ErrorToast';
+import AuthLoadingScreen from '../components/common/AuthLoadingScreen';
+import AuthSplitShell from '../components/auth/AuthSplitShell';
+
 const VerifyRegisterOtpPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -95,63 +99,81 @@ const VerifyRegisterOtpPage = () => {
   }
 
   return (
-    <div className="register-page">
+    <div className="auth-page">
+      {loading && <AuthLoadingScreen overlay />}
       {error && <ErrorToast message={error} onClose={() => setError('')} />}
       {info && (
         <div className="verify-otp-info" role="status">
           {info}
         </div>
       )}
-      <div className="register-container">
-        <form className="register-form verify-otp-form" onSubmit={handleVerify}>
-          <h2 className="register-title">Xác minh email</h2>
-          <p className="verify-otp-subtitle">
+
+      <AuthSplitShell panelInnerClassName="login-panel-inner--scroll">
+        <form className="login-split-form" onSubmit={handleVerify}>
+          <div className="login-split-title-row">
+            <img src="/iuh.png" alt="" className="login-split-brand-logo" width={56} height={56} />
+            <h2 className="login-split-title">Xác minh email</h2>
+          </div>
+
+          <p className="verify-otp-subtitle verify-otp-subtitle--light">
             Nhập mã OTP đã gửi tới email của bạn. Sau khi xác minh, hãy đăng nhập
             bằng tên đăng nhập và mật khẩu.
           </p>
 
-          <div className="form-group">
-            <label htmlFor="verify-email">Email</label>
-            <input
-              type="email"
-              id="verify-email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="email@example.com"
-              required
-              readOnly={emailLocked}
-              className={emailLocked ? 'verify-email-readonly' : ''}
-            />
+          <div className="login-field">
+            <label className="login-field-label" htmlFor="verify-email">
+              Email
+            </label>
+            <div className="login-input-shell login-input-shell--user">
+              <FaEnvelope className="login-input-icon" aria-hidden />
+              <input
+                type="email"
+                id="verify-email"
+                className={`login-input ${emailLocked ? 'verify-email-readonly' : ''}`}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="email@example.com"
+                required
+                readOnly={emailLocked}
+                autoComplete="email"
+              />
+            </div>
           </div>
 
-          <div className="form-group">
-            <label htmlFor="otp">Mã OTP</label>
-            <input
-              type="text"
-              id="otp"
-              value={otp}
-              onChange={(e) => setOtp(e.target.value)}
-              placeholder="Nhập mã trong email"
-              required
-              autoComplete="one-time-code"
-              inputMode="numeric"
-            />
+          <div className="login-field">
+            <label className="login-field-label" htmlFor="otp">
+              Mã OTP
+            </label>
+            <div className="login-input-shell login-input-shell--pass">
+              <FaKey className="login-input-icon" aria-hidden />
+              <input
+                type="text"
+                id="otp"
+                className="login-input"
+                value={otp}
+                onChange={(e) => setOtp(e.target.value)}
+                placeholder="Nhập mã trong email"
+                required
+                autoComplete="one-time-code"
+                inputMode="numeric"
+              />
+            </div>
           </div>
 
-          <button type="submit" className="btn-register" disabled={loading}>
-            {loading ? 'Đang xác minh...' : 'Xác minh'}
+          <button type="submit" className="login-btn-primary login-btn-primary--spaced" disabled={loading}>
+            {loading ? 'Đang xác minh…' : 'Xác minh'}
           </button>
 
           <button
             type="button"
-            className="btn-verify-resend"
+            className="login-btn-verify-resend"
             onClick={handleResend}
             disabled={resendLoading}
           >
-            {resendLoading ? 'Đang gửi...' : 'Gửi lại mã OTP'}
+            {resendLoading ? 'Đang gửi…' : 'Gửi lại mã OTP'}
           </button>
 
-          <div className="register-footer">
+          <div className="login-footer-split">
             <p>
               <Link to="/login">Đăng nhập</Link>
               {' · '}
@@ -159,7 +181,7 @@ const VerifyRegisterOtpPage = () => {
             </p>
           </div>
         </form>
-      </div>
+      </AuthSplitShell>
     </div>
   );
 };

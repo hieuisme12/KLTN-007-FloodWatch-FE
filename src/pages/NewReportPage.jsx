@@ -23,7 +23,7 @@ import { WiFlood } from 'react-icons/wi';
 import { MdAddLocation, MdLocationOn, MdLightbulb } from 'react-icons/md';
 import ErrorToast from '../components/common/ErrorToast';
 import SearchAutoComplete from '../components/common/SearchAutoComplete';
-import { searchNominatimPlacesInHcm } from '../utils/geocode';
+import { searchAddressSuggestionsInHcm, fetchAddressFromCoords, resolveGeocodePlaceSelection, clearGeocodeAutocompleteSessionToken } from '../utils/geocode';
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
 // Mapbox: [lng, lat]; DEFAULT_CENTER là [lat, lng]
@@ -154,126 +154,32 @@ const NewReportPage = () => {
     setPhotoList([]);
   };
 
-  // Hàm format địa chỉ từ reverse geocoding
-  const formatAddress = (data) => {
-    if (!data) return null;
-    
-    // Ưu tiên dùng display_name và parse lại để lấy địa chỉ chính xác
-    if (data.display_name) {
-      const displayParts = data.display_name.split(',').map(s => s.trim());
-      
-      // Tìm phần có chứa "Đường" hoặc tên đường
-      const roadIndex = displayParts.findIndex(p => 
-        p.toLowerCase().includes('đường') || 
-        p.toLowerCase().includes('street') ||
-        /^\d+\s+(tháng|thang)/i.test(p) || // Đường 3 tháng 2, đường 2 tháng 2
-        /đường\s+\d+/i.test(p)
-      );
-      
-      if (roadIndex !== -1) {
-        // Lấy từ phần đường và 2-3 phần sau đó (thường là phường, quận)
-        const addressParts = displayParts.slice(roadIndex, roadIndex + 3);
-        // Loại bỏ các phần không cần thiết như "Thành phố Thủ Đức", "Vietnam"
-        const filteredParts = addressParts.filter(p => 
-          !p.toLowerCase().includes('thành phố thủ đức') &&
-          !p.toLowerCase().includes('vietnam') &&
-          !p.toLowerCase().includes('việt nam')
-        );
-        if (filteredParts.length > 0) {
-          return filteredParts.join(', ');
-        }
-      }
-      
-      // Nếu không tìm thấy đường, lấy 3 phần đầu và loại bỏ phần không cần thiết
-      const firstParts = displayParts.slice(0, 4).filter(p => 
-        !p.toLowerCase().includes('thành phố thủ đức') &&
-        !p.toLowerCase().includes('vietnam') &&
-        !p.toLowerCase().includes('việt nam') &&
-        !p.toLowerCase().includes('ho chi minh city')
-      );
-      if (firstParts.length > 0) {
-        return firstParts.join(', ');
-      }
-    }
-    
-    // Fallback: dùng address object nếu có
-    if (data.address) {
-      const addr = data.address;
-      const parts = [];
-      
-      // Ưu tiên: số nhà > tên đường > phường > quận
-      if (addr.house_number) {
-        parts.push(addr.house_number);
-      }
-      if (addr.road) {
-        parts.push(addr.road);
-      }
-      if (addr.ward) {
-        parts.push(`Phường ${addr.ward}`);
-      }
-      if (addr.district && !addr.district.includes('Thủ Đức')) {
-        parts.push(`Quận ${addr.district}`);
-      }
-      
-      // Chỉ thêm city nếu không phải Thủ Đức
-      if (addr.city && !addr.city.includes('Thủ Đức')) {
-        parts.push(addr.city);
-      }
-      
-      if (parts.length > 0) {
-        return parts.join(', ');
-      }
-    }
-    
-    return null;
-  };
-
-  // Hàm lấy địa chỉ từ tọa độ với cache
+  // Hàm lấy địa chỉ từ tọa độ với cache (BE Google → Mapbox → Nominatim; không mã bưu chính khi hiển thị)
   const fetchLocationDescription = async (lat, lng) => {
     const cacheKey = `${lat.toFixed(6)},${lng.toFixed(6)}`;
-    
-    // Kiểm tra cache trước
+
     if (locationCache[cacheKey]) {
       setLocationDescription(locationCache[cacheKey]);
       return locationCache[cacheKey];
     }
-    
+
     setFetchingLocation(true);
-    
+
     try {
-      // Dùng zoom level cao hơn để lấy thông tin chi tiết hơn
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=vi&extratags=1`,
-        {
-          headers: {
-            'User-Agent': 'HCM-Flood-Frontend/1.0'
-          }
-        }
-      );
-      
-      if (!response.ok) {
-        return null;
-      }
-      
-      const data = await response.json();
-      
-      // Debug: log dữ liệu để kiểm tra
-      
-      const formattedAddress = formatAddress(data);
-      
+      const formattedAddress = await fetchAddressFromCoords(lat, lng);
+
       if (formattedAddress) {
-        // Lưu vào cache (localStorage)
         const newCache = { ...locationCache, [cacheKey]: formattedAddress };
         try {
           localStorage.setItem('locationCache', JSON.stringify(newCache));
         } catch {
           // Quota or private mode — in-memory flow still works
         }
-        
+
         setLocationDescription(formattedAddress);
         return formattedAddress;
       }
-      
+
       return null;
     } catch {
       return null;
@@ -298,17 +204,23 @@ const NewReportPage = () => {
     setMapCenter(null);
   };
 
-  /** Gợi ý địa chỉ (Nominatim) — chỉ trong nội thành TP.HCM */
+  /** Gợi ý địa chỉ: BE → Mapbox → Nominatim (nhạy hơn khi có số nhà nếu có token / BE). */
   const completeAddressSearch = async (e) => {
     const q = e.query.trim();
-    if (q.length < 3) {
+    if (q.length < 2) {
       setSearchResults([]);
+      if (!q) clearGeocodeAutocompleteSessionToken();
       return;
     }
     setSearchingAddress(true);
     setError(null);
     try {
-      const data = await searchNominatimPlacesInHcm(q, { limit: 5 });
+      const data = await searchAddressSuggestionsInHcm(q, {
+        limit: 8,
+        lat: defaultLat,
+        lng: defaultLng,
+        radius: 35000
+      });
       setSearchResults(data);
     } catch {
       setSearchResults([]);
@@ -319,11 +231,36 @@ const NewReportPage = () => {
 
   // Hàm chọn kết quả tìm kiếm
   const handleSelectSearchResult = async (result) => {
-    const lat = parseFloat(result.lat);
-    const lng = parseFloat(result.lon);
+    if (!result) return;
+    let lat = parseFloat(result.lat);
+    let lng = parseFloat(result.lon);
+    const hasCoords = Number.isFinite(lat) && Number.isFinite(lng);
+    if (!hasCoords && result.place_id) {
+      setSearchingAddress(true);
+      try {
+        const resolved = await resolveGeocodePlaceSelection({
+          place_id: result.place_id,
+          geocode_session_token: result.geocode_session_token,
+          display_name: result.display_name
+        });
+        if (!resolved) {
+          setError('Không lấy được tọa độ cho địa điểm đã chọn. Vui lòng thử lại hoặc chọn trên bản đồ.');
+          return;
+        }
+        lat = resolved.lat;
+        lng = resolved.lng;
+      } finally {
+        setSearchingAddress(false);
+      }
+    }
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      setError('Không lấy được tọa độ. Vui lòng chọn gợi ý khác hoặc click trên bản đồ.');
+      return;
+    }
     setFormData({ ...formData, lat, lng });
     setSearchAddress('');
     setSearchResults([]);
+    clearGeocodeAutocompleteSessionToken();
     // Di chuyển map đến vị trí mới
     setMapCenter([lat, lng]);
     // Fetch địa chỉ chi tiết
@@ -630,14 +567,17 @@ const NewReportPage = () => {
                     suggestions={searchResults}
                     completeMethod={completeAddressSearch}
                     field="display_name"
-                    minLength={3}
+                    dataKey="id"
+                    minLength={2}
                     delay={400}
                     placeholder="Nhập địa chỉ để tìm (VD: Đường 3 tháng 2, Quận 10)"
                     className="w-full text-sm"
                     inputClassName="rounded border border-gray-300 px-2 py-2 text-sm"
                     onChange={(ev) => {
                       const v = ev.value;
-                      setSearchAddress(typeof v === 'string' ? v : '');
+                      const s = typeof v === 'string' ? v : '';
+                      setSearchAddress(s);
+                      if (!s.trim()) clearGeocodeAutocompleteSessionToken();
                     }}
                     onSelect={(ev) => handleSelectSearchResult(ev.value)}
                   />

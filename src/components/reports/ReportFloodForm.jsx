@@ -7,6 +7,7 @@ import { submitFloodReport } from '../../services/api';
 import ErrorToast from '../common/ErrorToast';
 import { isAuthenticated, getCurrentUser } from '../../utils/auth';
 import { DEFAULT_CENTER, DEFAULT_ZOOM } from '../../utils/constants';
+import { fetchAddressFromCoords } from '../../utils/geocode';
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
 const defaultLng = DEFAULT_CENTER[1];
@@ -129,89 +130,17 @@ const ReportFloodForm = ({ onSuccess, onClose }) => {
     }
   };
 
-  const formatAddress = (data) => {
-    if (!data || !data.address) return null;
-    
-    const addr = data.address;
-    const parts = [];
-    
-    // Ưu tiên: tên đường > tên địa điểm > quận/huyện > thành phố
-    if (addr.road) {
-      parts.push(addr.road);
-    }
-    if (addr.house_number) {
-      parts.unshift(addr.house_number); // Số nhà đặt trước tên đường
-    }
-    if (addr.suburb || addr.neighbourhood) {
-      parts.push(addr.suburb || addr.neighbourhood);
-    }
-    if (addr.ward) {
-      parts.push(`Phường ${addr.ward}`);
-    }
-    if (addr.district || addr.city_district) {
-      parts.push(`Quận ${addr.district || addr.city_district}`);
-    }
-    if (addr.city && !addr.district) {
-      parts.push(addr.city);
-    }
-    if (addr.state) {
-      parts.push(addr.state);
-    }
-    
-    // Nếu có đủ thông tin, trả về địa chỉ đã format
-    if (parts.length > 0) {
-      return parts.join(', ');
-    }
-    
-    // Fallback: dùng display_name nhưng format lại
-    if (data.display_name) {
-      // Loại bỏ các phần không cần thiết như country code
-      const displayName = data.display_name
-        .split(',')
-        .slice(0, 4) // Lấy 4 phần đầu (thường là địa chỉ cụ thể)
-        .join(', ')
-        .trim();
-      return displayName;
-    }
-    
-    return null;
-  };
-
   const handleLocationSelect = async (lng, lat) => {
     setFormData({ ...formData, lng, lat, location_description: null });
     setError(null);
-    
-    // Reverse geocoding để lấy địa chỉ từ tọa độ
+
     try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=vi`,
-        {
-          headers: {
-            'User-Agent': 'HCM-Flood-Frontend/1.0'
-          }
-        }
-      );
-      
-      if (!response.ok) {
-        throw new Error('Reverse geocoding failed');
-      }
-      
-      const data = await response.json();
-      
-      if (data) {
-        // Format địa chỉ đẹp hơn
-        const formattedAddress = formatAddress(data);
-        
-        if (formattedAddress) {
-          setFormData(prev => ({ ...prev, lng, lat, location_description: formattedAddress }));
-        } else if (data.display_name) {
-          // Fallback: dùng display_name gốc
-          setFormData(prev => ({ ...prev, lng, lat, location_description: data.display_name }));
-        }
+      const formattedAddress = await fetchAddressFromCoords(lat, lng);
+      if (formattedAddress) {
+        setFormData((prev) => ({ ...prev, lng, lat, location_description: formattedAddress }));
       }
     } catch {
-      // Vẫn cho phép submit với lat/lng khi reverse geocoding lỗi
-      setFormData(prev => ({ ...prev, lng, lat }));
+      setFormData((prev) => ({ ...prev, lng, lat }));
     }
   };
 

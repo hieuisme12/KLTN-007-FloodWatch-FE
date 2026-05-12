@@ -75,6 +75,7 @@ const DashboardPage = () => {
               floodData={floodData}
               crowdReports={nonExpiredCrowdReports}
               showFusionLayer={false}
+              sensorPopupTrigger="hover"
               onSensorSelect={(s) => {
                 setSelectedSensor(s);
                 setSelectedCrowdReport(null);

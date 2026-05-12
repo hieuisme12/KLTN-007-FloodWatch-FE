@@ -19,7 +19,7 @@ import {
   FaTrash,
   FaXmark
 } from 'react-icons/fa6';
-import { fetchAddressFromCoords, searchPlaces } from '../utils/geocode';
+import { fetchAddressFromCoords, resolveGeocodePlaceSelection, searchPlacesUnified } from '../utils/geocode';
 import { POLLING_INTERVALS, CROWD_REPORT_MAP_DISPLAY_HOURS } from '../config/apiConfig';
 import { filterNonExpiredReports } from '../utils/reportHelpers';
 import SensorMarker from '../components/map/SensorMarker';
@@ -31,6 +31,7 @@ import { Slab } from 'react-loading-indicators';
 const MAPBOX_TOKEN = getMapboxToken();
 const defaultLng = DEFAULT_CENTER[1];
 const defaultLat = DEFAULT_CENTER[0];
+const GEOCODE_SEARCH_BIAS = { lat: defaultLat, lng: defaultLng, radius: 35000 };
 const ROUTING_SEARCH_HISTORY_KEY = 'routingSearchHistory';
 /** Layer tuyến xanh (normal) — hover để xem ETA */
 const ROUTE_NORMAL_LAYER_ID = 'route-normal';
@@ -696,12 +697,12 @@ export default function RoutingPage() {
         return;
       }
       // người dùng bắt đầu gõ: ẩn lịch sử để tập trung vào gợi ý tìm kiếm mới
-      if (q.length < 3) {
+      if (q.length < 2) {
         setFromOptions([MY_LOCATION_OPTION]);
         return;
       }
       setSearchingFrom(true);
-      searchPlaces(q, { mapboxToken: MAPBOX_TOKEN, limit: 5 })
+      searchPlacesUnified(q, { mapboxToken: MAPBOX_TOKEN, limit: 8, ...GEOCODE_SEARCH_BIAS })
         .then((list) => setFromOptions([MY_LOCATION_OPTION, ...list]))
         .finally(() => setSearchingFrom(false));
     },
@@ -717,12 +718,12 @@ export default function RoutingPage() {
         return;
       }
       // người dùng bắt đầu gõ: ẩn lịch sử để tập trung vào gợi ý tìm kiếm mới
-      if (q.length < 3) {
+      if (q.length < 2) {
         setToOptions([MY_LOCATION_OPTION]);
         return;
       }
       setSearchingTo(true);
-      searchPlaces(q, { mapboxToken: MAPBOX_TOKEN, limit: 5 })
+      searchPlacesUnified(q, { mapboxToken: MAPBOX_TOKEN, limit: 8, ...GEOCODE_SEARCH_BIAS })
         .then((list) => setToOptions([MY_LOCATION_OPTION, ...list]))
         .finally(() => setSearchingTo(false));
     },
@@ -747,57 +748,89 @@ export default function RoutingPage() {
         setOpts(getIdleSuggestions());
         return;
       }
-      if (q.length < 3) {
+      if (q.length < 2) {
         setOpts([MY_LOCATION_OPTION]);
         return;
       }
       setSearchingExtra(true);
-      searchPlaces(q, { mapboxToken: MAPBOX_TOKEN, limit: 5 })
+      searchPlacesUnified(q, { mapboxToken: MAPBOX_TOKEN, limit: 8, ...GEOCODE_SEARCH_BIAS })
         .then((list) => setOpts([MY_LOCATION_OPTION, ...list]))
         .finally(() => setSearchingExtra(false));
     },
     [MY_LOCATION_OPTION, getIdleSuggestions]
   );
 
-  const applySuggestion = (type, option, extraStopId = null) => {
+  const applySuggestion = async (type, option, extraStopId = null) => {
     if (option?.isMyLocation) {
       if (extraStopId) setMyLocationTo('extra', extraStopId);
       else setMyLocationTo(type);
       return;
     }
-    if (!option || option.lat == null || option.lng == null) return;
+    if (!option) return;
+
+    const coordsReady =
+      option.lat != null &&
+      option.lng != null &&
+      Number.isFinite(Number(option.lat)) &&
+      Number.isFinite(Number(option.lng));
+    const needsPlace = option.place_id && !coordsReady;
+
+    let resolved = option;
+    if (needsPlace) {
+      if (extraStopId) setSearchingExtra(true);
+      else if (type === 'from') setSearchingFrom(true);
+      else setSearchingTo(true);
+      try {
+        const place = await resolveGeocodePlaceSelection(option);
+        if (!place) return;
+        const fullAddress = place.formatted_address || option.fullAddress || option.name;
+        resolved = {
+          ...option,
+          lat: place.lat,
+          lng: place.lng,
+          fullAddress,
+          name: fullAddress ? fullAddress.split(',')[0]?.trim() : option.name
+        };
+      } finally {
+        if (extraStopId) setSearchingExtra(false);
+        else if (type === 'from') setSearchingFrom(false);
+        else setSearchingTo(false);
+      }
+    }
+
+    if (resolved.lat == null || resolved.lng == null) return;
     if (extraStopId) {
       setExtraStops((rows) =>
         rows.map((r) =>
           r.id === extraStopId
             ? {
                 ...r,
-                lat: option.lat,
-                lng: option.lng,
-                query: option.fullAddress || option.name,
+                lat: resolved.lat,
+                lng: resolved.lng,
+                query: resolved.fullAddress || resolved.name,
                 locked: true,
                 options: []
               }
             : r
         )
       );
-      pushHistoryOption(option);
+      pushHistoryOption(resolved);
       return;
     }
     if (type === 'from') {
-      setStartLat(option.lat);
-      setStartLng(option.lng);
-      setFromQuery(option.fullAddress || option.name);
+      setStartLat(resolved.lat);
+      setStartLng(resolved.lng);
+      setFromQuery(resolved.fullAddress || resolved.name);
       setFromLocked(true);
       setFromOptions([]);
-      pushHistoryOption(option);
+      pushHistoryOption(resolved);
     } else {
-      setEndLat(option.lat);
-      setEndLng(option.lng);
-      setToQuery(option.fullAddress || option.name);
+      setEndLat(resolved.lat);
+      setEndLng(resolved.lng);
+      setToQuery(resolved.fullAddress || resolved.name);
       setToLocked(true);
       setToOptions([]);
-      pushHistoryOption(option);
+      pushHistoryOption(resolved);
     }
   };
 
@@ -844,7 +877,7 @@ export default function RoutingPage() {
           }}
           onSelect={(ev) => {
             skipIdleOpenOnFocusFromRef.current = true;
-            applySuggestion('from', ev.value);
+            void applySuggestion('from', ev.value);
           }}
           field="fullAddress"
           minLength={0}
@@ -882,7 +915,7 @@ export default function RoutingPage() {
         }}
         onSelect={(ev) => {
           skipIdleOpenOnFocusToRef.current = true;
-          applySuggestion('to', ev.value);
+          void applySuggestion('to', ev.value);
         }}
         field="fullAddress"
         minLength={0}
@@ -1145,7 +1178,7 @@ export default function RoutingPage() {
                           }}
                           onSelect={(ev) => {
                             skipIdleOpenOnFocusExtraRef.current[stop.id] = true;
-                            applySuggestion('to', ev.value, stop.id);
+                            void applySuggestion('to', ev.value, stop.id);
                           }}
                           field="fullAddress"
                           minLength={0}

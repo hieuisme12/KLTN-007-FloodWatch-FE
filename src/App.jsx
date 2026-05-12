@@ -8,6 +8,7 @@ import NewReportPage from './pages/NewReportPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import VerifyRegisterOtpPage from './pages/VerifyRegisterOtpPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ProfilePage from './pages/ProfilePage';
 import NewsDetailPage from './pages/NewsDetailPage';
 import MapPage from './pages/MapPage';
@@ -58,6 +59,7 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/register/verify" element={<VerifyRegisterOtpPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
         <Route path="/moderation" element={<Navigate to="/dashboard" replace />} />
         <Route path="/research" element={<Navigate to="/dashboard" replace />} />

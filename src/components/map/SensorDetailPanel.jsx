@@ -5,7 +5,7 @@ import { MdLocationOn } from 'react-icons/md';
 import { getStatusLabel, getVelocityLabel } from '../../utils/markerUtils';
 import { statusColors } from '../../utils/constants';
 import { fetchAddressFromCoords } from '../../utils/geocode';
-import { getSensorDisplayAddress } from '../../data/sensorOverrides';
+import { getSensorDisplayAddress, getSensorDisplayName } from '../../data/sensorOverrides';
 import { useReporterRanking } from '../../context/ReporterRankingProvider';
 import ReportEvaluationWidget from '../reports/ReportEvaluationWidget';
 import SensorForecastSection from './SensorForecastSection';
@@ -261,7 +261,7 @@ const SensorDetailPanel = ({ sensor, crowdReport }) => {
         </div>
         <div className="sensor-detail-item sensor-detail-location">
           <span className="sensor-detail-label">Trạm:</span>
-          <span className="sensor-detail-value">{sensor.location_name}</span>
+          <span className="sensor-detail-value">{getSensorDisplayName(sensor)}</span>
         </div>
         <div className="sensor-detail-item sensor-detail-location">
           <span className="sensor-detail-label"><MdLocationOn style={{ marginRight: '4px' }} /> Địa chỉ:</span>

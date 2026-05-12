@@ -62,6 +62,17 @@ export const API_ENDPOINTS = {
   // Routing (AMC-A*)
   ROUTING_SAFE_PATH: '/api/v1/routing/safe-path',
 
+  /** Reverse geocode (BE → Google Geocoding). Query: lat, lng */
+  REVERSE_GEOCODE: '/api/v1/geocode/reverse',
+  /** Gợi ý khi gõ (BE → Google Places Autocomplete). Query: q hoặc input; tuỳ chọn session_token, lat, lng, radius */
+  GEOCODE_SEARCH: '/api/v1/geocode/search',
+  /** Chi tiết địa điểm sau khi chọn gợi ý. Query: place_id; tuỳ chọn session_token */
+  GEOCODE_PLACE: '/api/v1/geocode/place',
+  /** Geocode một chuỗi địa chỉ đầy đủ. Query: address */
+  GEOCODE_FORWARD: '/api/v1/geocode/forward',
+  /** @deprecated Dùng GEOCODE_SEARCH / GEOCODE_FORWARD */
+  FORWARD_GEOCODE: '/api/v1/geocode/forward',
+
   // Admin (JWT role admin)
   ADMIN_DEVICES_HEALTH: '/api/v1/admin/devices/health',
   ADMIN_EMERGENCY_ALERTS_SUMMARY: '/api/v1/admin/emergency-alerts/summary',
@@ -90,6 +101,8 @@ export const API_ENDPOINTS = {
   AUTH_VERIFY_OTP: '/api/auth/verify-otp',
   AUTH_SEND_OTP: '/api/auth/send-otp',
   AUTH_RESEND_OTP: '/api/auth/resend-otp',
+  AUTH_FORGOT_PASSWORD: '/api/auth/forgot-password',
+  AUTH_RESET_PASSWORD: '/api/auth/reset-password',
   AUTH_REFRESH: '/api/auth/refresh',
   AUTH_LOGOUT: '/api/auth/logout',
   AUTH_PROFILE: '/api/auth/profile',
