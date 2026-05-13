@@ -11,19 +11,17 @@ function GuestModalPortal({ open, title, description, primaryLabel, onPrimary, s
     <div
       className="fixed inset-0 z-[3000] flex items-center justify-center p-4"
       role="presentation"
+      style={{ backgroundColor: 'rgba(2, 6, 23, 0.88)' }}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onSecondary();
+      }}
     >
-      <button
-        type="button"
-        className="absolute inset-0 bg-black/50 backdrop-blur-[1px]"
-        aria-label="Đóng hộp thoại"
-        onClick={onSecondary}
-      />
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="guest-modal-title"
-        className="relative z-10 w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
+        className="relative z-10 w-full max-w-md rounded-2xl border border-slate-200/90 bg-white p-6 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.35)]"
+        onMouseDown={(e) => e.stopPropagation()}
       >
         <h2 id="guest-modal-title" className="text-lg font-semibold text-slate-900">
           {title}

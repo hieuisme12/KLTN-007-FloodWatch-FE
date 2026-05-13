@@ -1599,7 +1599,12 @@ export const resolveAlert = async (alertId) => {
 // ==================== EMERGENCY SUBSCRIPTION APIs ====================
 
 /**
- * Đăng ký nhận cảnh báo khẩn
+ * POST /api/emergency-subscriptions — body JSON (một phần):
+ * - name (tuỳ chọn): string, trim, tối đa 200; rỗng → null trên server.
+ * - display_meta hoặc displayMeta (tuỳ chọn): object; không gửi khi tạo → server dùng {}.
+ * PUT /api/emergency-subscriptions/:id — chỉ các field có trong body được cập nhật; camelCase cho metadata được hỗ trợ.
+ *
+ * @param {Record<string, unknown>} subscriptionData
  */
 export const createEmergencySubscription = async (subscriptionData) => {
   try {
@@ -1645,7 +1650,8 @@ export const fetchMySubscriptions = async () => {
 };
 
 /**
- * Cập nhật subscription
+ * @param {string|number} subscriptionId
+ * @param {Record<string, unknown>} subscriptionData — có thể gồm name, display_meta / displayMeta cùng các field cũ (partial).
  */
 export const updateEmergencySubscription = async (subscriptionId, subscriptionData) => {
   try {

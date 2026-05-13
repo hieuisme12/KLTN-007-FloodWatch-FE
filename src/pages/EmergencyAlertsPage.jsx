@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Map, { Marker } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import {
@@ -15,6 +16,7 @@ import {
 import { DEFAULT_CENTER, DEFAULT_ZOOM, statusColors } from '../utils/constants';
 import SensorMarker from '../components/map/SensorMarker';
 import ErrorToast from '../components/common/ErrorToast';
+import ConfirmDialog from '../components/common/ConfirmDialog';
 import { cn } from '@/lib/cn';
 import {
   FaLink,
@@ -34,11 +36,68 @@ const MAPBOX_TOKEN = getMapboxToken();
 const defaultLng = DEFAULT_CENTER[1];
 const defaultLat = DEFAULT_CENTER[0];
 
-const METHOD_OPTIONS = [
-  { id: 'email', label: 'Email', desc: 'Gửi cảnh báo tới email gắn với tài khoản của bạn.' },
-  { id: 'telegram', label: 'Telegram', desc: 'Nhận tin qua bot sau khi đã liên kết Telegram.' },
-  { id: 'webhook', label: 'Webhook', desc: 'Gửi sự kiện tới URL webhook bạn cấu hình (nếu bật).' }
-];
+/** Chỉ dùng Telegram khi tạo/cập nhật; hiển thị vẫn đọc được bản ghi cũ có email/webhook từ BE. */
+const TELEGRAM_METHODS = ['telegram'];
+
+/** Khớp API: name trim, tối đa 200 ký tự; rỗng → null khi gửi POST/PUT. */
+const EMERGENCY_SUB_NAME_MAX = 200;
+
+function getDisplayMeta(sub) {
+  if (!sub || typeof sub !== 'object') return null;
+  const m = sub.display_meta ?? sub.displayMeta;
+  if (m && typeof m === 'object' && !Array.isArray(m)) return m;
+  return null;
+}
+
+/** Chuẩn hoá chuỗi nhập tên trước khi gửi API (trim + giới hạn độ dài). */
+function clipEmergencySubscriptionName(raw) {
+  if (raw == null) return '';
+  const s = String(raw).trim();
+  if (!s) return '';
+  return s.length > EMERGENCY_SUB_NAME_MAX ? s.slice(0, EMERGENCY_SUB_NAME_MAX) : s;
+}
+
+/** Tên hiển thị: name từ BE → display_meta (label, title, …) → các field legacy → Vùng #id */
+function getSubscriptionDisplayName(sub) {
+  if (!sub) return '';
+  if (typeof sub.name === 'string') {
+    const t = sub.name.trim();
+    if (t) return t.length > EMERGENCY_SUB_NAME_MAX ? t.slice(0, EMERGENCY_SUB_NAME_MAX) : t;
+  }
+  const meta = getDisplayMeta(sub);
+  if (meta) {
+    for (const k of ['label', 'title', 'displayName', 'name']) {
+      const v = meta[k];
+      if (typeof v === 'string' && v.trim()) {
+        const t = v.trim();
+        return t.length > EMERGENCY_SUB_NAME_MAX ? t.slice(0, EMERGENCY_SUB_NAME_MAX) : t;
+      }
+    }
+  }
+  const keys = ['label', 'title', 'zone_name', 'display_name'];
+  for (const k of keys) {
+    const v = sub[k];
+    if (typeof v === 'string' && v.trim()) {
+      const t = v.trim();
+      return t.length > EMERGENCY_SUB_NAME_MAX ? t.slice(0, EMERGENCY_SUB_NAME_MAX) : t;
+    }
+  }
+  return `Vùng #${sub.id}`;
+}
+
+/** Màu chữ tiêu đề từ display_meta.color (nếu có). */
+function getSubscriptionTitleStyle(sub) {
+  const meta = getDisplayMeta(sub);
+  if (!meta) return undefined;
+  const c = meta.color;
+  if (typeof c === 'string' && c.trim()) return { color: c.trim() };
+  return undefined;
+}
+
+/** Chỉ hiển thị Telegram trong UI (ẩn email/webhook trên giao diện). */
+function subscriptionChannelLine() {
+  return 'Telegram';
+}
 
 /** Cùng logic hiển thị với marker báo cáo người dân trên MapView (tên + avatar/icon + mũi pin). */
 function EmergencyPickMarkerBody({ displayName, avatarFileName, markerTheme = 'dark', avatarCacheNonce = 0 }) {
@@ -144,9 +203,64 @@ function ToggleSwitch({ checked, onChange, disabled }) {
   );
 }
 
+/** Modal form cùng phong cách overlay với ConfirmDialog / bản đồ cảnh báo */
+function EmergencyStackModal({ open, title, description, onClose, children, footer }) {
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose?.();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+
+  if (!open || typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[4600] flex items-center justify-center p-4"
+      role="presentation"
+      style={{ backgroundColor: 'rgba(2, 6, 23, 0.88)' }}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose?.();
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="emergency-stack-modal-title"
+        className="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-200/90 bg-white p-6 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.35)]"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
+          <div className="min-w-0 pr-2">
+            <h2 id="emergency-stack-modal-title" className="text-lg font-semibold text-slate-900">
+              {title}
+            </h2>
+            {description ? <div className="mt-2 text-sm leading-relaxed text-slate-600">{description}</div> : null}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="shrink-0 rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+            aria-label="Đóng"
+          >
+            <FaXmark className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="pt-4">{children}</div>
+        {footer ? <div className="mt-6 flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-4">{footer}</div> : null}
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 function EmergencyMapModal({
   open,
   onClose,
+  onConfirm,
+  fromCreateFlow,
   mapLat,
   mapLng,
   onPick,
@@ -218,8 +332,9 @@ function EmergencyMapModal({
 
   return (
     <div
-      className="fixed inset-0 z-[4000] flex items-center justify-center bg-slate-900/55 p-4 backdrop-blur-[2px]"
+      className="fixed inset-0 z-[4000] flex items-center justify-center p-4"
       role="presentation"
+      style={{ backgroundColor: 'rgba(2, 6, 23, 0.88)' }}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -236,7 +351,9 @@ function EmergencyMapModal({
               Chọn điểm trên bản đồ
             </h2>
             <p className="text-xs text-slate-500 sm:text-sm">
-              Có marker cảm biến mực nước; bấm map để chọn điểm cảnh báo. Không hiển thị báo cáo người dân.
+              {fromCreateFlow
+                ? 'Chọn điểm cảnh báo trên bản đồ (bấm map hoặc Lấy GPS), sau đó bấm Xong để hoàn tất đăng ký.'
+                : 'Có marker cảm biến mực nước; bấm map để chọn điểm cảnh báo. Không hiển thị báo cáo người dân.'}
             </p>
           </div>
           <button
@@ -350,7 +467,7 @@ function EmergencyMapModal({
             </button>
             <button
               type="button"
-              onClick={onClose}
+              onClick={() => (onConfirm ? onConfirm() : onClose())}
               className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"
             >
               Xong
@@ -375,15 +492,23 @@ export default function EmergencyAlertsPage() {
   const [formLng, setFormLng] = useState(defaultLng);
   const [userGps, setUserGps] = useState(null);
   const [radius, setRadius] = useState(500);
-  const [methods, setMethods] = useState({ email: true, telegram: false, webhook: false });
   const [submitting, setSubmitting] = useState(false);
   const [mapPickerOpen, setMapPickerOpen] = useState(false);
+  /** { type: 'delete', id } | { type: 'unlink' } */
+  const [confirmDialog, setConfirmDialog] = useState(null);
+  /** true: đóng bản đồ bằng «Xong» sẽ gọi API tạo đăng ký (sau khi đã kiểm tra Telegram). */
+  const [pendingCreateAfterPick, setPendingCreateAfterPick] = useState(false);
+  const pendingCreateNameRef = useRef('');
+  const [createNameModalOpen, setCreateNameModalOpen] = useState(false);
+  const [createNameInput, setCreateNameInput] = useState('');
   const [subSearch, setSubSearch] = useState('');
 
-  const [editingId, setEditingId] = useState(null);
-  const [editRadius, setEditRadius] = useState(500);
-  const [editMethods, setEditMethods] = useState({ email: true, telegram: false, webhook: false });
-  const [editActive, setEditActive] = useState(true);
+  /** null | subscription — sửa trong popup */
+  const [editModalSub, setEditModalSub] = useState(null);
+  const [editModalName, setEditModalName] = useState('');
+  const [editModalRadius, setEditModalRadius] = useState(500);
+  const [editModalActive, setEditModalActive] = useState(true);
+  const [editSaving, setEditSaving] = useState(false);
 
   const loadAll = useCallback(async () => {
     setError('');
@@ -423,93 +548,152 @@ export default function EmergencyAlertsPage() {
       (s) =>
         String(s.id).includes(q) ||
         String(s.radius).includes(q) ||
-        (s.notification_methods || []).some((m) => String(m).toLowerCase().includes(q)) ||
+        getSubscriptionDisplayName(s).toLowerCase().includes(q) ||
         `${Number(s.lat).toFixed(4)} ${Number(s.lng).toFixed(4)}`.includes(q)
     );
   }, [subs, subSearch]);
 
-  const notificationMethodsArray = () => METHOD_OPTIONS.filter((m) => methods[m.id]).map((m) => m.id);
-
-  const handleCreate = async (e) => {
-    e.preventDefault();
+  const submitCreateSubscription = useCallback(async () => {
     setError('');
     setSuccess('');
-    const arr = notificationMethodsArray();
-    if (arr.length === 0) {
-      setError('Chọn ít nhất một kênh thông báo.');
-      return;
-    }
-    if (arr.includes('telegram') && profile && !profile.telegram_linked) {
-      setError('Bạn chọn Telegram nhưng chưa liên kết bot. Hãy liên kết ở mục bên dưới trước.');
-      return;
-    }
     setSubmitting(true);
-    const res = await createEmergencySubscription({
+    const payload = {
       lat: Number(formLat),
       lng: Number(formLng),
       radius: Number(radius),
-      notification_methods: arr
-    });
+      notification_methods: TELEGRAM_METHODS
+    };
+    const nm = clipEmergencySubscriptionName(pendingCreateNameRef.current);
+    payload.name = nm === '' ? null : nm;
+    const res = await createEmergencySubscription(payload);
     setSubmitting(false);
+    pendingCreateNameRef.current = '';
     if (res.success) {
       setSuccess(res.message || 'Đã tạo đăng ký.');
       await loadAll();
     } else {
       setError(res.error || 'Không tạo được đăng ký.');
     }
-  };
+  }, [formLat, formLng, radius, loadAll]);
 
-  const startEdit = (sub) => {
-    setEditingId(sub.id);
-    setEditRadius(sub.radius ?? 500);
-    setEditActive(sub.is_active !== false);
-    const m = { email: false, telegram: false, webhook: false };
-    (sub.notification_methods || []).forEach((x) => {
-      if (m[x] !== undefined) m[x] = true;
-    });
-    if (!sub.notification_methods?.length) m.email = true;
-    setEditMethods(m);
-  };
-
-  const saveEdit = async (id) => {
+  const handleCreate = async (e) => {
+    e.preventDefault();
     setError('');
-    const sub = subs.find((s) => String(s.id) === String(id));
-    const arr = METHOD_OPTIONS.filter((o) => editMethods[o.id]).map((o) => o.id);
-    if (arr.length === 0) {
-      setError('Chọn ít nhất một kênh.');
+    setSuccess('');
+    if (!profile?.telegram_linked) {
+      setError('Vui lòng liên kết Telegram ở mục trên trước khi đăng ký nhận tin.');
       return;
     }
-    if (arr.includes('telegram') && profile && !profile.telegram_linked) {
-      setError('Cần liên kết Telegram trước khi bật kênh Telegram.');
+    setCreateNameInput('');
+    setCreateNameModalOpen(true);
+  };
+
+  const cancelCreateNameModal = () => {
+    setCreateNameModalOpen(false);
+    setCreateNameInput('');
+  };
+
+  const confirmCreateNameAndOpenMap = () => {
+    setError('');
+    pendingCreateNameRef.current = clipEmergencySubscriptionName(createNameInput);
+    setCreateNameModalOpen(false);
+    setCreateNameInput('');
+    setPendingCreateAfterPick(true);
+    setMapPickerOpen(true);
+  };
+
+  const openMapPickerOnly = () => {
+    setPendingCreateAfterPick(false);
+    setMapPickerOpen(true);
+  };
+
+  const closeMapPicker = () => {
+    setMapPickerOpen(false);
+    setPendingCreateAfterPick(false);
+    pendingCreateNameRef.current = '';
+  };
+
+  const confirmMapPicker = () => {
+    setMapPickerOpen(false);
+    if (pendingCreateAfterPick) {
+      setPendingCreateAfterPick(false);
+      void submitCreateSubscription();
+    }
+  };
+
+  const openEditModal = (sub) => {
+    setEditModalSub(sub);
+    const raw = sub.name;
+    setEditModalName(typeof raw === 'string' ? raw : '');
+    setEditModalRadius(sub.radius ?? 500);
+    setEditModalActive(sub.is_active !== false);
+  };
+
+  const closeEditModal = () => {
+    setEditModalSub(null);
+    setEditSaving(false);
+  };
+
+  const saveEditModal = async () => {
+    if (!editModalSub) return;
+    setError('');
+    if (!profile?.telegram_linked) {
+      setError('Cần liên kết Telegram để duy trì đăng ký.');
       return;
     }
+    setEditSaving(true);
     const body = {
-      radius: Number(editRadius),
-      notification_methods: arr,
-      is_active: editActive
+      radius: Number(editModalRadius),
+      notification_methods: TELEGRAM_METHODS,
+      is_active: editModalActive,
+      lat: Number(editModalSub.lat),
+      lng: Number(editModalSub.lng)
     };
-    if (sub && sub.lat != null && sub.lng != null) {
-      body.lat = Number(sub.lat);
-      body.lng = Number(sub.lng);
-    }
-    const res = await updateEmergencySubscription(id, body);
+    const trimmed = clipEmergencySubscriptionName(editModalName);
+    body.name = trimmed === '' ? null : trimmed;
+    const res = await updateEmergencySubscription(editModalSub.id, body);
+    setEditSaving(false);
     if (res.success) {
       setSuccess('Đã cập nhật đăng ký.');
-      setEditingId(null);
+      closeEditModal();
       await loadAll();
     } else {
       setError(res.error || 'Cập nhật thất bại.');
     }
   };
 
-  const removeSub = async (id) => {
-    if (!window.confirm('Xóa đăng ký cảnh báo tại vùng này?')) return;
+  const removeSub = (id) => {
+    setConfirmDialog({ type: 'delete', id });
+  };
+
+  const confirmDeleteSub = async () => {
+    if (confirmDialog?.type !== 'delete') return;
+    const id = confirmDialog.id;
+    setConfirmDialog(null);
     const res = await deleteEmergencySubscription(id);
     if (res.success) {
       setSuccess('Đã xóa đăng ký.');
       await loadAll();
     } else {
       setError(res.error || 'Xóa thất bại.');
+    }
+  };
+
+  const requestTelegramUnlink = () => {
+    setConfirmDialog({ type: 'unlink' });
+  };
+
+  const confirmTelegramUnlink = async () => {
+    if (confirmDialog?.type !== 'unlink') return;
+    setConfirmDialog(null);
+    setTgBusy(true);
+    const res = await deleteTelegramUnlink();
+    setTgBusy(false);
+    if (res.success) {
+      setSuccess('Đã gỡ liên kết Telegram.');
+      await loadAll();
+    } else {
+      setError(res.error || 'Gỡ liên kết thất bại.');
     }
   };
 
@@ -529,19 +713,6 @@ export default function EmergencyAlertsPage() {
       setSuccess('Đã mở Telegram. Hoàn tất /start trên bot để liên kết.');
     } else {
       setError('Phản hồi từ server không có deep link.');
-    }
-  };
-
-  const onTelegramUnlink = async () => {
-    if (!window.confirm('Gỡ liên kết Telegram?')) return;
-    setTgBusy(true);
-    const res = await deleteTelegramUnlink();
-    setTgBusy(false);
-    if (res.success) {
-      setSuccess('Đã gỡ liên kết Telegram.');
-      await loadAll();
-    } else {
-      setError(res.error || 'Gỡ liên kết thất bại.');
     }
   };
 
@@ -639,7 +810,7 @@ export default function EmergencyAlertsPage() {
         <div style={heroStyle}>
           <h1 style={heroTitleStyle}>Cảnh báo khẩn theo vùng</h1>
           <p style={heroSubtitleStyle}>
-            Chọn điểm, bán kính và kênh nhận tin — được báo khi nguy cơ ngập cao trong vùng đó.
+            Liên kết Telegram, chọn điểm và bán kính — nhận cảnh báo khi nguy cơ ngập cao trong vùng đó.
           </p>
         </div>
         <div className={listPanelClass}>
@@ -657,16 +828,144 @@ export default function EmergencyAlertsPage() {
 
   return (
     <div style={pageShellStyle}>
+      <ConfirmDialog
+        open={confirmDialog?.type === 'delete'}
+        title="Xóa đăng ký cảnh báo?"
+        description="Đăng ký tại vùng này sẽ bị gỡ. Bạn có thể tạo lại đăng ký mới sau nếu cần."
+        confirmLabel="Xóa đăng ký"
+        cancelLabel="Hủy"
+        variant="danger"
+        onCancel={() => setConfirmDialog(null)}
+        onConfirm={() => void confirmDeleteSub()}
+      />
+      <ConfirmDialog
+        open={confirmDialog?.type === 'unlink'}
+        title="Gỡ liên kết Telegram?"
+        description="Bạn sẽ không nhận cảnh báo qua bot cho đến khi liên kết lại. Các đăng ký vùng vẫn giữ trên tài khoản nhưng không gửi được qua Telegram."
+        confirmLabel="Gỡ liên kết"
+        cancelLabel="Hủy"
+        variant="danger"
+        onCancel={() => setConfirmDialog(null)}
+        onConfirm={() => void confirmTelegramUnlink()}
+      />
+
+      <EmergencyStackModal
+        open={createNameModalOpen}
+        title="Đặt tên vùng cảnh báo (tuỳ chọn)"
+        description="Tuỳ chọn, tối đa 200 ký tự. Để trống thì server lưu không tên (danh sách có thể hiển thị «Vùng #id» hoặc nhãn từ display_meta nếu API cung cấp)."
+        onClose={cancelCreateNameModal}
+        footer={
+          <>
+            <button
+              type="button"
+              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              onClick={cancelCreateNameModal}
+            >
+              Hủy
+            </button>
+            <button
+              type="button"
+              className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"
+              onClick={confirmCreateNameAndOpenMap}
+            >
+              Tiếp tục chọn vị trí
+            </button>
+          </>
+        }
+      >
+        <label className="block text-sm font-medium text-slate-800">
+          Tên vùng (tuỳ chọn)
+          <input
+            type="text"
+            value={createNameInput}
+            onChange={(e) => setCreateNameInput(e.target.value)}
+            maxLength={EMERGENCY_SUB_NAME_MAX}
+            autoFocus
+            className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+            placeholder="Ví dụ: Nhà tôi — Quận 1 (tuỳ chọn, tối đa 200 ký tự)"
+          />
+        </label>
+      </EmergencyStackModal>
+
+      <EmergencyStackModal
+        open={editModalSub != null}
+        title="Sửa đăng ký cảnh báo"
+        description={
+          editModalSub ? (
+            <span>
+              Tọa độ hiện tại:{' '}
+              <strong className="text-slate-800">
+                {Number(editModalSub.lat).toFixed(5)}, {Number(editModalSub.lng).toFixed(5)}
+              </strong>
+              . Để đổi điểm trên bản đồ, hãy tạo đăng ký mới hoặc xóa và tạo lại vùng này.
+            </span>
+          ) : null
+        }
+        onClose={closeEditModal}
+        footer={
+          <>
+            <button
+              type="button"
+              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              onClick={closeEditModal}
+            >
+              Hủy
+            </button>
+            <button
+              type="button"
+              disabled={editSaving}
+              className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+              onClick={() => void saveEditModal()}
+            >
+              {editSaving ? 'Đang lưu…' : 'Lưu'}
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <label className="block text-sm font-medium text-slate-800">
+            Tên hiển thị
+            <input
+              type="text"
+              value={editModalName}
+              onChange={(e) => setEditModalName(e.target.value)}
+              maxLength={EMERGENCY_SUB_NAME_MAX}
+              className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+              placeholder="Tên vùng cảnh báo (tuỳ chọn)"
+            />
+          </label>
+          <label className="block text-sm font-medium text-slate-800">
+            Bán kính (m)
+            <input
+              type="number"
+              min={100}
+              value={editModalRadius}
+              onChange={(e) => setEditModalRadius(Number(e.target.value))}
+              className="mt-1.5 w-full max-w-xs rounded-lg border border-slate-200 px-3 py-2.5 text-sm"
+            />
+          </label>
+          <p className="text-sm text-slate-600">
+            Kênh nhận tin: <strong>Telegram</strong> (cố định).
+          </p>
+          <label className="flex items-center gap-3 text-sm text-slate-800">
+            <ToggleSwitch checked={editModalActive} onChange={(v) => setEditModalActive(v)} />
+            Đang bật đăng ký
+          </label>
+        </div>
+      </EmergencyStackModal>
+
       <div style={heroStyle}>
         <h1 style={heroTitleStyle}>Cảnh báo khẩn theo vùng</h1>
         <p style={heroSubtitleStyle}>
-          Chọn điểm, bán kính và kênh nhận tin — được báo khi nguy cơ ngập cao trong vùng đó.
+          Liên kết Telegram, chọn điểm và bán kính — nhận cảnh báo khi nguy cơ ngập cao trong vùng đó.
         </p>
       </div>
 
       <EmergencyMapModal
         open={mapPickerOpen}
-        onClose={() => setMapPickerOpen(false)}
+        onClose={closeMapPicker}
+        onConfirm={confirmMapPicker}
+        fromCreateFlow={pendingCreateAfterPick}
         mapLat={formLat}
         mapLng={formLng}
         onPick={(lat, lng) => {
@@ -696,7 +995,9 @@ export default function EmergencyAlertsPage() {
         <div className="flex flex-col gap-4 border-b border-slate-200 px-4 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <div className="min-w-0">
             <h2 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">Thiết lập nhận tin</h2>
-            <p className="mt-1 text-sm text-slate-600">Bật kênh, chọn vùng và quản lý các đăng ký cảnh báo.</p>
+            <p className="mt-1 text-sm text-slate-600">
+              Nhận cảnh báo qua Telegram; chọn vùng và quản lý các đăng ký.
+            </p>
           </div>
           <div className="relative w-full shrink-0 sm:max-w-sm">
             <FaMagnifyingGlass className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -710,44 +1011,17 @@ export default function EmergencyAlertsPage() {
           </div>
         </div>
 
-        <div className="grid border-b border-slate-200 md:grid-cols-[minmax(200px,280px)_1fr]">
-          <div className="border-slate-200 p-5 md:border-r md:bg-slate-50/60">
-            <h3 className="text-base font-semibold text-slate-900">Kênh thông báo</h3>
-            <p className="mt-2 text-sm leading-relaxed text-slate-600">
-              Chọn cách bạn muốn nhận tin khi có nguy cơ ngập cao trong bán kính đã chọn.
-            </p>
-          </div>
-          <div className="min-w-0 divide-y divide-slate-100">
-            {METHOD_OPTIONS.map((m) => (
-              <div
-                key={m.id}
-                className="flex items-start gap-4 px-4 py-4 sm:px-6 sm:py-5"
-              >
-                <ToggleSwitch
-                  checked={!!methods[m.id]}
-                  onChange={(v) => setMethods((prev) => ({ ...prev, [m.id]: v }))}
-                  disabled={
-                    m.id === 'telegram' && !!profile && !profile.telegram_linked && !methods.telegram
-                  }
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="font-medium text-slate-900">{m.label}</div>
-                  <p className="mt-0.5 text-sm text-slate-500">{m.desc}</p>
-                  {m.id === 'telegram' && profile && !profile.telegram_linked && (
-                    <p className="mt-1 text-xs text-amber-700">Cần liên kết Telegram ở mục dưới trước khi bật.</p>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
         <div className="border-b border-slate-200 px-4 py-5 sm:px-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h3 className="text-base font-semibold text-slate-900">Liên kết Telegram</h3>
               <p className="mt-1 text-sm text-slate-600">
-                Trạng thái: <strong>{profile?.telegram_linked ? 'Đã liên kết' : 'Chưa liên kết'}</strong>
+                Bắt buộc để nhận tin. Trạng thái:{' '}
+                <strong
+                  className={profile?.telegram_linked ? 'font-semibold text-emerald-600' : 'font-semibold text-red-600'}
+                >
+                  {profile?.telegram_linked ? 'Đã liên kết' : 'Chưa liên kết'}
+                </strong>
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -767,7 +1041,7 @@ export default function EmergencyAlertsPage() {
                 <button
                   type="button"
                   disabled={tgBusy}
-                  onClick={onTelegramUnlink}
+                  onClick={requestTelegramUnlink}
                   className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                 >
                   Gỡ liên kết
@@ -778,14 +1052,15 @@ export default function EmergencyAlertsPage() {
         </div>
 
         <form onSubmit={handleCreate} className="border-b border-slate-200">
-          <div className="grid md:grid-cols-[minmax(200px,280px)_1fr]">
-            <div className="border-slate-200 p-5 md:border-r md:bg-slate-50/60">
-              <h3 className="text-base font-semibold text-slate-900">Đăng ký vùng mới</h3>
-              <p className="mt-2 text-sm leading-relaxed text-slate-600">
-                Chọn bán kính và điểm trung tâm, rồi gửi đăng ký. Bản đồ chỉ dùng để chọn tọa độ.
-              </p>
-            </div>
-            <div className="min-w-0 space-y-0 divide-y divide-slate-100">
+          <div className="border-b border-slate-100 px-4 py-4 sm:px-6">
+            <h3 className="text-base font-semibold text-slate-900">Đăng ký vùng mới</h3>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600">
+              Chọn bán kính trước, bấm <strong>Tạo đăng ký</strong> — trong hộp thoại có thể đặt <strong>tên vùng</strong>{' '}
+              (tuỳ chọn, tối đa 200 ký tự), sau đó bản đồ mở để bạn chọn điểm; bấm <strong>Xong</strong> trên bản đồ để hoàn
+              tất. Dùng «Mở bản đồ chọn điểm» hoặc «GPS nhanh» để chỉnh tọa độ trước khi tạo nếu cần.
+            </p>
+          </div>
+          <div className="min-w-0 divide-y divide-slate-100">
               <div className="px-4 py-4 sm:px-6 sm:py-5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="text-sm font-medium text-slate-800">Bán kính</span>
@@ -812,7 +1087,7 @@ export default function EmergencyAlertsPage() {
                 <div className="flex shrink-0 flex-wrap gap-2">
                   <button
                     type="button"
-                    onClick={() => setMapPickerOpen(true)}
+                    onClick={openMapPickerOnly}
                     className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-800 shadow-sm hover:bg-slate-50"
                   >
                     <FaMapLocationDot className="h-4 w-4 text-sky-600" />
@@ -852,7 +1127,7 @@ export default function EmergencyAlertsPage() {
                   </label>
                 </div>
               )}
-              <div className="px-4 py-4 sm:px-6 sm:py-5">
+              <div className="space-y-2 px-4 py-4 sm:px-6 sm:py-5">
                 <button
                   type="submit"
                   disabled={submitting}
@@ -860,20 +1135,22 @@ export default function EmergencyAlertsPage() {
                 >
                   {submitting ? 'Đang gửi…' : 'Tạo đăng ký'}
                 </button>
+                <p className="max-w-xl text-xs leading-relaxed text-slate-500">
+                  Kênh nhận tin: <strong>Telegram</strong> (duy nhất). Tên vùng tuỳ chọn (tối đa 200 ký tự) ở bước sau khi
+                  bấm Tạo đăng ký; để trống thì server lưu không tên.
+                </p>
               </div>
             </div>
-          </div>
         </form>
 
         <div className="flex-1">
-          <div className="grid md:grid-cols-[minmax(200px,280px)_1fr]">
-            <div className="border-slate-200 p-5 md:border-r md:bg-slate-50/60">
-              <h3 className="text-base font-semibold text-slate-900">Đăng ký của tôi</h3>
-              <p className="mt-2 text-sm text-slate-600">
-                {filteredSubs.length} / {subs.length} hiển thị
-              </p>
-            </div>
-            <div className="min-w-0 divide-y divide-slate-100">
+          <div className="border-b border-slate-100 px-4 py-4 sm:px-6">
+            <h3 className="text-base font-semibold text-slate-900">Đăng ký của tôi</h3>
+            <p className="mt-2 text-sm text-slate-600">
+              {filteredSubs.length} / {subs.length} hiển thị
+            </p>
+          </div>
+          <div className="min-w-0 divide-y divide-slate-100">
               {filteredSubs.length === 0 ? (
                 <div className="px-4 py-8 text-sm text-slate-500 sm:px-6">
                   {subs.length === 0 ? 'Chưa có đăng ký nào.' : 'Không có đăng ký nào khớp tìm kiếm.'}
@@ -881,107 +1158,58 @@ export default function EmergencyAlertsPage() {
               ) : (
                 filteredSubs.map((sub) => (
                   <div key={sub.id} className="px-4 py-4 sm:px-6 sm:py-5">
-                    {editingId === sub.id ? (
-                      <div className="space-y-4">
-                        <label className="block text-sm font-medium text-slate-800">
-                          Bán kính (m)
-                          <input
-                            type="number"
-                            min={100}
-                            value={editRadius}
-                            onChange={(e) => setEditRadius(Number(e.target.value))}
-                            className="mt-1 w-full max-w-xs rounded-lg border border-slate-200 px-3 py-2"
-                          />
-                        </label>
-                        <div className="space-y-3 border-t border-slate-100 pt-3">
-                          {METHOD_OPTIONS.map((m) => (
-                            <div key={m.id} className="flex items-start gap-4">
-                              <ToggleSwitch
-                                checked={!!editMethods[m.id]}
-                                onChange={(v) => setEditMethods((prev) => ({ ...prev, [m.id]: v }))}
-                              />
-                              <span className="text-sm font-medium text-slate-800">{m.label}</span>
-                            </div>
-                          ))}
-                        </div>
-                        <label className="flex items-center gap-3 text-sm text-slate-800">
-                          <ToggleSwitch checked={editActive} onChange={(v) => setEditActive(v)} />
-                          Đang bật đăng ký
-                        </label>
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            onClick={() => saveEdit(sub.id)}
-                            className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                      <div className="flex min-w-0 flex-1 items-start gap-4">
+                        <ToggleSwitch
+                          checked={sub.is_active !== false}
+                          onChange={async (v) => {
+                            setError('');
+                            const body = {
+                              radius: Number(sub.radius),
+                              notification_methods: TELEGRAM_METHODS,
+                              is_active: v,
+                              lat: Number(sub.lat),
+                              lng: Number(sub.lng)
+                            };
+                            const res = await updateEmergencySubscription(sub.id, body);
+                            if (res.success) {
+                              setSuccess(v ? 'Đã bật đăng ký.' : 'Đã tạm tắt đăng ký.');
+                              await loadAll();
+                            } else {
+                              setError(res.error || 'Không cập nhật được.');
+                            }
+                          }}
+                        />
+                        <div className="min-w-0">
+                          <div
+                            className="font-medium text-slate-900"
+                            style={getSubscriptionTitleStyle(sub)}
                           >
-                            Lưu
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setEditingId(null)}
-                            className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                          >
-                            Hủy
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                        <div className="flex min-w-0 flex-1 items-start gap-4">
-                          <ToggleSwitch
-                            checked={sub.is_active !== false}
-                            onChange={async (v) => {
-                              setError('');
-                              const m = { email: false, telegram: false, webhook: false };
-                              (sub.notification_methods || []).forEach((x) => {
-                                if (m[x] !== undefined) m[x] = true;
-                              });
-                              if (!sub.notification_methods?.length) m.email = true;
-                              const arr = METHOD_OPTIONS.filter((o) => m[o.id]).map((o) => o.id);
-                              const body = {
-                                radius: Number(sub.radius),
-                                notification_methods: arr,
-                                is_active: v,
-                                lat: Number(sub.lat),
-                                lng: Number(sub.lng)
-                              };
-                              const res = await updateEmergencySubscription(sub.id, body);
-                              if (res.success) {
-                                setSuccess(v ? 'Đã bật đăng ký.' : 'Đã tạm tắt đăng ký.');
-                                await loadAll();
-                              } else {
-                                setError(res.error || 'Không cập nhật được.');
-                              }
-                            }}
-                          />
-                          <div className="min-w-0">
-                            <div className="font-medium text-slate-900">
-                              Vùng #{sub.id} · bán kính {sub.radius} m
-                            </div>
-                            <p className="mt-0.5 text-sm text-slate-500">
-                              {(sub.notification_methods || []).join(', ') || '—'} ·{' '}
-                              {Number(sub.lat).toFixed(4)}, {Number(sub.lng).toFixed(4)}
-                            </p>
+                            {getSubscriptionDisplayName(sub)} · bán kính {sub.radius} m
                           </div>
-                        </div>
-                        <div className="flex shrink-0 gap-2">
-                          <button
-                            type="button"
-                            onClick={() => startEdit(sub)}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
-                          >
-                            <FaPen className="h-3.5 w-3.5" /> Sửa chi tiết
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => removeSub(sub.id)}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
-                          >
-                            <FaTrash className="h-3.5 w-3.5" /> Xóa
-                          </button>
+                          <p className="mt-0.5 text-sm text-slate-500">
+                            {subscriptionChannelLine()} · {Number(sub.lat).toFixed(4)},{' '}
+                            {Number(sub.lng).toFixed(4)}
+                          </p>
                         </div>
                       </div>
-                    )}
+                      <div className="flex shrink-0 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openEditModal(sub)}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
+                        >
+                          <FaPen className="h-3.5 w-3.5" /> Sửa chi tiết
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeSub(sub.id)}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
+                        >
+                          <FaTrash className="h-3.5 w-3.5" /> Xóa
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 ))
               )}
@@ -989,6 +1217,5 @@ export default function EmergencyAlertsPage() {
           </div>
         </div>
       </div>
-    </div>
   );
 }

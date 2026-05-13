@@ -18,8 +18,44 @@ const Footer = () => {
           : 'ml-0 w-full md:ml-[220px] md:w-[calc(100%-220px)] lg:ml-[260px] lg:w-[calc(100%-260px)]'
       )}
     >
-      <div className="mx-auto max-w-[1400px] px-5 pb-5 pt-10 max-md:px-[15px] max-md:pb-[15px] max-md:pt-[30px]">
-        <div className="mb-[30px] grid grid-cols-1 gap-10 max-md:gap-[30px] md:grid-cols-[repeat(auto-fit,minmax(250px,1fr))]">
+      <div className="mx-auto max-w-[1400px] px-4 pb-4 pt-6 md:px-5 md:pb-5 md:pt-10">
+        {/* Mobile: liên kết gọn + bản quyền */}
+        <div className="mb-4 border-b border-white/20 pb-4 md:hidden">
+          <div className="flex flex-wrap justify-center gap-x-3 gap-y-2 text-[12px] text-white/95">
+            <Link to="/dashboard" className="no-underline hover:text-white">
+              Trang chủ
+            </Link>
+            <span className="text-white/40">|</span>
+            <Link to="/map" className="no-underline hover:text-white">
+              Bản đồ
+            </Link>
+            <span className="text-white/40">|</span>
+            <Link to="/routing" className="no-underline hover:text-white">
+              Tìm đường
+            </Link>
+            <span className="text-white/40">|</span>
+            <Link to="/reports" className="no-underline hover:text-white">
+              Báo cáo
+            </Link>
+            <span className="text-white/40">|</span>
+            <GuestAwareLink to="/report/new" requiresAuth className="no-underline hover:text-white">
+              Gửi báo cáo
+            </GuestAwareLink>
+            <span className="text-white/40">|</span>
+            <Link to="/faq" className="no-underline hover:text-white">
+              FAQ
+            </Link>
+            <span className="text-white/40">|</span>
+            <Link to="/contact" className="no-underline hover:text-white">
+              Liên hệ
+            </Link>
+          </div>
+          <p className="mt-3 text-center text-[11px] leading-snug text-white/75">
+            © {new Date().getFullYear()} FloodSight TP.HCM · IUH
+          </p>
+        </div>
+
+        <div className="mb-[30px] hidden grid-cols-1 gap-10 max-md:gap-[30px] md:grid md:grid-cols-[repeat(auto-fit,minmax(250px,1fr))]">
           <div className="flex flex-col gap-4">
             <div className="mb-2 flex items-center gap-3">
               <img src="/logo_mini.png" alt="IUH Logo" className="h-6 w-6 flex-shrink-0 object-contain" />
@@ -172,7 +208,7 @@ const Footer = () => {
           </div>
         </div>
 
-        <div className="mt-5 border-t border-white/20 pt-5">
+        <div className="mt-5 hidden border-t border-white/20 pt-5 md:block">
           <div className="text-center text-[13px] leading-relaxed text-white/80">
             <p className="my-1">
               &copy; {new Date().getFullYear()} FLOODSIGHT THÀNH PHỐ HỒ CHÍ MINH. Tất cả quyền được bảo lưu.

@@ -11,7 +11,6 @@ import {
 import { fetchFloodData, fetchCrowdReports, fetchHeatmapTimeline24h } from '../services/api';
 import { POLLING_INTERVALS, CROWD_REPORT_MAP_DISPLAY_HOURS } from '../config/apiConfig';
 import { filterNonExpiredReports } from '../utils/reportHelpers';
-import MapHeader from '../components/map/MapHeader';
 import MapView from '../components/map/MapView';
 const MapPage = () => {
   const [floodData, setFloodData] = useState([]);
@@ -123,8 +122,7 @@ const MapPage = () => {
   const filteredCrowdReports = filters.crowdReports ? nonExpiredCrowdReports : [];
 
   return (
-    <div className="map-page-layout">
-      <MapHeader />
+    <div className="map-page-layout map-page-layout--in-app">
       <div className="map-page-container">
         {/* Filter Panel - Left Side */}
         <div className="map-filter-panel">

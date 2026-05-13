@@ -132,9 +132,13 @@ function App() {
             </Layout>
           }
         />
-        <Route 
-          path="/map" 
-          element={<MapPage />} 
+        <Route
+          path="/map"
+          element={
+            <Layout>
+              <MapPage />
+            </Layout>
+          }
         />
         <Route
           path="/about"
