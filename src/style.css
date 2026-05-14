@@ -2783,16 +2783,6 @@ button:focus-visible {
 }
 
 /* Messages */
-.profile-page .success-message {
-  background: #d1fae5;
-  border: 1px solid #10b981;
-  color: #065f46;
-  padding: 12px 16px;
-  border-radius: 4px;
-  margin: 20px 32px;
-  font-size: 14px;
-}
-
 .profile-page .error-message {
   background: #fee2e2;
   border: 1px solid #ef4444;

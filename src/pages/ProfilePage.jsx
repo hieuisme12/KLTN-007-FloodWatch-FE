@@ -126,6 +126,7 @@ const ProfilePage = () => {
   const handleSelectAvatar = async (icon) => {
     setSavingAvatar(true);
     setError('');
+    setSuccess('');
     const result = await updateProfile({ avatar: icon.name });
     if (result.success) {
       setUser(result.data);
@@ -171,14 +172,10 @@ const ProfilePage = () => {
       <div className="profile-container">
         <h1 className="profile-title">Chỉnh sửa hồ sơ của bạn</h1>
 
-        {error && (
-          <ErrorToast message={error} onClose={() => setError('')} />
-        )}
         {success && (
-          <div className="success-message">
-            {success}
-          </div>
+          <ErrorToast variant="success" message={success} onClose={() => setSuccess('')} />
         )}
+        {error && <ErrorToast message={error} onClose={() => setError('')} />}
 
         <div className="profile-form">
           <div className="profile-form-layout">
