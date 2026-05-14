@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { Trans, useTranslation } from 'react-i18next';
 import GuestAwareLink from '../common/GuestAwareLink';
 import { FaFacebook, FaTwitter, FaYoutube, FaLinkedin, FaEnvelope, FaPhone } from 'react-icons/fa6';
 import { MdLocationOn } from 'react-icons/md';
@@ -7,7 +8,9 @@ import { useSidebar } from '@/context/SidebarProvider';
 import { cn } from '@/lib/cn';
 
 const Footer = () => {
+  const { t } = useTranslation();
   const { collapsed } = useSidebar();
+  const year = new Date().getFullYear();
 
   return (
     <footer
@@ -19,39 +22,38 @@ const Footer = () => {
       )}
     >
       <div className="mx-auto max-w-[1400px] px-4 pb-4 pt-6 md:px-5 md:pb-5 md:pt-10">
-        {/* Mobile: liên kết gọn + bản quyền */}
         <div className="mb-4 border-b border-white/20 pb-4 md:hidden">
           <div className="flex flex-wrap justify-center gap-x-3 gap-y-2 text-[12px] text-white/95">
             <Link to="/dashboard" className="no-underline hover:text-white">
-              Trang chủ
+              {t('footer.home')}
             </Link>
             <span className="text-white/40">|</span>
             <Link to="/map" className="no-underline hover:text-white">
-              Bản đồ
+              {t('footer.map')}
             </Link>
             <span className="text-white/40">|</span>
             <Link to="/routing" className="no-underline hover:text-white">
-              Tìm đường
+              {t('footer.routing')}
             </Link>
             <span className="text-white/40">|</span>
             <Link to="/reports" className="no-underline hover:text-white">
-              Báo cáo
+              {t('footer.reports')}
             </Link>
             <span className="text-white/40">|</span>
             <GuestAwareLink to="/report/new" requiresAuth className="no-underline hover:text-white">
-              Gửi báo cáo
+              {t('footer.sendReport')}
             </GuestAwareLink>
             <span className="text-white/40">|</span>
             <Link to="/faq" className="no-underline hover:text-white">
-              FAQ
+              {t('footer.faq')}
             </Link>
             <span className="text-white/40">|</span>
             <Link to="/contact" className="no-underline hover:text-white">
-              Liên hệ
+              {t('footer.contact')}
             </Link>
           </div>
           <p className="mt-3 text-center text-[11px] leading-snug text-white/75">
-            © {new Date().getFullYear()} FloodSight TP.HCM · IUH
+            {t('footer.copyrightMobile', { year })}
           </p>
         </div>
 
@@ -60,13 +62,10 @@ const Footer = () => {
             <div className="mb-2 flex items-center gap-3">
               <img src="/logo_mini.png" alt="IUH Logo" className="h-6 w-6 flex-shrink-0 object-contain" />
               <h3 className="m-0 text-lg font-bold uppercase tracking-wide text-white max-md:text-base">
-                FLOODSIGHT THÀNH PHỐ HỒ CHÍ MINH
+                {t('footer.brand')}
               </h3>
             </div>
-            <p className="m-0 text-sm leading-relaxed text-white/90 max-md:text-[13px]">
-              Hệ thống giám sát và cảnh báo ngập lụt thông minh cho Thành phố Hồ Chí Minh. Cung cấp thông tin thời
-              gian thực về tình trạng ngập lụt và hỗ trợ người dân trong việc ứng phó với thiên tai.
-            </p>
+            <p className="m-0 text-sm leading-relaxed text-white/90 max-md:text-[13px]">{t('footer.intro')}</p>
             <div className="mt-2 flex gap-3">
               <a
                 href="https://www.facebook.com/trieuminh1003"
@@ -104,14 +103,16 @@ const Footer = () => {
           </div>
 
           <div className="flex flex-col gap-4">
-            <h3 className="m-0 text-lg font-bold uppercase tracking-wide text-white max-md:text-base">Liên kết nhanh</h3>
+            <h3 className="m-0 text-lg font-bold uppercase tracking-wide text-white max-md:text-base">
+              {t('footer.quickLinks')}
+            </h3>
             <ul className="m-0 flex list-none flex-col gap-3 p-0">
               <li className="m-0">
                 <Link
                   to="/dashboard"
                   className="inline-block text-sm text-white/90 no-underline transition-all duration-200 ease-in-out hover:pl-1 hover:text-white max-md:text-[13px]"
                 >
-                  Trang chủ
+                  {t('footer.home')}
                 </Link>
               </li>
               <li className="m-0">
@@ -119,7 +120,7 @@ const Footer = () => {
                   to="/reports"
                   className="inline-block text-sm text-white/90 no-underline transition-all duration-200 ease-in-out hover:pl-1 hover:text-white max-md:text-[13px]"
                 >
-                  Báo cáo ngập lụt
+                  {t('footer.floodReports')}
                 </Link>
               </li>
               <li className="m-0">
@@ -128,7 +129,7 @@ const Footer = () => {
                   requiresAuth
                   className="inline-block text-sm text-white/90 no-underline transition-all duration-200 ease-in-out hover:pl-1 hover:text-white max-md:text-[13px]"
                 >
-                  Báo cáo mới
+                  {t('footer.newReport')}
                 </GuestAwareLink>
               </li>
               <li className="m-0">
@@ -137,21 +138,23 @@ const Footer = () => {
                   requiresAuth
                   className="inline-block text-sm text-white/90 no-underline transition-all duration-200 ease-in-out hover:pl-1 hover:text-white max-md:text-[13px]"
                 >
-                  Tài khoản
+                  {t('footer.account')}
                 </GuestAwareLink>
               </li>
             </ul>
           </div>
 
           <div className="flex flex-col gap-4">
-            <h3 className="m-0 text-lg font-bold uppercase tracking-wide text-white max-md:text-base">Thông tin</h3>
+            <h3 className="m-0 text-lg font-bold uppercase tracking-wide text-white max-md:text-base">
+              {t('footer.info')}
+            </h3>
             <ul className="m-0 flex list-none flex-col gap-3 p-0">
               <li className="m-0">
                 <Link
                   to="/about"
                   className="inline-block text-sm text-white/90 no-underline transition-all duration-200 ease-in-out hover:pl-1 hover:text-white max-md:text-[13px]"
                 >
-                  Về chúng tôi
+                  {t('footer.about')}
                 </Link>
               </li>
               <li className="m-0">
@@ -159,7 +162,7 @@ const Footer = () => {
                   to="/privacy"
                   className="inline-block text-sm text-white/90 no-underline transition-all duration-200 ease-in-out hover:pl-1 hover:text-white max-md:text-[13px]"
                 >
-                  Chính sách bảo mật
+                  {t('footer.privacy')}
                 </Link>
               </li>
               <li className="m-0">
@@ -167,7 +170,7 @@ const Footer = () => {
                   to="/terms"
                   className="inline-block text-sm text-white/90 no-underline transition-all duration-200 ease-in-out hover:pl-1 hover:text-white max-md:text-[13px]"
                 >
-                  Điều khoản sử dụng
+                  {t('footer.terms')}
                 </Link>
               </li>
               <li className="m-0">
@@ -175,7 +178,7 @@ const Footer = () => {
                   to="/faq"
                   className="inline-block text-sm text-white/90 no-underline transition-all duration-200 ease-in-out hover:pl-1 hover:text-white max-md:text-[13px]"
                 >
-                  Câu hỏi thường gặp
+                  {t('footer.faqLong')}
                 </Link>
               </li>
               <li className="m-0">
@@ -183,26 +186,28 @@ const Footer = () => {
                   to="/contact"
                   className="inline-block text-sm text-white/90 no-underline transition-all duration-200 ease-in-out hover:pl-1 hover:text-white max-md:text-[13px]"
                 >
-                  Liên hệ
+                  {t('footer.contact')}
                 </Link>
               </li>
             </ul>
           </div>
 
           <div className="flex flex-col gap-4">
-            <h3 className="m-0 text-lg font-bold uppercase tracking-wide text-white max-md:text-base">Liên hệ</h3>
+            <h3 className="m-0 text-lg font-bold uppercase tracking-wide text-white max-md:text-base">
+              {t('footer.contactSection')}
+            </h3>
             <ul className="m-0 flex list-none flex-col gap-4 p-0">
               <li className="m-0 flex items-start gap-3 text-sm leading-relaxed text-white/90 max-md:text-[13px]">
                 <MdLocationOn className="mt-0.5 flex-shrink-0 text-lg text-white" />
-                <span className="flex-1">Số 12 Nguyễn Văn Bảo, P. Hạnh Thông, Thành phố Hồ Chí Minh</span>
+                <span className="flex-1">{t('footer.address')}</span>
               </li>
               <li className="m-0 flex items-start gap-3 text-sm leading-relaxed text-white/90 max-md:text-[13px]">
                 <FaPhone className="mt-0.5 flex-shrink-0 text-lg text-white" />
-                <span className="flex-1">Hotline: 0283.8940 390</span>
+                <span className="flex-1">{t('footer.hotline')}</span>
               </li>
               <li className="m-0 flex items-start gap-3 text-sm leading-relaxed text-white/90 max-md:text-[13px]">
                 <FaEnvelope className="mt-0.5 flex-shrink-0 text-lg text-white" />
-                <span className="flex-1">Email: dhcn@iuh.edu.vn</span>
+                <span className="flex-1">{t('footer.email')}</span>
               </li>
             </ul>
           </div>
@@ -210,12 +215,12 @@ const Footer = () => {
 
         <div className="mt-5 hidden border-t border-white/20 pt-5 md:block">
           <div className="text-center text-[13px] leading-relaxed text-white/80">
-            <p className="my-1">
-              &copy; {new Date().getFullYear()} FLOODSIGHT THÀNH PHỐ HỒ CHÍ MINH. Tất cả quyền được bảo lưu.
-            </p>
+            <p className="my-1">{t('footer.copyright', { year })}</p>
             <p className="mt-2 text-xs text-white/70">
-              Được phát triển bởi{' '}
-              <strong className="font-semibold text-white/90">Nhóm 007 - Trường Đại học Công nghiệp TP. Hồ Chí Minh (IUH)</strong>
+              <Trans
+                i18nKey="footer.developedBy"
+                components={{ 1: <strong className="font-semibold text-white/90" /> }}
+              />
             </p>
           </div>
         </div>

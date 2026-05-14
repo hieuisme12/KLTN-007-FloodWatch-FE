@@ -1,8 +1,10 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 
 const MapHeader = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -24,7 +26,7 @@ const MapHeader = () => {
             <img src="/iuh.png" alt="IUH Logo" className="h-full w-full object-contain p-1" />
           </div>
           <span className="hidden text-lg font-semibold text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.2)] lg:inline">
-            FLOODSIGHT THÀNH PHỐ HỒ CHÍ MINH
+            {t('mapHeader.brandTitle')}
           </span>
         </div>
 
@@ -40,7 +42,7 @@ const MapHeader = () => {
               )}
               onClick={() => navigate('/')}
             >
-              <span className="whitespace-nowrap max-md:hidden">Trang chủ</span>
+              <span className="whitespace-nowrap max-md:hidden">{t('mapHeader.home')}</span>
             </button>
             <button
               type="button"
@@ -52,7 +54,7 @@ const MapHeader = () => {
               )}
               onClick={() => navigate('/reports')}
             >
-              <span className="whitespace-nowrap max-md:hidden">Báo cáo</span>
+              <span className="whitespace-nowrap max-md:hidden">{t('mapHeader.reports')}</span>
             </button>
           </div>
         </div>

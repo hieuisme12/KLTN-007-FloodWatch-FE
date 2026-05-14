@@ -12,11 +12,11 @@ import {
   getTelegramLinkStatus,
   deleteTelegramUnlink,
   fetchFloodData
-} from '../services/api';
-import { DEFAULT_CENTER, DEFAULT_ZOOM, statusColors } from '../utils/constants';
-import SensorMarker from '../components/map/SensorMarker';
-import ErrorToast from '../components/common/ErrorToast';
-import ConfirmDialog from '../components/common/ConfirmDialog';
+} from '../../services/api';
+import { DEFAULT_CENTER, DEFAULT_ZOOM, statusColors } from '../../utils/constants';
+import SensorMarker from '../../components/map/SensorMarker';
+import ErrorToast from '../../components/common/ErrorToast';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
 import { cn } from '@/lib/cn';
 import {
   FaLink,
@@ -27,10 +27,12 @@ import {
   FaXmark,
   FaMapLocationDot
 } from 'react-icons/fa6';
-import { getMapboxToken } from '../utils/mapboxToken';
-import { getReporterAvatarUrl } from '../utils/reporterAvatarUrl';
-import { getCurrentUser } from '../utils/auth';
+import { getMapboxToken } from '../../utils/mapboxToken';
+import { getReporterAvatarUrl } from '../../utils/reporterAvatarUrl';
+import { getCurrentUser } from '../../utils/auth';
 import Skeleton from 'react-loading-skeleton';
+import { useTranslation } from 'react-i18next';
+import i18n from '../../i18n';
 
 const MAPBOX_TOKEN = getMapboxToken();
 const defaultLng = DEFAULT_CENTER[1];
@@ -82,7 +84,7 @@ function getSubscriptionDisplayName(sub) {
       return t.length > EMERGENCY_SUB_NAME_MAX ? t.slice(0, EMERGENCY_SUB_NAME_MAX) : t;
     }
   }
-  return `Vùng #${sub.id}`;
+  return i18n.t('emergency.zoneFallback', { id: sub.id });
 }
 
 /** Màu chữ tiêu đề từ display_meta.color (nếu có). */
@@ -101,6 +103,7 @@ function subscriptionChannelLine() {
 
 /** Cùng logic hiển thị với marker báo cáo người dân trên MapView (tên + avatar/icon + mũi pin). */
 function EmergencyPickMarkerBody({ displayName, avatarFileName, markerTheme = 'dark', avatarCacheNonce = 0 }) {
+  const { t } = useTranslation();
   const isLight = markerTheme === 'light';
   const textColor = isLight ? '#fff' : '#000';
   const borderColor = isLight ? '#fff' : '#000';
@@ -137,7 +140,7 @@ function EmergencyPickMarkerBody({ displayName, avatarFileName, markerTheme = 'd
             textOverflow: 'ellipsis'
           }}
         >
-          {trimmed || 'Bạn'}
+          {trimmed || t('emergency.you')}
         </div>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -205,6 +208,7 @@ function ToggleSwitch({ checked, onChange, disabled }) {
 
 /** Modal form cùng phong cách overlay với ConfirmDialog / bản đồ cảnh báo */
 function EmergencyStackModal({ open, title, description, onClose, children, footer }) {
+  const { t } = useTranslation();
   useEffect(() => {
     if (!open) return undefined;
     const onKey = (e) => {
@@ -243,7 +247,7 @@ function EmergencyStackModal({ open, title, description, onClose, children, foot
             type="button"
             onClick={onClose}
             className="shrink-0 rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
-            aria-label="Đóng"
+            aria-label={t('emergency.close')}
           >
             <FaXmark className="h-5 w-5" />
           </button>
@@ -271,6 +275,7 @@ function EmergencyMapModal({
   pickAvatarFileName,
   pickAvatarCacheNonce = 0
 }) {
+  const { t } = useTranslation();
   const mapRef = useRef(null);
   const floodEndpointRef = useRef(null);
   const [sensors, setSensors] = useState([]);
@@ -278,9 +283,11 @@ function EmergencyMapModal({
 
   useEffect(() => {
     if (!open) {
-      setSensorPopupId(null);
-      setSensors([]);
-      return undefined;
+      const id = window.requestAnimationFrame(() => {
+        setSensorPopupId(null);
+        setSensors([]);
+      });
+      return () => window.cancelAnimationFrame(id);
     }
     let cancelled = false;
     fetchFloodData(floodEndpointRef).then((res) => {
@@ -348,19 +355,17 @@ function EmergencyMapModal({
         <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-4 py-3 sm:px-5">
           <div>
             <h2 id="emergency-map-title" className="text-base font-semibold text-slate-900 sm:text-lg">
-              Chọn điểm trên bản đồ
+              {t('emergency.pickTitle')}
             </h2>
             <p className="text-xs text-slate-500 sm:text-sm">
-              {fromCreateFlow
-                ? 'Chọn điểm cảnh báo trên bản đồ (bấm map hoặc Lấy GPS), sau đó bấm Xong để hoàn tất đăng ký.'
-                : 'Có marker cảm biến mực nước; bấm map để chọn điểm cảnh báo. Không hiển thị báo cáo người dân.'}
+              {fromCreateFlow ? t('emergency.pickHintWithCrowd') : t('emergency.pickHintSensorsOnly')}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
             className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
-            aria-label="Đóng"
+            aria-label={t('emergency.close')}
           >
             <FaXmark className="h-5 w-5" />
           </button>
@@ -404,7 +409,7 @@ function EmergencyMapModal({
                 <Marker key={`sub-${s.id}`} longitude={Number(s.lng)} latitude={Number(s.lat)} anchor="center">
                   <div
                     className="h-2.5 w-2.5 rounded-full border border-white bg-slate-400 opacity-90 shadow"
-                    title={`Đăng ký #${s.id}`}
+                    title={t('emergency.subTitleMarker', { id: s.id })}
                   />
                 </Marker>
               ))}
@@ -412,7 +417,7 @@ function EmergencyMapModal({
                 <Marker longitude={userGps.lng} latitude={userGps.lat} anchor="center">
                   <div
                     className="h-3.5 w-3.5 rounded-full border-2 border-white bg-sky-500 shadow-md"
-                    title="Vị trí GPS của bạn"
+                    title={t('emergency.gpsTitle')}
                   />
                 </Marker>
               )}
@@ -434,7 +439,7 @@ function EmergencyMapModal({
                     cursor: 'default',
                     lineHeight: 1.2
                   }}
-                  title="Điểm đăng ký cảnh báo"
+                  title={t('emergency.alertPointTitle')}
                 >
                   <EmergencyPickMarkerBody
                     displayName={pickDisplayName}
@@ -447,14 +452,14 @@ function EmergencyMapModal({
             </Map>
           ) : (
             <div className="flex h-[min(70vh,560px)] items-center justify-center bg-slate-100 px-4 text-center text-sm text-amber-800">
-              Chưa cấu hình VITE_MAPBOX_TOKEN — không thể hiển thị bản đồ.
+              {t('emergency.mapboxMissing')}
             </div>
           )}
         </div>
 
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-slate-50 px-4 py-3 sm:px-5">
           <div className="text-xs text-slate-600 sm:text-sm">
-            Vĩ độ <strong>{Number(mapLat).toFixed(5)}</strong>, kinh độ <strong>{Number(mapLng).toFixed(5)}</strong>
+            {t('emergency.latLngLine', { lat: Number(mapLat).toFixed(5), lng: Number(mapLng).toFixed(5) })}
           </div>
           <div className="flex flex-wrap gap-2">
             <button
@@ -463,14 +468,14 @@ function EmergencyMapModal({
               className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-100"
             >
               <FaLocationCrosshairs className="h-4 w-4 text-sky-600" />
-              Lấy GPS
+              {t('emergency.getGps')}
             </button>
             <button
               type="button"
               onClick={() => (onConfirm ? onConfirm() : onClose())}
               className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"
             >
-              Xong
+              {t('emergency.done')}
             </button>
           </div>
         </div>
@@ -480,6 +485,7 @@ function EmergencyMapModal({
 }
 
 export default function EmergencyAlertsPage() {
+  const { t } = useTranslation();
   const [profile, setProfile] = useState(null);
   const [subs, setSubs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -526,20 +532,20 @@ export default function EmergencyAlertsPage() {
 
   useEffect(() => {
     if (!telegramPoll) return undefined;
-    const t = setInterval(async () => {
+    const intervalId = setInterval(async () => {
       const st = await getTelegramLinkStatus();
       if (st.success && st.data?.linked) {
         setTelegramPoll(false);
-        setSuccess('Đã liên kết Telegram thành công.');
+        setSuccess(t('emergency.tgLinkedOk'));
         await loadAll();
       }
     }, 4000);
     const stop = setTimeout(() => setTelegramPoll(false), 120000);
     return () => {
-      clearInterval(t);
+      clearInterval(intervalId);
       clearTimeout(stop);
     };
-  }, [telegramPoll, loadAll]);
+  }, [telegramPoll, loadAll, t]);
 
   const filteredSubs = useMemo(() => {
     const q = subSearch.trim().toLowerCase();
@@ -569,19 +575,19 @@ export default function EmergencyAlertsPage() {
     setSubmitting(false);
     pendingCreateNameRef.current = '';
     if (res.success) {
-      setSuccess(res.message || 'Đã tạo đăng ký.');
+      setSuccess(res.message || t('emergency.createdOk'));
       await loadAll();
     } else {
-      setError(res.error || 'Không tạo được đăng ký.');
+      setError(res.error || t('emergency.createFail'));
     }
-  }, [formLat, formLng, radius, loadAll]);
+  }, [formLat, formLng, radius, loadAll, t]);
 
   const handleCreate = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
     if (!profile?.telegram_linked) {
-      setError('Vui lòng liên kết Telegram ở mục trên trước khi đăng ký nhận tin.');
+      setError(t('emergency.needTgFirst'));
       return;
     }
     setCreateNameInput('');
@@ -638,7 +644,7 @@ export default function EmergencyAlertsPage() {
     if (!editModalSub) return;
     setError('');
     if (!profile?.telegram_linked) {
-      setError('Cần liên kết Telegram để duy trì đăng ký.');
+      setError(t('emergency.needTgMaintain'));
       return;
     }
     setEditSaving(true);
@@ -654,11 +660,11 @@ export default function EmergencyAlertsPage() {
     const res = await updateEmergencySubscription(editModalSub.id, body);
     setEditSaving(false);
     if (res.success) {
-      setSuccess('Đã cập nhật đăng ký.');
+      setSuccess(t('emergency.updatedOk'));
       closeEditModal();
       await loadAll();
     } else {
-      setError(res.error || 'Cập nhật thất bại.');
+      setError(res.error || t('emergency.updateFail'));
     }
   };
 
@@ -672,10 +678,10 @@ export default function EmergencyAlertsPage() {
     setConfirmDialog(null);
     const res = await deleteEmergencySubscription(id);
     if (res.success) {
-      setSuccess('Đã xóa đăng ký.');
+      setSuccess(t('emergency.deletedOk'));
       await loadAll();
     } else {
-      setError(res.error || 'Xóa thất bại.');
+      setError(res.error || t('emergency.deleteFail'));
     }
   };
 
@@ -690,10 +696,10 @@ export default function EmergencyAlertsPage() {
     const res = await deleteTelegramUnlink();
     setTgBusy(false);
     if (res.success) {
-      setSuccess('Đã gỡ liên kết Telegram.');
+      setSuccess(t('emergency.unlinkedOk'));
       await loadAll();
     } else {
-      setError(res.error || 'Gỡ liên kết thất bại.');
+      setError(res.error || t('emergency.unlinkFail'));
     }
   };
 
@@ -703,22 +709,22 @@ export default function EmergencyAlertsPage() {
     const res = await postTelegramLink();
     setTgBusy(false);
     if (!res.success) {
-      setError(res.error || 'Không tạo liên kết được.');
+      setError(res.error || t('emergency.linkFail'));
       return;
     }
     const link = res.data?.deep_link || res.data?.deepLink;
     if (link) {
       window.open(link, '_blank', 'noopener,noreferrer');
       setTelegramPoll(true);
-      setSuccess('Đã mở Telegram. Hoàn tất /start trên bot để liên kết.');
+      setSuccess(t('emergency.tgOpened'));
     } else {
-      setError('Phản hồi từ server không có deep link.');
+      setError(t('emergency.noDeepLink'));
     }
   };
 
   const useMyLocationInline = () => {
     if (!navigator.geolocation) {
-      setError('Trình duyệt không hỗ trợ định vị.');
+      setError(t('emergency.geoUnsupported'));
       return;
     }
     navigator.geolocation.getCurrentPosition(
@@ -726,9 +732,9 @@ export default function EmergencyAlertsPage() {
         setFormLat(pos.coords.latitude);
         setFormLng(pos.coords.longitude);
         setUserGps({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        setSuccess('Đã lấy vị trí hiện tại.');
+        setSuccess(t('emergency.gpsOk'));
       },
-      () => setError('Không lấy được vị trí. Kiểm tra quyền truy cập vị trí.')
+      () => setError(t('emergency.gpsError'))
     );
   };
 
@@ -799,19 +805,19 @@ export default function EmergencyAlertsPage() {
       u?.username ??
       u?.full_name ??
       u?.name ??
-      'Bạn';
+      t('emergency.you');
     const avatar = profile?.avatar ?? u?.avatar ?? null;
     return { displayName: name, avatarFileName: avatar };
-  }, [profile, pickMarkerRev]);
+    // pickMarkerRev: bust pick marker when profile/avatar updates without profile ref change
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional invalidation
+  }, [profile, pickMarkerRev, t]);
 
   if (loading) {
     return (
       <div style={pageShellStyle}>
         <div style={heroStyle}>
-          <h1 style={heroTitleStyle}>Cảnh báo khẩn theo vùng</h1>
-          <p style={heroSubtitleStyle}>
-            Liên kết Telegram, chọn điểm và bán kính — nhận cảnh báo khi nguy cơ ngập cao trong vùng đó.
-          </p>
+          <h1 style={heroTitleStyle}>{t('emergency.heroTitle')}</h1>
+          <p style={heroSubtitleStyle}>{t('emergency.heroSubtitle')}</p>
         </div>
         <div className={listPanelClass}>
           <div className="space-y-4 p-6">
@@ -830,20 +836,20 @@ export default function EmergencyAlertsPage() {
     <div style={pageShellStyle}>
       <ConfirmDialog
         open={confirmDialog?.type === 'delete'}
-        title="Xóa đăng ký cảnh báo?"
-        description="Đăng ký tại vùng này sẽ bị gỡ. Bạn có thể tạo lại đăng ký mới sau nếu cần."
-        confirmLabel="Xóa đăng ký"
-        cancelLabel="Hủy"
+        title={t('emergency.deleteTitle')}
+        description={t('emergency.deleteDesc')}
+        confirmLabel={t('emergency.deleteConfirm')}
+        cancelLabel={t('emergency.cancelBtn')}
         variant="danger"
         onCancel={() => setConfirmDialog(null)}
         onConfirm={() => void confirmDeleteSub()}
       />
       <ConfirmDialog
         open={confirmDialog?.type === 'unlink'}
-        title="Gỡ liên kết Telegram?"
-        description="Bạn sẽ không nhận cảnh báo qua bot cho đến khi liên kết lại. Các đăng ký vùng vẫn giữ trên tài khoản nhưng không gửi được qua Telegram."
-        confirmLabel="Gỡ liên kết"
-        cancelLabel="Hủy"
+        title={t('emergency.unlinkTitle')}
+        description={t('emergency.unlinkDesc')}
+        confirmLabel={t('emergency.unlinkConfirm')}
+        cancelLabel={t('emergency.cancelBtn')}
         variant="danger"
         onCancel={() => setConfirmDialog(null)}
         onConfirm={() => void confirmTelegramUnlink()}
@@ -851,8 +857,8 @@ export default function EmergencyAlertsPage() {
 
       <EmergencyStackModal
         open={createNameModalOpen}
-        title="Đặt tên vùng cảnh báo (tuỳ chọn)"
-        description="Tuỳ chọn, tối đa 200 ký tự. Để trống thì server lưu không tên (danh sách có thể hiển thị «Vùng #id» hoặc nhãn từ display_meta nếu API cung cấp)."
+        title={t('emergency.nameModalTitle')}
+        description={t('emergency.nameModalDesc')}
         onClose={cancelCreateNameModal}
         footer={
           <>
@@ -861,20 +867,20 @@ export default function EmergencyAlertsPage() {
               className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
               onClick={cancelCreateNameModal}
             >
-              Hủy
+              {t('emergency.cancelBtn')}
             </button>
             <button
               type="button"
               className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"
               onClick={confirmCreateNameAndOpenMap}
             >
-              Tiếp tục chọn vị trí
+              {t('emergency.continuePick')}
             </button>
           </>
         }
       >
         <label className="block text-sm font-medium text-slate-800">
-          Tên vùng (tuỳ chọn)
+          {t('emergency.nameFieldLabel')}
           <input
             type="text"
             value={createNameInput}
@@ -882,22 +888,21 @@ export default function EmergencyAlertsPage() {
             maxLength={EMERGENCY_SUB_NAME_MAX}
             autoFocus
             className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-            placeholder="Ví dụ: Nhà tôi — Quận 1 (tuỳ chọn, tối đa 200 ký tự)"
+            placeholder={t('emergency.namePlaceholder')}
           />
         </label>
       </EmergencyStackModal>
 
       <EmergencyStackModal
         open={editModalSub != null}
-        title="Sửa đăng ký cảnh báo"
+        title={t('emergency.editTitle')}
         description={
           editModalSub ? (
             <span>
-              Tọa độ hiện tại:{' '}
-              <strong className="text-slate-800">
-                {Number(editModalSub.lat).toFixed(5)}, {Number(editModalSub.lng).toFixed(5)}
-              </strong>
-              . Để đổi điểm trên bản đồ, hãy tạo đăng ký mới hoặc xóa và tạo lại vùng này.
+              {t('emergency.editCoordsNote', {
+                lat: Number(editModalSub.lat).toFixed(5),
+                lng: Number(editModalSub.lng).toFixed(5)
+              })}
             </span>
           ) : null
         }
@@ -909,7 +914,7 @@ export default function EmergencyAlertsPage() {
               className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
               onClick={closeEditModal}
             >
-              Hủy
+              {t('emergency.cancelBtn')}
             </button>
             <button
               type="button"
@@ -917,25 +922,25 @@ export default function EmergencyAlertsPage() {
               className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
               onClick={() => void saveEditModal()}
             >
-              {editSaving ? 'Đang lưu…' : 'Lưu'}
+              {editSaving ? t('emergency.saving') : t('emergency.save')}
             </button>
           </>
         }
       >
         <div className="space-y-4">
           <label className="block text-sm font-medium text-slate-800">
-            Tên hiển thị
+            {t('emergency.displayNameLabel')}
             <input
               type="text"
               value={editModalName}
               onChange={(e) => setEditModalName(e.target.value)}
               maxLength={EMERGENCY_SUB_NAME_MAX}
               className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-              placeholder="Tên vùng cảnh báo (tuỳ chọn)"
+              placeholder={t('emergency.editNamePh')}
             />
           </label>
           <label className="block text-sm font-medium text-slate-800">
-            Bán kính (m)
+            {t('emergency.radiusLabel')}
             <input
               type="number"
               min={100}
@@ -944,21 +949,17 @@ export default function EmergencyAlertsPage() {
               className="mt-1.5 w-full max-w-xs rounded-lg border border-slate-200 px-3 py-2.5 text-sm"
             />
           </label>
-          <p className="text-sm text-slate-600">
-            Kênh nhận tin: <strong>Telegram</strong> (cố định).
-          </p>
+          <p className="text-sm text-slate-600">{t('emergency.channelTelegramNote')}</p>
           <label className="flex items-center gap-3 text-sm text-slate-800">
             <ToggleSwitch checked={editModalActive} onChange={(v) => setEditModalActive(v)} />
-            Đang bật đăng ký
+            {t('emergency.subActive')}
           </label>
         </div>
       </EmergencyStackModal>
 
       <div style={heroStyle}>
-        <h1 style={heroTitleStyle}>Cảnh báo khẩn theo vùng</h1>
-        <p style={heroSubtitleStyle}>
-          Liên kết Telegram, chọn điểm và bán kính — nhận cảnh báo khi nguy cơ ngập cao trong vùng đó.
-        </p>
+        <h1 style={heroTitleStyle}>{t('emergency.heroTitle')}</h1>
+        <p style={heroSubtitleStyle}>{t('emergency.heroSubtitle')}</p>
       </div>
 
       <EmergencyMapModal
@@ -994,10 +995,8 @@ export default function EmergencyAlertsPage() {
 
         <div className="flex flex-col gap-4 border-b border-slate-200 px-4 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <div className="min-w-0">
-            <h2 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">Thiết lập nhận tin</h2>
-            <p className="mt-1 text-sm text-slate-600">
-              Nhận cảnh báo qua Telegram; chọn vùng và quản lý các đăng ký.
-            </p>
+            <h2 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">{t('emergency.setupTitle')}</h2>
+            <p className="mt-1 text-sm text-slate-600">{t('emergency.setupLead')}</p>
           </div>
           <div className="relative w-full shrink-0 sm:max-w-sm">
             <FaMagnifyingGlass className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -1005,7 +1004,7 @@ export default function EmergencyAlertsPage() {
               type="search"
               value={subSearch}
               onChange={(e) => setSubSearch(e.target.value)}
-              placeholder="Tìm trong đăng ký của tôi…"
+              placeholder={t('emergency.searchSubsPh')}
               className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-sky-500"
             />
           </div>
@@ -1014,13 +1013,13 @@ export default function EmergencyAlertsPage() {
         <div className="border-b border-slate-200 px-4 py-5 sm:px-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h3 className="text-base font-semibold text-slate-900">Liên kết Telegram</h3>
+              <h3 className="text-base font-semibold text-slate-900">{t('emergency.tgSection')}</h3>
               <p className="mt-1 text-sm text-slate-600">
-                Bắt buộc để nhận tin. Trạng thái:{' '}
+                {t('emergency.tgStatusLead')}{' '}
                 <strong
                   className={profile?.telegram_linked ? 'font-semibold text-emerald-600' : 'font-semibold text-red-600'}
                 >
-                  {profile?.telegram_linked ? 'Đã liên kết' : 'Chưa liên kết'}
+                  {profile?.telegram_linked ? t('emergency.tgLinked') : t('emergency.tgNotLinked')}
                 </strong>
               </p>
             </div>
@@ -1035,7 +1034,7 @@ export default function EmergencyAlertsPage() {
                 )}
               >
                 <FaLink className="h-4 w-4" />
-                {tgBusy ? 'Đang xử lý…' : 'Mở liên kết Telegram'}
+                {tgBusy ? t('emergency.tgBusy') : t('emergency.tgOpenLink')}
               </button>
               {profile?.telegram_linked && (
                 <button
@@ -1044,7 +1043,7 @@ export default function EmergencyAlertsPage() {
                   onClick={requestTelegramUnlink}
                   className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                 >
-                  Gỡ liên kết
+                  {t('emergency.unlinkBtn')}
                 </button>
               )}
             </div>
@@ -1053,18 +1052,14 @@ export default function EmergencyAlertsPage() {
 
         <form onSubmit={handleCreate} className="border-b border-slate-200">
           <div className="border-b border-slate-100 px-4 py-4 sm:px-6">
-            <h3 className="text-base font-semibold text-slate-900">Đăng ký vùng mới</h3>
-            <p className="mt-2 text-sm leading-relaxed text-slate-600">
-              Chọn bán kính trước, bấm <strong>Tạo đăng ký</strong> — trong hộp thoại có thể đặt <strong>tên vùng</strong>{' '}
-              (tuỳ chọn, tối đa 200 ký tự), sau đó bản đồ mở để bạn chọn điểm; bấm <strong>Xong</strong> trên bản đồ để hoàn
-              tất. Dùng «Mở bản đồ chọn điểm» hoặc «GPS nhanh» để chỉnh tọa độ trước khi tạo nếu cần.
-            </p>
+            <h3 className="text-base font-semibold text-slate-900">{t('emergency.newSubTitle')}</h3>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600">{t('emergency.newSubHelp')}</p>
           </div>
           <div className="min-w-0 divide-y divide-slate-100">
               <div className="px-4 py-4 sm:px-6 sm:py-5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-sm font-medium text-slate-800">Bán kính</span>
-                  <span className="text-sm tabular-nums text-slate-600">{radius} m</span>
+                  <span className="text-sm font-medium text-slate-800">{t('emergency.radiusLabelShort')}</span>
+                  <span className="text-sm tabular-nums text-slate-600">{t('emergency.radiusMeters', { radius })}</span>
                 </div>
                 <input
                   type="range"
@@ -1078,10 +1073,10 @@ export default function EmergencyAlertsPage() {
               </div>
               <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-5">
                 <div className="min-w-0">
-                  <div className="text-sm font-medium text-slate-800">Vị trí trung tâm</div>
+                  <div className="text-sm font-medium text-slate-800">{t('emergency.centerLabel')}</div>
                   <p className="mt-0.5 text-xs text-slate-500 sm:text-sm">
                     {Number(formLat).toFixed(5)}, {Number(formLng).toFixed(5)}
-                    {userGps ? ' · đã lấy GPS' : ''}
+                    {userGps ? t('emergency.gpsSuffix') : ''}
                   </p>
                 </div>
                 <div className="flex shrink-0 flex-wrap gap-2">
@@ -1091,7 +1086,7 @@ export default function EmergencyAlertsPage() {
                     className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-800 shadow-sm hover:bg-slate-50"
                   >
                     <FaMapLocationDot className="h-4 w-4 text-sky-600" />
-                    Mở bản đồ chọn điểm
+                    {t('emergency.openMapPick')}
                   </button>
                   <button
                     type="button"
@@ -1099,14 +1094,14 @@ export default function EmergencyAlertsPage() {
                     className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-800 hover:bg-slate-50"
                   >
                     <FaLocationCrosshairs className="h-4 w-4 text-sky-600" />
-                    GPS nhanh
+                    {t('emergency.quickGps')}
                   </button>
                 </div>
               </div>
               {!MAPBOX_TOKEN && (
                 <div className="grid gap-3 px-4 py-4 sm:grid-cols-2 sm:px-6">
                   <label className="text-sm text-slate-700">
-                    Vĩ độ
+                    {t('emergency.lat')}
                     <input
                       type="number"
                       step="any"
@@ -1116,7 +1111,7 @@ export default function EmergencyAlertsPage() {
                     />
                   </label>
                   <label className="text-sm text-slate-700">
-                    Kinh độ
+                    {t('emergency.lng')}
                     <input
                       type="number"
                       step="any"
@@ -1133,27 +1128,24 @@ export default function EmergencyAlertsPage() {
                   disabled={submitting}
                   className="rounded-lg bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
                 >
-                  {submitting ? 'Đang gửi…' : 'Tạo đăng ký'}
+                  {submitting ? t('emergency.submitting') : t('emergency.createSub')}
                 </button>
-                <p className="max-w-xl text-xs leading-relaxed text-slate-500">
-                  Kênh nhận tin: <strong>Telegram</strong> (duy nhất). Tên vùng tuỳ chọn (tối đa 200 ký tự) ở bước sau khi
-                  bấm Tạo đăng ký; để trống thì server lưu không tên.
-                </p>
+                <p className="max-w-xl text-xs leading-relaxed text-slate-500">{t('emergency.channelTelegramCreate')}</p>
               </div>
             </div>
         </form>
 
         <div className="flex-1">
           <div className="border-b border-slate-100 px-4 py-4 sm:px-6">
-            <h3 className="text-base font-semibold text-slate-900">Đăng ký của tôi</h3>
+            <h3 className="text-base font-semibold text-slate-900">{t('emergency.mySubsTitle')}</h3>
             <p className="mt-2 text-sm text-slate-600">
-              {filteredSubs.length} / {subs.length} hiển thị
+              {t('emergency.subListCount', { shown: filteredSubs.length, total: subs.length })}
             </p>
           </div>
           <div className="min-w-0 divide-y divide-slate-100">
               {filteredSubs.length === 0 ? (
                 <div className="px-4 py-8 text-sm text-slate-500 sm:px-6">
-                  {subs.length === 0 ? 'Chưa có đăng ký nào.' : 'Không có đăng ký nào khớp tìm kiếm.'}
+                  {subs.length === 0 ? t('emergency.noSubs') : t('emergency.noSearchMatch')}
                 </div>
               ) : (
                 filteredSubs.map((sub) => (
@@ -1173,10 +1165,10 @@ export default function EmergencyAlertsPage() {
                             };
                             const res = await updateEmergencySubscription(sub.id, body);
                             if (res.success) {
-                              setSuccess(v ? 'Đã bật đăng ký.' : 'Đã tạm tắt đăng ký.');
+                              setSuccess(v ? t('emergency.subOn') : t('emergency.subOff'));
                               await loadAll();
                             } else {
-                              setError(res.error || 'Không cập nhật được.');
+                              setError(res.error || t('emergency.toggleFail'));
                             }
                           }}
                         />
@@ -1185,7 +1177,7 @@ export default function EmergencyAlertsPage() {
                             className="font-medium text-slate-900"
                             style={getSubscriptionTitleStyle(sub)}
                           >
-                            {getSubscriptionDisplayName(sub)} · bán kính {sub.radius} m
+                            {getSubscriptionDisplayName(sub)} {t('emergency.subRadiusSuffix', { radius: sub.radius })}
                           </div>
                           <p className="mt-0.5 text-sm text-slate-500">
                             {subscriptionChannelLine()} · {Number(sub.lat).toFixed(4)},{' '}
@@ -1199,14 +1191,14 @@ export default function EmergencyAlertsPage() {
                           onClick={() => openEditModal(sub)}
                           className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
                         >
-                          <FaPen className="h-3.5 w-3.5" /> Sửa chi tiết
+                          <FaPen className="h-3.5 w-3.5" /> {t('emergency.editDetails')}
                         </button>
                         <button
                           type="button"
                           onClick={() => removeSub(sub.id)}
                           className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
                         >
-                          <FaTrash className="h-3.5 w-3.5" /> Xóa
+                          <FaTrash className="h-3.5 w-3.5" /> {t('emergency.delete')}
                         </button>
                       </div>
                     </div>

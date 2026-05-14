@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 function AuthPanelSkyline() {
   return (
     <svg
@@ -38,6 +40,7 @@ function AuthPanelSkyline() {
  * Khung tách đôi (hero + form) dùng chung đăng nhập / đăng ký.
  */
 export default function AuthSplitShell({ children, panelInnerClassName = '' }) {
+  const { t } = useTranslation();
   return (
     <div className="login-split">
       <aside className="login-hero">
@@ -47,8 +50,8 @@ export default function AuthSplitShell({ children, panelInnerClassName = '' }) {
             <span className="login-hero-logo-ring" aria-hidden>
               <img src="/iuh.png" alt="" className="login-hero-brand-logo" />
             </span>
-            <span className="login-hero-title-line1">HỆ THỐNG CẢNH BÁO NGẬP LỤT FLOODSIGHT</span>
-            <span className="login-hero-title-line2">THÀNH PHỐ HỒ CHÍ MINH</span>
+            <span className="login-hero-title-line1">{t('auth.heroLine1')}</span>
+            <span className="login-hero-title-line2">{t('auth.heroLine2')}</span>
           </h1>
         </div>
       </aside>

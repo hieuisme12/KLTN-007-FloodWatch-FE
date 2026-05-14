@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { Trans, useTranslation } from 'react-i18next';
 import { FaUser, FaLock } from 'react-icons/fa6';
 import { FcGoogle } from 'react-icons/fc';
 import { login } from '../services/api';
@@ -12,6 +13,7 @@ import AuthLoadingScreen from '../components/common/AuthLoadingScreen';
 import AuthSplitShell from '../components/auth/AuthSplitShell';
 
 const LoginPage = () => {
+  const { t } = useTranslation();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
@@ -92,10 +94,10 @@ const LoginPage = () => {
         navigate('/dashboard');
       } else {
         setNeedsEmailVerifyCta(Boolean(result.needsEmailVerification));
-        setError(result.error || 'Đăng nhập thất bại');
+        setError(result.error || t('errors.loginFailed'));
       }
     } catch {
-      setError('Có lỗi xảy ra. Vui lòng thử lại.');
+      setError(t('errors.generic'));
     } finally {
       setLoading(false);
     }
@@ -111,7 +113,7 @@ const LoginPage = () => {
             type="button"
             className="login-success-hint-close"
             onClick={() => setVerifyHint('')}
-            aria-label="Đóng"
+            aria-label={t('auth.login.closeHint')}
           >
             ×
           </button>
@@ -125,12 +127,12 @@ const LoginPage = () => {
         <form className="login-split-form" onSubmit={handleSubmit}>
           <div className="login-split-title-row">
             <img src="/iuh.png" alt="" className="login-split-brand-logo" width={56} height={56} />
-            <h2 className="login-split-title">Đăng nhập</h2>
+            <h2 className="login-split-title">{t('auth.login.title')}</h2>
           </div>
 
           <div className="login-field">
             <label className="login-field-label" htmlFor="username">
-              Tên đăng nhập / Email
+              {t('auth.login.usernameLabel')}
             </label>
             <div className="login-input-shell login-input-shell--user">
               <FaUser className="login-input-icon" aria-hidden />
@@ -140,7 +142,7 @@ const LoginPage = () => {
                 className="login-input"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="Nhập tài khoản"
+                placeholder={t('auth.login.usernamePh')}
                 required
                 autoFocus
                 autoComplete="username"
@@ -150,7 +152,7 @@ const LoginPage = () => {
 
           <div className="login-field">
             <label className="login-field-label" htmlFor="password">
-              Mật khẩu
+              {t('auth.login.passwordLabel')}
             </label>
             <div className="login-input-shell login-input-shell--pass">
               <FaLock className="login-input-icon" aria-hidden />
@@ -160,7 +162,7 @@ const LoginPage = () => {
                 className="login-input"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Nhập mật khẩu"
+                placeholder={t('auth.login.passwordPh')}
                 required
                 autoComplete="current-password"
               />
@@ -173,7 +175,7 @@ const LoginPage = () => {
               checked={rememberMe}
               onChange={(e) => setRememberMe(e.target.checked)}
             />
-            <span>Ghi nhớ đăng nhập</span>
+            <span>{t('auth.login.remember')}</span>
           </label>
 
           <button
@@ -181,12 +183,12 @@ const LoginPage = () => {
             className="login-btn-primary"
             disabled={loading}
           >
-            {loading ? 'Đang đăng nhập…' : 'Đăng nhập'}
+            {loading ? t('auth.login.submitting') : t('auth.login.submit')}
           </button>
 
           <div className="login-forgot-wrap">
             <Link to="/forgot-password" className="login-forgot-link">
-              Quên mật khẩu?
+              {t('auth.login.forgot')}
             </Link>
           </div>
 
@@ -196,13 +198,13 @@ const LoginPage = () => {
                 to="/register/verify"
                 state={{ fromLogin: true, username }}
               >
-                Xác minh email / nhập mã OTP
+                {t('auth.login.verifyCta')}
               </Link>
             </p>
           )}
 
           <div className="login-divider">
-            <span>HOẶC</span>
+            <span>{t('auth.login.divider')}</span>
           </div>
 
           <div className="login-alt-actions">
@@ -214,7 +216,7 @@ const LoginPage = () => {
               }}
             >
               <FcGoogle aria-hidden className="login-btn-google-icon" />
-              Đăng nhập Google
+              {t('auth.login.google')}
             </button>
 
             <button
@@ -225,17 +227,20 @@ const LoginPage = () => {
                 navigate('/dashboard', { state: { guestWelcome: true } });
               }}
             >
-              <FaUser aria-hidden /> Vào với tư cách khách
+              <FaUser aria-hidden /> {t('auth.login.guest')}
             </button>
           </div>
 
           <p className="login-guest-note">
-            Khách có thể xem thông tin nhưng không thể báo cáo ngập lụt
+            {t('auth.login.guestNote')}
           </p>
 
           <div className="login-footer-split">
             <p>
-              Chưa có tài khoản? <Link to="/register">Đăng ký</Link>
+              <Trans
+                i18nKey="auth.login.footer"
+                components={{ 1: <Link to="/register" /> }}
+              />
             </p>
           </div>
         </form>

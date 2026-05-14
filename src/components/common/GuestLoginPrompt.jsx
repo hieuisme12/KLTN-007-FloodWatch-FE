@@ -1,8 +1,10 @@
 import { useNavigate } from 'react-router-dom';
+import { Trans, useTranslation } from 'react-i18next';
 import { FaLock } from 'react-icons/fa6';
 import { cn } from '@/lib/cn';
 
 const GuestLoginPrompt = ({ message, onClose }) => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
   return (
@@ -22,10 +24,10 @@ const GuestLoginPrompt = ({ message, onClose }) => {
           <FaLock />
         </div>
         <h2 id="guest-prompt-title" className="mb-4 mt-0 text-3xl font-bold text-[#333] max-md:text-2xl">
-          Yêu cầu đăng nhập
+          {t('guest.promptTitle')}
         </h2>
         <p className="mb-8 mt-0 text-lg leading-relaxed text-[#666] max-md:text-base">
-          {message || 'Vui lòng đăng nhập để sử dụng tính năng này'}
+          {message || t('guest.promptDefault')}
         </p>
         <div className="mb-5 flex flex-wrap justify-center gap-3 max-md:flex-col">
           <button
@@ -36,7 +38,7 @@ const GuestLoginPrompt = ({ message, onClose }) => {
             )}
             onClick={onClose}
           >
-            Đóng
+            {t('guest.close')}
           </button>
           <button
             type="button"
@@ -46,21 +48,25 @@ const GuestLoginPrompt = ({ message, onClose }) => {
             )}
             onClick={() => navigate('/login')}
           >
-            Đăng nhập ngay
+            {t('guest.loginNow')}
           </button>
         </div>
         <p className="m-0 text-sm text-[#666]">
-          Chưa có tài khoản?{' '}
-          <a
-            href="/register"
-            className="font-semibold text-[#1E3A8A] no-underline hover:underline"
-            onClick={(e) => {
-              e.preventDefault();
-              navigate('/register');
+          <Trans
+            i18nKey="guest.registerNowFooter"
+            components={{
+              1: (
+                <a
+                  href="/register"
+                  className="font-semibold text-[#1E3A8A] no-underline hover:underline"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    navigate('/register');
+                  }}
+                />
+              ),
             }}
-          >
-            Đăng ký ngay
-          </a>
+          />
         </p>
       </div>
     </div>

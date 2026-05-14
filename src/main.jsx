@@ -6,6 +6,7 @@ import 'primeicons/primeicons.css'
 import 'react-loading-skeleton/dist/skeleton.css'
 import './index.css'
 import './style.css'
+import './i18n'
 import App from './App.jsx'
 
 createRoot(document.getElementById('root')).render(

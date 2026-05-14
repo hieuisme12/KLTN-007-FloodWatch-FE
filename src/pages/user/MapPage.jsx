@@ -8,11 +8,14 @@ import {
   Tooltip,
   CartesianGrid
 } from 'recharts';
-import { fetchFloodData, fetchCrowdReports, fetchHeatmapTimeline24h } from '../services/api';
-import { POLLING_INTERVALS, CROWD_REPORT_MAP_DISPLAY_HOURS } from '../config/apiConfig';
-import { filterNonExpiredReports } from '../utils/reportHelpers';
-import MapView from '../components/map/MapView';
+import { fetchFloodData, fetchCrowdReports, fetchHeatmapTimeline24h } from '../../services/api';
+import { POLLING_INTERVALS, CROWD_REPORT_MAP_DISPLAY_HOURS } from '../../config/apiConfig';
+import { filterNonExpiredReports } from '../../utils/reportHelpers';
+import { getSafeUserFacingError } from '../../utils/safeErrorMessage';
+import { useTranslation } from 'react-i18next';
+
 const MapPage = () => {
+  const { t } = useTranslation();
   const [floodData, setFloodData] = useState([]);
   const [crowdReports, setCrowdReports] = useState([]);
   const endpointRef = useRef(null);
@@ -35,7 +38,7 @@ const MapPage = () => {
     const res = await fetchHeatmapTimeline24h();
     if (!res.success) {
       setTimelineChart([]);
-      setTimelineError(res.error || 'Không tải được timeline 24h');
+      setTimelineError(getSafeUserFacingError(res.error, t('mapPage.timelineErrorFallback')));
       setTimelineLoading(false);
       return;
     }
@@ -62,7 +65,7 @@ const MapPage = () => {
     });
     setTimelineChart(chartData);
     setTimelineLoading(false);
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!filters.timeline24h) {
@@ -127,7 +130,7 @@ const MapPage = () => {
         {/* Filter Panel - Left Side */}
         <div className="map-filter-panel">
           <div className="filter-panel-header">
-            <h3 className="filter-title">Bộ lọc</h3>
+            <h3 className="filter-title">{t('mapPage.filterTitle')}</h3>
           </div>
           
           <div className="filter-options">
@@ -141,7 +144,7 @@ const MapPage = () => {
                 />
                 <span className="filter-checkbox-custom"></span>
                 <div className="filter-option-content">
-                  <span className="filter-option-text">Cảm biến đo mực nước</span>
+                  <span className="filter-option-text">{t('mapPage.optionSensors')}</span>
                 </div>
               </label>
             </div>
@@ -156,7 +159,7 @@ const MapPage = () => {
                 />
                 <span className="filter-checkbox-custom"></span>
                 <div className="filter-option-content">
-                  <span className="filter-option-text">Báo cáo từ người dân</span>
+                  <span className="filter-option-text">{t('mapPage.optionCrowd')}</span>
                 </div>
               </label>
             </div>
@@ -171,7 +174,7 @@ const MapPage = () => {
                 />
                 <span className="filter-checkbox-custom"></span>
                 <div className="filter-option-content">
-                  <span className="filter-option-text">Lớp trộn dữ liệu</span>
+                  <span className="filter-option-text">{t('mapPage.optionFusion')}</span>
                 </div>
               </label>
             </div>
@@ -186,7 +189,7 @@ const MapPage = () => {
                 />
                 <span className="filter-checkbox-custom"></span>
                 <div className="filter-option-content">
-                  <span className="filter-option-text">Heatmap kết hợp (24h)</span>
+                  <span className="filter-option-text">{t('mapPage.optionHeatmap')}</span>
                 </div>
               </label>
             </div>
@@ -201,7 +204,7 @@ const MapPage = () => {
                 />
                 <span className="filter-checkbox-custom"></span>
                 <div className="filter-option-content">
-                  <span className="filter-option-text">Biểu đồ mật độ 24h</span>
+                  <span className="filter-option-text">{t('mapPage.optionDensityChart')}</span>
                 </div>
               </label>
             </div>
@@ -210,11 +213,11 @@ const MapPage = () => {
           {/* Statistics */}
           <div className="filter-statistics">
             <div className="stat-item">
-              <span className="stat-label">Cảm biến:</span>
+              <span className="stat-label">{t('mapPage.statSensors')}</span>
               <span className="stat-value">{floodData.length}</span>
             </div>
             <div className="stat-item">
-              <span className="stat-label">Báo cáo:</span>
+              <span className="stat-label">{t('mapPage.statReports')}</span>
               <span className="stat-value">{nonExpiredCrowdReports.length}</span>
             </div>
           </div>
@@ -223,7 +226,7 @@ const MapPage = () => {
             <div className="map-timeline-panel" style={{ marginTop: '14px' }}>
               <div className="filter-panel-header" style={{ marginBottom: '8px' }}>
                 <h4 className="filter-title" style={{ fontSize: '14px' }}>
-                  Mật độ theo giờ (24h)
+                  {t('mapPage.densityChartTitle')}
                 </h4>
               </div>
               {timelineError && (
@@ -237,14 +240,14 @@ const MapPage = () => {
                       <XAxis dataKey="name" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
                       <YAxis tick={{ fontSize: 10 }} width={28} />
                       <Tooltip />
-                      <Bar dataKey="value" fill="#1976d2" radius={[4, 4, 0, 0]} name="Mật độ" />
+                      <Bar dataKey="value" fill="#1976d2" radius={[4, 4, 0, 0]} name={t('mapPage.barNameDensity')} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               ) : (
                 !timelineError && (
                   <p style={{ fontSize: '12px', color: '#64748b' }}>
-                    {timelineLoading ? 'Đang tải…' : 'Chưa có dữ liệu trong 24h gần đây.'}
+                    {timelineLoading ? t('mapPage.timelineLoading') : t('mapPage.timelineEmpty')}
                   </p>
                 )
               )}

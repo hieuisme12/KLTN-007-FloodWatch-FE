@@ -1,13 +1,14 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import FilterDropdown from '../components/common/FilterDropdown';
-import { fetchCrowdReports, fetchAllCrowdReports } from '../services/api';
-import { POLLING_INTERVALS, CROWD_REPORT_MAP_DISPLAY_HOURS } from '../config/apiConfig';
-import { isReportExpired } from '../utils/reportHelpers';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+import FilterDropdown from '../../components/common/FilterDropdown';
+import { fetchCrowdReports, fetchAllCrowdReports } from '../../services/api';
+import { POLLING_INTERVALS, CROWD_REPORT_MAP_DISPLAY_HOURS } from '../../config/apiConfig';
+import { isReportExpired } from '../../utils/reportHelpers';
 import { useNavigate } from 'react-router-dom';
-import { getCurrentUser } from '../utils/auth';
-import { isGuestBrowseMode } from '../utils/guestSession';
-import { useGuestExplore } from '../hooks/useGuestExplore';
-import { useReporterRanking } from '../context/ReporterRankingProvider';
+import { getCurrentUser } from '../../utils/auth';
+import { isGuestBrowseMode } from '../../utils/guestSession';
+import { useGuestExplore } from '../../hooks/useGuestExplore';
+import { useReporterRanking } from '../../context/ReporterRankingProvider';
 import { 
   FaMobileScreen, 
   FaCheck, 
@@ -22,11 +23,12 @@ import {
 } from 'react-icons/fa6';
 import { WiFlood } from 'react-icons/wi';
 import { MdLocationOn } from 'react-icons/md';
-import ConfidenceBadge from '../components/common/ConfidenceBadge';
-import SearchAutoComplete from '../components/common/SearchAutoComplete';
+import ConfidenceBadge from '../../components/common/ConfidenceBadge';
+import SearchAutoComplete from '../../components/common/SearchAutoComplete';
 import Skeleton from 'react-loading-skeleton';
-import { fetchAddressFromCoords, formatAddressForUiDisplay } from '../utils/geocode';
+import { fetchAddressFromCoords, formatAddressForUiDisplay } from '../../utils/geocode';
 const ReportsPage = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { openRequireLogin } = useGuestExplore();
   const { getReporterReliability } = useReporterRanking();
@@ -38,31 +40,42 @@ const ReportsPage = () => {
   const [reportSuggestions, setReportSuggestions] = useState([]);
   const [confidenceBand, setConfidenceBand] = useState('all');
   const [confidenceSort, setConfidenceSort] = useState('none');
-  
-  // Filter options for Combobox
-  const filterOptions = [
-    { id: 'all', name: 'Trạng thái: Tất cả' },
-    { id: 'verified', name: 'Trạng thái: Đã xác minh' },
-    { id: 'pending', name: 'Trạng thái: Chờ xem xét' },
-  ];
 
-  const expiryFilterOptions = [
-    { id: 'all', name: 'Thời hạn: Tất cả' },
-    { id: 'active', name: 'Thời hạn: Còn hiệu lực' },
-    { id: 'expired', name: 'Thời hạn: Đã hết hạn' },
-  ];
+  const filterOptions = useMemo(
+    () => [
+      { id: 'all', name: t('reportsPage.modAll') },
+      { id: 'verified', name: t('reportsPage.modVerified') },
+      { id: 'pending', name: t('reportsPage.modPending') }
+    ],
+    [t]
+  );
 
-  const confidenceBandOptions = [
-    { id: 'all', name: 'Độ tin: tất cả' },
-    { id: 'low', name: 'Độ tin: dưới 40' },
-    { id: 'mid', name: 'Độ tin: 40–69' },
-    { id: 'high', name: 'Độ tin: từ 70' },
-  ];
-  const confidenceSortOptions = [
-    { id: 'none', name: 'Sắp xếp tin cậy: không' },
-    { id: 'desc', name: 'Tin cậy: cao xuống thấp' },
-    { id: 'asc', name: 'Tin cậy: thấp lên cao' },
-  ];
+  const expiryFilterOptions = useMemo(
+    () => [
+      { id: 'all', name: t('reportsPage.expAll') },
+      { id: 'active', name: t('reportsPage.expActive') },
+      { id: 'expired', name: t('reportsPage.expExpired') }
+    ],
+    [t]
+  );
+
+  const confidenceBandOptions = useMemo(
+    () => [
+      { id: 'all', name: t('reportsPage.confAll') },
+      { id: 'low', name: t('reportsPage.confLow') },
+      { id: 'mid', name: t('reportsPage.confMid') },
+      { id: 'high', name: t('reportsPage.confHigh') }
+    ],
+    [t]
+  );
+  const confidenceSortOptions = useMemo(
+    () => [
+      { id: 'none', name: t('reportsPage.sortNone') },
+      { id: 'desc', name: t('reportsPage.sortDesc') },
+      { id: 'asc', name: t('reportsPage.sortAsc') }
+    ],
+    [t]
+  );
 
   const [locationCache, setLocationCache] = useState(() => {
     // Load cache từ localStorage khi khởi tạo
@@ -245,7 +258,7 @@ const ReportsPage = () => {
     // Nếu đã được moderator xử lý (approved hoặc rejected), ưu tiên hiển thị
     if (moderationStatus === 'approved' || moderationStatus === 'rejected') {
       if (moderationStatus === 'rejected') {
-        return { text: 'Đã từ chối', color: '#dc3545', icon: FaXmark };
+        return { text: t('reportUi.moderation.rejected'), color: '#dc3545', icon: FaXmark };
       }
       // Đã duyệt: màu theo mức độ ngập (Nặng / Trung bình / Nhẹ)
       const levelColors = {
@@ -255,7 +268,7 @@ const ReportsPage = () => {
       };
       const level = report.flood_level && levelColors[report.flood_level] ? report.flood_level : null;
       const color = level ? levelColors[level] : '#28a745';
-      return { text: 'Đã duyệt', color, icon: FaCheck };
+      return { text: t('reportUi.moderation.approved'), color, icon: FaCheck };
     }
     
     // Nếu moderation_status = 'pending' hoặc null, hiển thị validation_status
@@ -265,9 +278,9 @@ const ReportsPage = () => {
     
     // Badge mapping cho validation_status
     const statusConfig = {
-      pending: { text: 'Chờ xét duyệt', color: '#ffc107', icon: FaClock },
-      verified: { text: 'Đã xác minh', color: '#17a2b8', icon: FaCheck },
-      cross_verified: { text: 'Đã xác minh chéo', color: '#28a745', icon: FaCheck }
+      pending: { text: t('reportUi.moderation.pending'), color: '#ffc107', icon: FaClock },
+      verified: { text: t('reportUi.moderation.verified'), color: '#17a2b8', icon: FaCheck },
+      cross_verified: { text: t('reportUi.moderation.cross_verified'), color: '#28a745', icon: FaCheck }
     };
     
     // Nếu có verified_by_sensor, ưu tiên hiển thị cross_verified
@@ -275,36 +288,37 @@ const ReportsPage = () => {
       return statusConfig.cross_verified;
     }
     
-    return statusConfig[displayStatus] || { text: 'Không xác định', color: '#6c757d', icon: FaCircleQuestion };
+    return statusConfig[displayStatus] || { text: t('reportUi.moderation.unknown'), color: '#6c757d', icon: FaCircleQuestion };
   };
 
   const getReliabilityBadge = (score) => {
-    if (score >= 81) return { color: '#28a745', text: 'Rất cao', icon: FaStar };
-    if (score >= 61) return { color: '#17a2b8', text: 'Cao', icon: FaCircle };
-    if (score >= 31) return { color: '#ffc107', text: 'Trung bình', icon: FaCircle };
-    return { color: '#dc3545', text: 'Thấp', icon: FaCircle };
+    if (score >= 81) return { color: '#28a745', text: t('reportUi.confidence.veryHigh'), icon: FaStar };
+    if (score >= 61) return { color: '#17a2b8', text: t('reportUi.confidence.high'), icon: FaCircle };
+    if (score >= 31) return { color: '#ffc107', text: t('reportUi.confidence.medium'), icon: FaCircle };
+    return { color: '#dc3545', text: t('reportUi.confidence.low'), icon: FaCircle };
   };
 
   const getFloodLevelInfo = (level) => {
+    const descFor = (lv) => (lv ? t(`reportUi.floodDepth.${lv}`, { defaultValue: lv }) : '');
     const levels = {
       'Nhẹ': { 
         color: '#17a2b8', 
         icon: WiFlood, 
-        desc: 'Đến mắt cá (~10cm)',
+        desc: descFor('Nhẹ'),
         gradient: 'linear-gradient(180deg, #4FC3F7 0%, #29B6F6 100%)', // Light blue gradient
         gradientDark: 'linear-gradient(180deg, #29B6F6 0%, #0288D1 100%)'
       },
       'Trung bình': { 
         color: '#ffc107', 
         icon: WiFlood, 
-        desc: 'Đến đầu gối (~30cm)',
+        desc: descFor('Trung bình'),
         gradient: 'linear-gradient(180deg, #FFB74D 0%, #FF9800 100%)', // Orange gradient
         gradientDark: 'linear-gradient(180deg, #FF9800 0%, #F57C00 100%)'
       },
       'Nặng': { 
         color: '#dc3545', 
         icon: WiFlood, 
-        desc: 'Ngập nửa xe (~50cm)',
+        desc: descFor('Nặng'),
         gradient: 'linear-gradient(180deg, #EF5350 0%, #E53935 100%)', // Red gradient
         gradientDark: 'linear-gradient(180deg, #E53935 0%, #C62828 100%)'
       }
@@ -312,7 +326,7 @@ const ReportsPage = () => {
     return levels[level] || { 
       color: '#6c757d', 
       icon: FaCircleQuestion, 
-      desc: level,
+      desc: descFor(level) || level,
       gradient: 'linear-gradient(180deg, #9E9E9E 0%, #757575 100%)',
       gradientDark: 'linear-gradient(180deg, #757575 0%, #616161 100%)'
     };
@@ -472,7 +486,7 @@ const ReportsPage = () => {
           position: 'relative',
           zIndex: 1
         }}>
-          Báo cáo từ người dân
+          {t('reportsPage.pageTitle')}
         </h1>
         <p style={{ 
           margin: '0', 
@@ -484,7 +498,7 @@ const ReportsPage = () => {
           position: 'relative',
           zIndex: 1
         }}>
-          Tổng hợp và quản lý các báo cáo ngập lụt từ cộng đồng người dân
+          {t('reportsPage.pageSubtitle')}
         </p>
       </div>
 
@@ -515,7 +529,7 @@ const ReportsPage = () => {
                   options={filterOptions}
                   optionLabel="name"
                   optionValue="id"
-                  placeholder="Trạng thái"
+                  placeholder={t('reportsPage.phStatus')}
                   className="filter-dropdown-toolbar w-full"
                 />
               </div>
@@ -527,7 +541,7 @@ const ReportsPage = () => {
                   options={expiryFilterOptions}
                   optionLabel="name"
                   optionValue="id"
-                  placeholder="Thời hạn"
+                  placeholder={t('reportsPage.phExpiry')}
                   className="filter-dropdown-toolbar w-full"
                 />
               </div>
@@ -544,7 +558,7 @@ const ReportsPage = () => {
                   completeMethod={completeReportSearch}
                   minLength={0}
                   delay={200}
-                  placeholder="Tìm kiếm báo cáo..."
+                  placeholder={t('reportsPage.phSearch')}
                   className="w-full reports-toolbar-search"
                   onChange={(ev) => {
                     const v = ev.value;
@@ -563,8 +577,8 @@ const ReportsPage = () => {
                 options={confidenceBandOptions}
                 optionLabel="name"
                 optionValue="id"
-                placeholder="Độ tin"
-                aria-label="Lọc theo độ tin báo cáo"
+                placeholder={t('reportsPage.phConfidence')}
+                aria-label={t('reportsPage.ariaConfidence')}
                 className="filter-dropdown-toolbar max-w-[200px]"
               />
               <FilterDropdown
@@ -573,8 +587,8 @@ const ReportsPage = () => {
                 options={confidenceSortOptions}
                 optionLabel="name"
                 optionValue="id"
-                placeholder="Sắp xếp tin cậy"
-                aria-label="Sắp xếp theo độ tin"
+                placeholder={t('reportsPage.phSortConf')}
+                aria-label={t('reportsPage.ariaSortConf')}
                 className="filter-dropdown-toolbar max-w-[240px]"
               />
             </div>
@@ -602,11 +616,11 @@ const ReportsPage = () => {
               boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
               color: '#6c757d'
             }}>
-              <p style={{ fontSize: '18px', margin: '0 0 10px 0', fontWeight: '500' }}>Không có báo cáo nào</p>
+              <p style={{ fontSize: '18px', margin: '0 0 10px 0', fontWeight: '500' }}>{t('reportsPage.emptyTitle')}</p>
               <button
                 onClick={() => {
                   if (isGuestBrowseMode()) {
-                    openRequireLogin('Đăng nhập để tạo và gửi báo cáo ngập lụt.');
+                    openRequireLogin(t('reportsPage.loginToCreate'));
                     return;
                   }
                   navigate('/report/new');
@@ -632,7 +646,7 @@ const ReportsPage = () => {
                   e.target.style.boxShadow = 'none';
                 }}
               >
-                <FaPenToSquare /> Tạo báo cáo mới
+                <FaPenToSquare /> {t('reportsPage.createReportBtn')}
               </button>
             </div>
           ) : (
@@ -806,7 +820,7 @@ const ReportsPage = () => {
                           fontWeight: '700',
                           marginBottom: '4px'
                         }}>
-                          {report.reporter_name || 'Ẩn danh'}
+                          {report.reporter_name || t('reportUi.anonymous')}
                         </div>
                         {rel != null && (
                           <div style={{
@@ -818,7 +832,10 @@ const ReportsPage = () => {
                             fontWeight: 'bold',
                             display: 'inline-block'
                           }}>
-                            Độ tin cậy: {reliabilityInfo.text} ({typeof rel === 'number' ? rel.toFixed(1) : rel})
+                            {t('reportsPage.reliabilityLine', {
+                              tier: reliabilityInfo.text,
+                              value: typeof rel === 'number' ? rel.toFixed(1) : rel
+                            })}
                           </div>
                         )}
                       </div>
@@ -857,7 +874,7 @@ const ReportsPage = () => {
                       <MdLocationOn style={{ marginTop: '2px', flexShrink: 0, fontSize: '16px' }} />
                       <span style={{ flex: 1, lineHeight: '1.5' }}>
                         {report.location_description || 
-                         (report.lat && report.lng ? `${report.lat.toFixed(6)}, ${report.lng.toFixed(6)}` : 'Không có thông tin vị trí')}
+                         (report.lat && report.lng ? `${report.lat.toFixed(6)}, ${report.lng.toFixed(6)}` : t('reportUi.noLocationInfo'))}
                       </span>
                     </div>
 
@@ -902,7 +919,7 @@ const ReportsPage = () => {
                           fontWeight: '500',
                           color: '#2c3e50'
                         }}>
-                          <FaCheck /> Đã được xác nhận bởi cảm biến
+                          <FaCheck /> {t('reportsPage.verifiedBySensorCard')}
                         </div>
                       )}
                     </div>

@@ -1,0 +1,27 @@
+/** @type {Record<string, unknown>} */
+export default {
+  nav: {
+    home: 'Trang chủ',
+    mapDetail: 'Bản đồ chi tiết',
+    routing: 'Tìm đường',
+    reports: 'Báo cáo',
+    newReport: 'Báo cáo mới',
+    emergency: 'Cảnh báo khẩn',
+    guestMode: 'Chế độ khách',
+    admin: 'Quản trị viên',
+    moderator: 'Điều hành viên',
+    user: 'Người dùng',
+    expandSidebar: 'Mở rộng sidebar',
+    collapseSidebar: 'Thu gọn sidebar',
+    closeMenu: 'Đóng menu',
+    logout: 'Đăng xuất',
+    login: 'Đăng nhập',
+    exitGuest: 'Thoát chế độ khách',
+    staffPortalAdmin: 'Trang quản trị',
+    staffPortalMod: 'Trang điều hành',
+    staffPortalTitle: '{{label}} (mở tab mới)',
+    quickSummary: 'Tóm tắt nhanh (FE)',
+    quickSummaryTitle: 'Tóm tắt nhanh trong ứng dụng (không thay cổng quản trị đầy đủ)',
+    floodsightTitle: 'FLOODSIGHT THÀNH PHỐ HỒ CHÍ MINH',
+  },
+};

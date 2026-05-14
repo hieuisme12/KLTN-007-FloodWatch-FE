@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Map, { Marker, Popup, Source, Layer } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import { useTranslation } from 'react-i18next';
 import { statusColors, DEFAULT_CENTER, DEFAULT_ZOOM } from '../../utils/constants';
 import { fetchAddressFromCoords } from '../../utils/geocode';
 import { getSensorDisplayPosition } from '../../data/sensorOverrides';
@@ -29,12 +30,11 @@ const MAPBOX_TOKEN = getMapboxToken();
 const defaultLng = DEFAULT_CENTER[1];
 const defaultLat = DEFAULT_CENTER[0];
 
-// Kiểu bản đồ cơ bản (nhẹ)
-const MAP_STYLES = {
-  streets: { id: 'streets', label: 'Bản đồ', url: 'mapbox://styles/mapbox/streets-v12' },
-  satellite: { id: 'satellite', label: 'Vệ tinh', url: 'mapbox://styles/mapbox/satellite-v9' },
-  satelliteStreets: { id: 'satelliteStreets', label: 'Vệ tinh + đường', url: 'mapbox://styles/mapbox/satellite-streets-v12' },
-  outdoors: { id: 'outdoors', label: 'Địa hình', url: 'mapbox://styles/mapbox/outdoors-v12' }
+const MAP_STYLE_URLS = {
+  streets: 'mapbox://styles/mapbox/streets-v12',
+  satellite: 'mapbox://styles/mapbox/satellite-v9',
+  satelliteStreets: 'mapbox://styles/mapbox/satellite-streets-v12',
+  outdoors: 'mapbox://styles/mapbox/outdoors-v12'
 };
 
 // Crowd report marker: màu theo status/level
@@ -132,6 +132,7 @@ const CrowdReportMarkerBody = ({
   labelScale = 1,
   markerTheme = 'dark'
 }) => {
+  const { t } = useTranslation();
   const isLight = markerTheme === 'light';
   const textColor = isLight ? '#fff' : '#000';
   const borderColor = isLight ? '#fff' : '#000';
@@ -146,7 +147,7 @@ const CrowdReportMarkerBody = ({
   const reporterAvatarUrl = reporterAvatarFileName ? getReporterAvatarUrl(reporterAvatarFileName) : null;
   const reliabilityScore = getReporterReliability ? getReporterReliability(report.reporter_id) : (report.reporter_reliability ?? null);
   const reliabilityPercent = reliabilityScore != null ? Math.round(Number(reliabilityScore)) : null;
-  const displayName = report.reporter_name || report.reporter_username || 'Ẩn danh';
+  const displayName = report.reporter_name || report.reporter_username || t('reportUi.anonymous');
   const initials = displayName.trim() ? (displayName.split(/\s+/).length >= 2
     ? (displayName.split(/\s+/)[0].charAt(0) + displayName.split(/\s+/).pop().charAt(0)).toUpperCase()
     : displayName.charAt(0).toUpperCase()) : '?';
@@ -220,27 +221,31 @@ const CrowdReportMarkerBody = ({
 
 // Nội dung popup chi tiết báo cáo – dùng trong Marker đơn và trong stack.
 const CrowdReportPopupContent = ({ report, lat, lng, getReporterReliability }) => {
+  const { t, i18n } = useTranslation();
   const desc = report.location_description || null;
   const [fetchedAddress, setFetchedAddress] = useState(null);
   const moderationStatus = report.moderation_status;
-  let statusInfo = { color: '#6c757d', text: 'Không xác định' };
+  let statusInfo = { color: '#6c757d', text: t('reportUi.moderation.unknown') };
   if (moderationStatus === 'approved') {
     const levelColors = { 'Nặng': '#dc3545', 'Trung bình': '#ffc107', 'Nhẹ': '#17a2b8' };
-    statusInfo = { color: report.flood_level && levelColors[report.flood_level] ? levelColors[report.flood_level] : '#28a745', text: 'Đã duyệt' };
+    statusInfo = {
+      color: report.flood_level && levelColors[report.flood_level] ? levelColors[report.flood_level] : '#28a745',
+      text: t('reportUi.moderation.approved')
+    };
   } else if (moderationStatus === 'rejected') {
-    statusInfo = { color: '#dc3545', text: 'Đã từ chối' };
+    statusInfo = { color: '#dc3545', text: t('reportUi.moderation.rejected') };
   } else {
     const displayStatus = moderationStatus === 'pending' || !moderationStatus ? report.validation_status : moderationStatus;
     const statusConfig = {
-      pending: { color: '#ffc107', text: 'Chờ xét duyệt' },
-      verified: { color: '#17a2b8', text: 'Đã xác minh' },
-      cross_verified: { color: '#28a745', text: 'Đã xác minh chéo' }
+      pending: { color: '#ffc107', text: t('reportUi.moderation.pending') },
+      verified: { color: '#17a2b8', text: t('reportUi.moderation.verified') },
+      cross_verified: { color: '#28a745', text: t('reportUi.moderation.cross_verified') }
     };
     statusInfo = report.verified_by_sensor ? statusConfig.cross_verified : (statusConfig[displayStatus] || statusInfo);
   }
   const getFloodLevelDesc = (level) => {
-    const levels = { 'Nhẹ': 'Đến mắt cá (~10cm)', 'Trung bình': 'Đến đầu gối (~30cm)', 'Nặng': 'Ngập nửa xe (~50cm)' };
-    return levels[level] || level;
+    if (!level) return '';
+    return t(`reportUi.floodDepth.${level}`, { defaultValue: level });
   };
   useEffect(() => {
     if (!lat || !lng || desc) {
@@ -252,36 +257,38 @@ const CrowdReportPopupContent = ({ report, lat, lng, getReporterReliability }) =
     });
     return () => { cancelled = true; };
   }, [lat, lng, desc]);
+  const addrLine =
+    !desc && fetchedAddress === null && lat && lng
+      ? t('reportUi.addressLoading')
+      : desc ||
+        fetchedAddress ||
+        (lat != null && lng != null ? t('reportUi.coordLabel', { lat: lat.toFixed(6), lng: lng.toFixed(6) }) : '—');
   return (
     <div style={{ textAlign: 'left', maxHeight: '70vh', overflow: 'auto', padding: '14px 16px', boxSizing: 'border-box' }}>
       <h3 style={{ margin: '0 0 8px 0', color: statusInfo.color, fontSize: '16px', fontWeight: 'bold', paddingLeft: 0 }}>
-        <FaMobileScreen style={{ marginRight: '6px', flexShrink: 0 }} /> {report.reporter_name || 'Ẩn danh'}
+        <FaMobileScreen style={{ marginRight: '6px', flexShrink: 0 }} /> {report.reporter_name || t('reportUi.anonymous')}
       </h3>
       <div style={{ fontSize: '12px', color: '#333', marginBottom: '8px', display: 'flex', alignItems: 'flex-start', gap: '4px' }}>
         <MdLocationOn style={{ flexShrink: 0, marginTop: '2px' }} />
-        <span>
-          {!desc && fetchedAddress === null && lat && lng
-            ? 'Đang tải địa chỉ...'
-            : desc || fetchedAddress || (lat != null && lng != null ? `Tọa độ: ${lat.toFixed(6)}, ${lng.toFixed(6)}` : '—')}
-        </span>
+        <span>{addrLine}</span>
       </div>
       <div style={{ marginBottom: '8px', padding: '8px', background: '#f5f5f5', borderRadius: '4px' }}>
         <strong style={{ fontSize: '16px', color: statusInfo.color, display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <WiFlood /> Mức độ: {report.flood_level}
+          <WiFlood /> {t('reportUi.popupLevel')}: {report.flood_level}
         </strong><br />
         <small>{getFloodLevelDesc(report.flood_level)}</small><br />
-        <strong>Trạng thái: </strong>{statusInfo.text}
+        <strong>{t('reportUi.status')} </strong>{statusInfo.text}
       </div>
       {report.verified_by_sensor && (
         <div style={{ marginBottom: '8px', padding: '6px', background: '#f0fff4', borderRadius: '4px', fontSize: '12px', color: '#28a745' }}>
-          <FaCheck style={{ marginRight: '4px' }} /> Đã xác minh bởi hệ thống cảm biến
+          <FaCheck style={{ marginRight: '4px' }} /> {t('reportUi.sensorVerified')}
         </div>
       )}
       {getReporterReliability && (() => {
         const rel = getReporterReliability(report.reporter_id) ?? report.reporter_reliability;
         return rel != null ? (
           <div style={{ marginBottom: '8px', fontSize: '12px', color: '#666', display: 'flex', alignItems: 'center', flexWrap: 'nowrap', gap: '6px' }}>
-            <strong style={{ flexShrink: 0 }}>Độ tin cậy người báo cáo:</strong>
+            <strong style={{ flexShrink: 0 }}>{t('reportUi.reporterConfidence')}</strong>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
               <FaStar style={{ color: '#ffc107' }} />
               <span>{typeof rel === 'number' ? rel.toFixed(1) : rel}/100</span>
@@ -299,7 +306,7 @@ const CrowdReportPopupContent = ({ report, lat, lng, getReporterReliability }) =
         </div>
       )}
       <div style={{ fontSize: '11px', color: '#999', borderTop: '1px solid #ddd', paddingTop: '8px' }}>
-        <strong>Thời gian:</strong> {new Date(report.created_at).toLocaleString('vi-VN')}
+        <strong>{t('reportUi.popupTime')}:</strong> {new Date(report.created_at).toLocaleString(i18n.language === 'en' ? 'en-US' : 'vi-VN')}
       </div>
     </div>
   );
@@ -583,6 +590,7 @@ const CrowdReportStack = ({
 };
 
 const FusionCrowdMarker = ({ point, mode, popupKey, openPopupId, setOpenPopupId, markerTheme }) => {
+  const { t } = useTranslation();
   const cm = mode === 'fused' ? point.fused_cm : point.crowd_only_cm;
   const color = fusionCmToColor(cm);
   const r = fusionCmToMarkerRadius(cm);
@@ -610,7 +618,7 @@ const FusionCrowdMarker = ({ point, mode, popupKey, openPopupId, setOpenPopupId,
             cursor: 'pointer',
             boxShadow: '0 2px 8px rgba(0,0,0,0.25)'
           }}
-          title={mode === 'fused' ? 'Kết hợp với cảm biến' : 'Chỉ theo báo cáo người dân'}
+          title={mode === 'fused' ? t('mapView.fusionFused') : t('mapView.fusionCrowdOnly')}
         />
       </Marker>
       {isOpen && (
@@ -625,27 +633,27 @@ const FusionCrowdMarker = ({ point, mode, popupKey, openPopupId, setOpenPopupId,
           maxWidth="320px"
         >
           <div style={{ padding: '10px 12px', fontSize: '12px', color: '#333' }}>
-            <strong style={{ display: 'block', marginBottom: '8px' }}>Điểm ước tính ngập</strong>
+            <strong style={{ display: 'block', marginBottom: '8px' }}>{t('mapView.estFloodTitle')}</strong>
             <div style={{ marginBottom: '6px' }}>
-              <span style={{ color: '#64748b' }}>Theo báo cáo: </span>
+              <span style={{ color: '#64748b' }}>{t('mapView.fromReport')}</span>
               <strong>{point.crowd_only_cm != null ? `${Number(point.crowd_only_cm).toFixed(1)} cm` : '—'}</strong>
             </div>
             <div style={{ marginBottom: '6px' }}>
-              <span style={{ color: '#64748b' }}>Sau khi kết hợp cảm biến: </span>
+              <span style={{ color: '#64748b' }}>{t('mapView.afterFusion')}</span>
               <strong>{point.fused_cm != null ? `${Number(point.fused_cm).toFixed(1)} cm` : '—'}</strong>
             </div>
             <div style={{ marginBottom: '6px' }}>
-              <span style={{ color: '#64748b' }}>Phủ sóng: </span>
-              {getFusionCoverageLabel(point.coverage)}
+              <span style={{ color: '#64748b' }}>{t('mapView.coverage')}</span>
+              {getFusionCoverageLabel(point.coverage, t)}
             </div>
             {point.nearest_sensor && (
               <div style={{ marginBottom: '6px', fontSize: '11px' }}>
-                Cảm biến gần nhất: <strong>{typeof point.nearest_sensor === 'object' ? point.nearest_sensor.sensor_id || JSON.stringify(point.nearest_sensor) : point.nearest_sensor}</strong>
+                {t('mapView.nearestSensor')} <strong>{typeof point.nearest_sensor === 'object' ? point.nearest_sensor.sensor_id || JSON.stringify(point.nearest_sensor) : point.nearest_sensor}</strong>
               </div>
             )}
             {point.weights && typeof point.weights === 'object' && (
               <details style={{ fontSize: '11px', marginTop: '8px' }}>
-                <summary style={{ cursor: 'pointer' }}>Chi tiết đóng góp nguồn dữ liệu</summary>
+                <summary style={{ cursor: 'pointer' }}>{t('mapView.dataSourcesSummary')}</summary>
                 <pre style={{ margin: '6px 0 0', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
                   {JSON.stringify(point.weights, null, 2)}
                 </pre>
@@ -672,7 +680,17 @@ const MapView = ({
   /** Popup sensor: "hover" (dashboard) hoặc "click" (mặc định, vd /map) */
   sensorPopupTrigger = 'click'
 }) => {
+  const { t } = useTranslation();
   const { getReporterReliability } = useReporterRanking();
+  const mapStyleOptions = useMemo(
+    () => [
+      { id: 'streets', label: t('mapView.styleStreets'), url: MAP_STYLE_URLS.streets },
+      { id: 'satellite', label: t('mapView.styleSatellite'), url: MAP_STYLE_URLS.satellite },
+      { id: 'satelliteStreets', label: t('mapView.styleSatelliteStreets'), url: MAP_STYLE_URLS.satelliteStreets },
+      { id: 'outdoors', label: t('mapView.styleOutdoors'), url: MAP_STYLE_URLS.outdoors }
+    ],
+    [t]
+  );
   const [fusionInternal, setFusionInternal] = useState(false);
   const fusionEnabled = fusionEnabledProp !== undefined ? fusionEnabledProp : fusionInternal;
   const effectiveFusionEnabled = showFusionLayer && fusionEnabled;
@@ -685,7 +703,7 @@ const MapView = ({
   const [fusionPanelOpen, setFusionPanelOpen] = useState(false);
   const [heatGeoJSON, setHeatGeoJSON] = useState(() => ({ type: 'FeatureCollection', features: [] }));
   const [onlineCount, setOnlineCount] = useState(0);
-  const [mapStyle, setMapStyle] = useState(MAP_STYLES.streets.url);
+  const [mapStyle, setMapStyle] = useState(MAP_STYLE_URLS.streets);
   const [mapStyleOpen, setMapStyleOpen] = useState(false);
   const mapStyleMenuRef = useRef(null);
   const [openPopupId, setOpenPopupId] = useState(null);
@@ -910,7 +928,7 @@ const MapView = ({
 
   const displayCrowdReports = effectiveFusionEnabled ? [] : crowdReports;
   const markerTheme =
-    mapStyle === MAP_STYLES.satellite.url || mapStyle === MAP_STYLES.satelliteStreets.url ? 'light' : 'dark';
+    mapStyle === MAP_STYLE_URLS.satellite || mapStyle === MAP_STYLE_URLS.satelliteStreets ? 'light' : 'dark';
 
   if (!MAPBOX_TOKEN) {
     return (
@@ -1066,8 +1084,8 @@ const MapView = ({
             boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
           }}
         >
-          Trộn dữ liệu
-          <span style={{ opacity: 0.85 }}>{fusionEnabled ? 'Bật' : 'Tắt'}</span>
+          {t('mapView.fusionPanelTitle')}
+          <span style={{ opacity: 0.85 }}>{fusionEnabled ? t('mapView.fusionOn') : t('mapView.fusionOff')}</span>
         </button>
         {fusionPanelOpen && (
           <div
@@ -1088,9 +1106,9 @@ const MapView = ({
                 checked={fusionEnabled}
                 onChange={(e) => setFusionEnabled(e.target.checked)}
               />
-              Hiển thị lớp trộn trên bản đồ
+              {t('mapView.fusionShowOnMap')}
             </label>
-            <div style={{ marginBottom: '8px', fontWeight: '600' }}>Cách tính mực nước hiển thị</div>
+            <div style={{ marginBottom: '8px', fontWeight: '600' }}>{t('mapView.waterCalcTitle')}</div>
             <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: '6px' }}>
               <input
                 type="radio"
@@ -1098,7 +1116,7 @@ const MapView = ({
                 checked={fusionWaterMode === 'crowd_only'}
                 onChange={() => setFusionWaterMode('crowd_only')}
               />
-              Chỉ theo báo cáo người dân
+              {t('mapView.fusionCrowdOnly')}
             </label>
             <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: '10px' }}>
               <input
@@ -1107,11 +1125,10 @@ const MapView = ({
                 checked={fusionWaterMode === 'fused'}
                 onChange={() => setFusionWaterMode('fused')}
               />
-              Kết hợp với cảm biến gần đó
+              {t('mapView.fusionFusedNearby')}
             </label>
             <div style={{ fontSize: '10px', color: '#64748b', lineHeight: 1.45 }}>
-              Màu điểm theo mực nước ước tính: dưới 10 cm nhạt, 10–30 cm xanh, 30–50 cm vàng, từ 50 cm đỏ.
-              Khi bật lớp này, các điểm báo cáo thường trên bản đồ tạm ẩn để dễ nhìn.
+              {t('mapView.fusionColorGuide')}
             </div>
           </div>
         )}
@@ -1147,7 +1164,7 @@ const MapView = ({
             e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,0.15)';
             e.currentTarget.style.transform = 'scale(1)';
           }}
-          title="Chế độ xem bản đồ"
+          title={t('mapView.mapStyleTitle')}
           aria-expanded={mapStyleOpen}
           aria-haspopup="true"
         >
@@ -1171,7 +1188,7 @@ const MapView = ({
             }}
             role="menu"
           >
-            {Object.values(MAP_STYLES).map((s) => (
+            {mapStyleOptions.map((s) => (
               <button
                 key={s.id}
                 type="button"
@@ -1225,10 +1242,10 @@ const MapView = ({
           minWidth: '140px',
           textAlign: 'center'
         }}>
-          <div style={{ fontSize: '14px', color: '#333', marginBottom: '8px', fontWeight: '500' }}>Lượt truy cập</div>
+          <div style={{ fontSize: '14px', color: '#333', marginBottom: '8px', fontWeight: '500' }}>{t('mapView.visitsLabel')}</div>
           <div style={{ height: '1px', background: '#e0e0e0', marginBottom: '12px' }} />
           <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#28a745', marginBottom: '8px', lineHeight: '1' }}>{onlineCount}</div>
-          <div style={{ fontSize: '12px', color: '#666', fontWeight: '500' }}>Đang online</div>
+          <div style={{ fontSize: '12px', color: '#666', fontWeight: '500' }}>{t('mapView.onlineLabel')}</div>
         </div>
       </div>
 

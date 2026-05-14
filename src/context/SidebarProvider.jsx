@@ -43,7 +43,8 @@ export function SidebarProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    setMobileDrawerOpen(false);
+    const id = window.requestAnimationFrame(() => setMobileDrawerOpen(false));
+    return () => window.cancelAnimationFrame(id);
   }, [location.pathname]);
 
   useEffect(() => {

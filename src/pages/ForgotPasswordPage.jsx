@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { FaEnvelope, FaKey, FaLock } from 'react-icons/fa6';
 import { forgotPassword, resetPassword, login } from '../services/api';
 import { isAuthenticated } from '../utils/auth';
@@ -12,6 +13,7 @@ import AuthSplitShell from '../components/auth/AuthSplitShell';
  * Quên mật khẩu: POST /api/auth/forgot-password → OTP mail → POST /api/auth/reset-password → đăng nhập.
  */
 const ForgotPasswordPage = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [phase, setPhase] = useState('email');
   const [email, setEmail] = useState('');
@@ -35,7 +37,7 @@ const ForgotPasswordPage = () => {
     setInfo('');
     const em = email.trim().toLowerCase();
     if (!em) {
-      setError('Vui lòng nhập email đã đăng ký.');
+      setError(t('auth.forgot.errEmail'));
       return;
     }
     setLoading(true);
@@ -44,17 +46,17 @@ const ForgotPasswordPage = () => {
       if (result.success) {
         setInfo(
           result.message ||
-            'Đã gửi mã OTP đặt lại mật khẩu tới email của bạn. Kiểm tra hộp thư (và thư mục spam).'
+            t('auth.forgot.infoOtpSent')
         );
         setPhase('reset');
         setOtp('');
         setNewPassword('');
         setConfirmPassword('');
       } else {
-        setError(result.error || 'Không gửi được mã.');
+        setError(result.error || t('auth.forgot.errSendFail'));
       }
     } catch {
-      setError('Có lỗi xảy ra. Vui lòng thử lại.');
+      setError(t('errors.generic'));
     } finally {
       setLoading(false);
     }
@@ -70,12 +72,12 @@ const ForgotPasswordPage = () => {
       const result = await forgotPassword(em);
       if (result.success) {
         setOtp('');
-        setInfo(result.message || 'Đã gửi lại mã OTP.');
+        setInfo(result.message || t('auth.forgot.infoResent'));
       } else {
-        setError(result.error || 'Không gửi lại được mã.');
+        setError(result.error || t('auth.forgot.errResendFail'));
       }
     } catch {
-      setError('Có lỗi xảy ra. Vui lòng thử lại.');
+      setError(t('errors.generic'));
     } finally {
       setResendLoading(false);
     }
@@ -88,15 +90,15 @@ const ForgotPasswordPage = () => {
     const em = email.trim().toLowerCase();
     const otpNorm = otp.replace(/\s+/g, '').trim();
     if (!em || !otpNorm) {
-      setError('Vui lòng nhập email và mã OTP.');
+      setError(t('auth.forgot.errOtpEmail'));
       return;
     }
     if (newPassword.length < 6) {
-      setError('Mật khẩu mới phải có ít nhất 6 ký tự.');
+      setError(t('auth.forgot.errNewMin6'));
       return;
     }
     if (newPassword !== confirmPassword) {
-      setError('Mật khẩu xác nhận không khớp.');
+      setError(t('errors.passwordMismatch'));
       return;
     }
 
@@ -108,7 +110,7 @@ const ForgotPasswordPage = () => {
         new_password: newPassword
       });
       if (!result.success) {
-        setError(result.error || 'Đặt lại mật khẩu thất bại.');
+        setError(result.error || t('auth.forgot.errResetFail'));
         return;
       }
 
@@ -128,11 +130,11 @@ const ForgotPasswordPage = () => {
       } else {
         setError(
           loginResult.error ||
-            'Đã đặt lại mật khẩu. Vui lòng đăng nhập thủ công bằng tên đăng nhập hoặc email và mật khẩu mới.'
+            t('auth.forgot.errLoginAfterReset')
         );
       }
     } catch {
-      setError('Có lỗi xảy ra. Vui lòng thử lại.');
+      setError(t('errors.generic'));
     } finally {
       setLoading(false);
     }
@@ -153,15 +155,15 @@ const ForgotPasswordPage = () => {
           <form className="login-split-form" onSubmit={handleSendOtp}>
             <div className="login-split-title-row">
               <img src="/iuh.png" alt="" className="login-split-brand-logo" width={56} height={56} />
-              <h2 className="login-split-title">Quên mật khẩu</h2>
+              <h2 className="login-split-title">{t('auth.forgot.titleEmail')}</h2>
             </div>
             <p className="verify-otp-subtitle verify-otp-subtitle--light forgot-password-lead">
-              Nhập email tài khoản đã xác minh. Hệ thống sẽ gửi mã OTP để đặt lại mật khẩu.
+              {t('auth.forgot.lead')}
             </p>
 
             <div className="login-field">
               <label className="login-field-label" htmlFor="fp-email">
-                Email
+                {t('auth.forgot.email')}
               </label>
               <div className="login-input-shell login-input-shell--user">
                 <FaEnvelope className="login-input-icon" aria-hidden />
@@ -171,7 +173,7 @@ const ForgotPasswordPage = () => {
                   className="login-input"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="email@example.com"
+                  placeholder={t('auth.forgot.emailPlaceholder')}
                   required
                   autoComplete="email"
                   autoFocus
@@ -180,12 +182,12 @@ const ForgotPasswordPage = () => {
             </div>
 
             <button type="submit" className="login-btn-primary login-btn-primary--spaced" disabled={loading}>
-              {loading ? 'Đang gửi…' : 'Gửi mã OTP'}
+              {loading ? t('auth.forgot.sending') : t('auth.forgot.sendOtp')}
             </button>
 
             <div className="login-footer-split">
               <p>
-                <Link to="/login">Quay lại đăng nhập</Link>
+                <Link to="/login">{t('auth.forgot.backLogin')}</Link>
               </p>
             </div>
           </form>
@@ -193,12 +195,12 @@ const ForgotPasswordPage = () => {
           <form className="login-split-form" onSubmit={handleReset}>
             <div className="login-split-title-row">
               <img src="/iuh.png" alt="" className="login-split-brand-logo" width={56} height={56} />
-              <h2 className="login-split-title">Đặt lại mật khẩu</h2>
+              <h2 className="login-split-title">{t('auth.forgot.titleReset')}</h2>
             </div>
 
             <div className="login-field">
               <label className="login-field-label" htmlFor="fp-email-ro">
-                Email
+                {t('auth.forgot.email')}
               </label>
               <div className="login-input-shell login-input-shell--user">
                 <FaEnvelope className="login-input-icon" aria-hidden />
@@ -216,7 +218,7 @@ const ForgotPasswordPage = () => {
 
             <div className="login-field">
               <label className="login-field-label" htmlFor="fp-otp">
-                Mã OTP
+                {t('auth.forgot.otp')}
               </label>
               <div className="login-input-shell login-input-shell--pass">
                 <FaKey className="login-input-icon" aria-hidden />
@@ -226,7 +228,7 @@ const ForgotPasswordPage = () => {
                   className="login-input"
                   value={otp}
                   onChange={(e) => setOtp(e.target.value)}
-                  placeholder="Nhập mã trong email"
+                  placeholder={t('auth.forgot.otpPh')}
                   required
                   autoComplete="one-time-code"
                   inputMode="numeric"
@@ -237,7 +239,7 @@ const ForgotPasswordPage = () => {
 
             <div className="login-field">
               <label className="login-field-label" htmlFor="fp-new">
-                Mật khẩu mới
+                {t('auth.forgot.newPassword')}
               </label>
               <div className="login-input-shell login-input-shell--pass">
                 <FaLock className="login-input-icon" aria-hidden />
@@ -247,7 +249,7 @@ const ForgotPasswordPage = () => {
                   className="login-input"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Tối thiểu 6 ký tự"
+                  placeholder={t('auth.register.passwordPh')}
                   required
                   minLength={6}
                   autoComplete="new-password"
@@ -257,7 +259,7 @@ const ForgotPasswordPage = () => {
 
             <div className="login-field">
               <label className="login-field-label" htmlFor="fp-confirm">
-                Xác nhận mật khẩu
+                {t('auth.forgot.confirm')}
               </label>
               <div className="login-input-shell login-input-shell--pass">
                 <FaLock className="login-input-icon" aria-hidden />
@@ -267,7 +269,7 @@ const ForgotPasswordPage = () => {
                   className="login-input"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Nhập lại mật khẩu mới"
+                  placeholder={t('auth.forgot.confirmPh')}
                   required
                   minLength={6}
                   autoComplete="new-password"
@@ -276,7 +278,7 @@ const ForgotPasswordPage = () => {
             </div>
 
             <button type="submit" className="login-btn-primary login-btn-primary--spaced" disabled={loading}>
-              {loading ? 'Đang xử lý…' : 'Đặt lại mật khẩu'}
+              {loading ? t('auth.forgot.processing') : t('auth.forgot.reset')}
             </button>
 
             <button
@@ -285,7 +287,7 @@ const ForgotPasswordPage = () => {
               onClick={handleResend}
               disabled={resendLoading}
             >
-              {resendLoading ? 'Đang gửi…' : 'Gửi lại mã OTP'}
+              {resendLoading ? t('auth.forgot.sending') : t('auth.forgot.resend')}
             </button>
 
             <div className="login-footer-split">
@@ -302,10 +304,10 @@ const ForgotPasswordPage = () => {
                     setError('');
                   }}
                 >
-                  Đổi email khác
+                  {t('auth.forgot.changeEmail')}
                 </button>
                 {' · '}
-                <Link to="/login">Đăng nhập</Link>
+                <Link to="/login">{t('auth.forgot.login')}</Link>
               </p>
             </div>
           </form>

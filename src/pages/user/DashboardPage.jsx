@@ -1,15 +1,16 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useGuestExplore } from '../hooks/useGuestExplore';
-import { fetchFloodData, fetchCrowdReports } from '../services/api';
-import { POLLING_INTERVALS, CROWD_REPORT_MAP_DISPLAY_HOURS } from '../config/apiConfig';
-import { filterNonExpiredReports } from '../utils/reportHelpers';
-import MapView from '../components/map/MapView';
-import ChatBot from '../components/common/ChatBot';
-import SensorDetailPanel from '../components/map/SensorDetailPanel';
-import WeatherNewsSection from '../components/news/WeatherNewsSection';
-import { FaMap } from 'react-icons/fa6';
+import { useTranslation } from 'react-i18next';
+import { useGuestExplore } from '../../hooks/useGuestExplore';
+import { fetchFloodData, fetchCrowdReports } from '../../services/api';
+import { POLLING_INTERVALS, CROWD_REPORT_MAP_DISPLAY_HOURS } from '../../config/apiConfig';
+import { filterNonExpiredReports } from '../../utils/reportHelpers';
+import MapView from '../../components/map/MapView';
+import ChatBot from '../../components/common/ChatBot';
+import SensorDetailPanel from '../../components/map/SensorDetailPanel';
+import WeatherNewsSection from '../../components/news/WeatherNewsSection';
 const DashboardPage = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const { openWelcome } = useGuestExplore();
@@ -104,12 +105,12 @@ const DashboardPage = () => {
         {/* Banner Section */}
         <div className="dashboard-banner">
           <div className="dashboard-banner-content">
-            <h2 className="dashboard-banner-title">Truy cập bản đồ chi tiết</h2>
+            <h2 className="dashboard-banner-title">{t('dashboard.mapBannerTitle')}</h2>
             <button 
               className="dashboard-banner-button"
               onClick={() => navigate('/map')}
             >
-              Xem bản đồ thông minh
+              {t('dashboard.mapBannerCta')}
             </button>
           </div>
         </div>

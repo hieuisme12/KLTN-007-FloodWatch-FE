@@ -1,9 +1,10 @@
+import { useTranslation } from 'react-i18next';
 import React, { Fragment, useEffect, useState } from 'react';
 import { Transition } from '@headlessui/react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { FLOODSIGHT_ADMIN_PORTAL_URL } from '@/config/adminPortal';
 import { isAdmin, isAuthenticated, isModerator, getCurrentUser } from '../../utils/auth';
 import { isGuestBrowseMode, clearGuestExploreMode } from '../../utils/guestSession';
-import { FLOODSIGHT_ADMIN_PORTAL_URL } from '@/config/adminPortal';
 import { API_CONFIG } from '../../config/apiConfig';
 import { logout } from '../../services/api';
 import { useGuestExplore } from '../../hooks/useGuestExplore';
@@ -20,18 +21,29 @@ import {
   FaRightFromBracket,
   FaBell,
   FaRoute,
-  FaArrowUpRightFromSquare,
+  FaGauge,
   FaMap,
+  FaArrowUpRightFromSquare,
 } from 'react-icons/fa6';
 
 const scrollbarAside =
   '[&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-lg [&::-webkit-scrollbar-thumb]:bg-white/30 hover:[&::-webkit-scrollbar-thumb]:bg-white/50';
 
+const MAIN_NAV_DEF = [
+  { path: '/', labelKey: 'nav.home', icon: FaHouse, badge: null, public: true },
+  { path: '/map', labelKey: 'nav.mapDetail', icon: FaMap, badge: null, public: true, mobileOnly: true },
+  { path: '/routing', labelKey: 'nav.routing', icon: FaRoute, badge: null, public: true },
+  { path: '/reports', labelKey: 'nav.reports', icon: FaClipboardList, badge: null, public: true },
+  { path: '/report/new', labelKey: 'nav.newReport', icon: FaPlus, badge: null, requireAuth: true },
+  { path: '/emergency-alerts', labelKey: 'nav.emergency', icon: FaBell, badge: null, requireAuth: true },
+];
+
 const Sidebar = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const { collapsed, toggleCollapse, mobileDrawerOpen, closeMobileDrawer } = useSidebar();
-  const { openRequireLogin, goLogin } = useGuestExplore();
+  const { openRequireLogin } = useGuestExplore();
   const [currentUser, setCurrentUser] = useState(() => getCurrentUser());
   /** Đổi khi có user-updated để ép <img> tải lại avatar (tránh cache trình duyệt). */
   const [avatarNonce, setAvatarNonce] = useState(0);
@@ -64,11 +76,14 @@ const Sidebar = () => {
 
   /** Sau bootstrap refresh có thể ghi user vào storage trước khi mount — đồng bộ lại khi đã đăng nhập. */
   useEffect(() => {
-    if (authenticated) {
-      setCurrentUser(getCurrentUser());
-    } else if (!guestBrowse) {
-      setCurrentUser(null);
-    }
+    const id = window.requestAnimationFrame(() => {
+      if (authenticated) {
+        setCurrentUser(getCurrentUser());
+      } else if (!guestBrowse) {
+        setCurrentUser(null);
+      }
+    });
+    return () => window.cancelAnimationFrame(id);
   }, [authenticated, guestBrowse]);
 
   const sidebarAvatarUrl = currentUser?.avatar
@@ -90,21 +105,12 @@ const Sidebar = () => {
     navigate('/login');
   };
 
-  const mainNavItems = [
-    { path: '/', label: 'Trang chủ', icon: FaHouse, badge: null, public: true },
-    { path: '/map', label: 'Bản đồ chi tiết', icon: FaMap, badge: null, public: true, mobileOnly: true },
-    { path: '/routing', label: 'Tìm đường', icon: FaRoute, badge: null, public: true },
-    { path: '/reports', label: 'Báo cáo', icon: FaClipboardList, badge: null, public: true },
-    { path: '/report/new', label: 'Báo cáo mới', icon: FaPlus, badge: null, requireAuth: true },
-    { path: '/emergency-alerts', label: 'Cảnh báo khẩn', icon: FaBell, badge: null, requireAuth: true },
-  ];
-
   const staffPortal = authenticated && (admin || moderator);
-  const staffPortalLabel = admin ? 'Trang quản trị' : 'Trang điều hành';
+  const staffPortalLabel = t(admin ? 'nav.staffPortalAdmin' : 'nav.staffPortalMod');
 
   const itemNeedsAccount = (item) => Boolean(item.requireAuth);
 
-  const visibleNavItems = mainNavItems.filter((item) => {
+  const visibleNavItems = MAIN_NAV_DEF.filter((item) => {
     if (item.mobileOnly && !isNarrowNav) return false;
     if (guestBrowse) return true;
     if (item.public) return true;
@@ -114,7 +120,7 @@ const Sidebar = () => {
 
   const handleNavClick = (item) => {
     if (guestBrowse && itemNeedsAccount(item)) {
-      openRequireLogin({ featureLabel: item.label });
+      openRequireLogin({ featureLabel: t(item.labelKey) });
       return;
     }
     closeMobileDrawer();
@@ -141,7 +147,7 @@ const Sidebar = () => {
         {showExpandedSidebar && guestBrowse ? (
           <div className="min-w-0 flex-1 rounded-lg border border-white/20 bg-white/5 px-2 py-1.5">
             <div className="truncate text-[11px] font-semibold uppercase tracking-wide text-white/90">
-              Chế độ khách
+              {t('nav.guestMode')}
             </div>
           </div>
         ) : showExpandedSidebar && currentUser ? (
@@ -163,15 +169,15 @@ const Sidebar = () => {
               <div className="flex items-center truncate text-[11px] text-white/80">
                 {currentUser.role === 'admin' ? (
                   <>
-                    <FaCrown className="mr-1 text-[10px]" /> Quản trị viên
+                    <FaCrown className="mr-1 text-[10px]" /> {t('nav.admin')}
                   </>
                 ) : currentUser.role === 'moderator' ? (
                   <>
-                    <FaUser className="mr-1 text-[10px]" /> Điều hành viên
+                    <FaUser className="mr-1 text-[10px]" /> {t('nav.moderator')}
                   </>
                 ) : (
                   <>
-                    <FaUser className="mr-1 text-[10px]" /> Người dùng
+                    <FaUser className="mr-1 text-[10px]" /> {t('nav.user')}
                   </>
                 )}
               </div>
@@ -179,7 +185,7 @@ const Sidebar = () => {
           </div>
         ) : showExpandedSidebar ? (
           <div className="min-w-0 flex-1 truncate text-xs font-semibold text-white">
-            FLOODSIGHT THÀNH PHỐ HỒ CHÍ MINH
+            {t('nav.floodsightTitle')}
           </div>
         ) : null}
         {/* Web (≥md): chỉ nút thu gọn sidebar — không dùng icon X */}
@@ -187,7 +193,7 @@ const Sidebar = () => {
           type="button"
           className="hidden h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg border-none bg-transparent p-0 text-white transition-colors hover:bg-white/10 focus:outline-none md:flex [&_svg]:block [&_svg]:h-[18px] [&_svg]:w-[18px]"
           onClick={toggleCollapse}
-          title={collapsed ? 'Mở rộng sidebar' : 'Thu gọn sidebar'}
+          title={collapsed ? t('nav.expandSidebar') : t('nav.collapseSidebar')}
         >
           <FaBars aria-hidden />
         </button>
@@ -196,7 +202,7 @@ const Sidebar = () => {
           type="button"
           className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg border-none bg-transparent p-0 text-white transition-colors hover:bg-white/10 focus:outline-none md:hidden [&_svg]:block [&_svg]:h-[18px] [&_svg]:w-[18px]"
           onClick={closeMobileDrawer}
-          title="Đóng menu"
+          title={t('nav.closeMenu')}
         >
           <FaXmark aria-hidden />
         </button>
@@ -228,7 +234,7 @@ const Sidebar = () => {
                 <item.icon />
               </span>
               {!collapsed || mobileDrawerOpen ? (
-                <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                <span className="min-w-0 flex-1 truncate">{t(item.labelKey)}</span>
               ) : null}
               {item.badge && (
                 <span className="min-w-[20px] rounded-lg bg-white/30 px-2 py-0.5 text-center text-[11px] font-semibold text-white">
@@ -251,7 +257,7 @@ const Sidebar = () => {
               collapsed && !mobileDrawerOpen ? 'justify-center px-0' : 'justify-start px-4',
               'max-md:justify-start max-md:px-4'
             )}
-            title={`${staffPortalLabel} (mở tab mới)`}
+            title={t('nav.staffPortalTitle', { label: staffPortalLabel })}
             onClick={() => closeMobileDrawer()}
           >
             <span className="w-6 text-center text-lg">
@@ -261,6 +267,23 @@ const Sidebar = () => {
               <span className="min-w-0 flex-1 truncate">{staffPortalLabel}</span>
             ) : null}
           </a>
+          <Link
+            to="/admin"
+            className={cn(
+              'flex w-full min-w-0 items-center gap-3 rounded-none border-none bg-transparent py-2.5 text-left text-xs font-medium text-white/75 no-underline transition-colors hover:bg-white/10 hover:text-white focus:outline-none',
+              collapsed && !mobileDrawerOpen ? 'justify-center px-0' : 'justify-start px-4',
+              'max-md:justify-start max-md:px-4'
+            )}
+            title={t('nav.quickSummaryTitle')}
+            onClick={() => closeMobileDrawer()}
+          >
+            <span className="w-6 text-center text-base">
+              <FaGauge />
+            </span>
+            {!collapsed || mobileDrawerOpen ? (
+              <span className="min-w-0 flex-1 truncate">{t('nav.quickSummary')}</span>
+            ) : null}
+          </Link>
         </div>
       )}
 
@@ -277,13 +300,13 @@ const Sidebar = () => {
               closeMobileDrawer();
               handleLogout();
             }}
-            title="Đăng xuất"
+            title={t('nav.logout')}
           >
             <span className="w-6 text-center text-lg">
               <FaRightFromBracket />
             </span>
             {!collapsed || mobileDrawerOpen ? (
-              <span className="min-w-0 flex-1 truncate whitespace-nowrap">Đăng xuất</span>
+              <span className="min-w-0 flex-1 truncate whitespace-nowrap">{t('nav.logout')}</span>
             ) : null}
           </button>
         </div>
@@ -298,13 +321,17 @@ const Sidebar = () => {
               collapsed && !mobileDrawerOpen ? 'justify-center px-0' : 'justify-start px-4',
               'max-md:justify-start max-md:px-4'
             )}
-            title="Đăng nhập"
+            title={t('nav.login')}
+            onClick={() => {
+              closeMobileDrawer();
+              navigate('/login');
+            }}
           >
             <span className="w-6 text-center text-lg">
               <FaUser />
             </span>
             {!collapsed || mobileDrawerOpen ? (
-              <span className="min-w-0 flex-1 truncate whitespace-nowrap">Đăng nhập</span>
+              <span className="min-w-0 flex-1 truncate whitespace-nowrap">{t('nav.login')}</span>
             ) : null}
           </button>
           <button
@@ -319,13 +346,13 @@ const Sidebar = () => {
               clearGuestExploreMode();
               navigate('/login');
             }}
-            title="Thoát chế độ khách"
+            title={t('nav.exitGuest')}
           >
             <span className="w-6 text-center text-lg">
               <FaRightFromBracket />
             </span>
             {!collapsed || mobileDrawerOpen ? (
-              <span className="min-w-0 flex-1 truncate whitespace-nowrap">Thoát chế độ khách</span>
+              <span className="min-w-0 flex-1 truncate whitespace-nowrap">{t('nav.exitGuest')}</span>
             ) : null}
           </button>
         </div>

@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getProfile, getProfileIcons, updateProfile } from '../services/api';
-import { API_CONFIG } from '../config/apiConfig';
-import ErrorToast from '../components/common/ErrorToast';
+import { getProfile, getProfileIcons, updateProfile } from '../../services/api';
+import { API_CONFIG } from '../../config/apiConfig';
+import ErrorToast from '../../components/common/ErrorToast';
 import Skeleton from 'react-loading-skeleton';
 const ProfilePage = () => {
   const navigate = useNavigate();

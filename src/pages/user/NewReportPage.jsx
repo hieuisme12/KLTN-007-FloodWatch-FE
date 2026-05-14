@@ -1,13 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Map, { Marker, Popup } from 'react-map-gl/mapbox';
-import FilterDropdown from '../components/common/FilterDropdown';
+import FilterDropdown from '../../components/common/FilterDropdown';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { submitFloodReport, uploadReportImage, fetchFloodData } from '../services/api';
-import { isAuthenticated, getCurrentUser } from '../utils/auth';
-import { DEFAULT_CENTER, DEFAULT_ZOOM, statusColors } from '../utils/constants';
-import { getSensorDisplayPosition } from '../data/sensorOverrides';
-import SensorMarker from '../components/map/SensorMarker';
+import { submitFloodReport, uploadReportImage, fetchFloodData } from '../../services/api';
+import { isAuthenticated, getCurrentUser } from '../../utils/auth';
+import { DEFAULT_CENTER, DEFAULT_ZOOM, statusColors } from '../../utils/constants';
+import { getSensorDisplayPosition } from '../../data/sensorOverrides';
+import SensorMarker from '../../components/map/SensorMarker';
 import { 
   FaPenToSquare,
   FaCheck,
@@ -21,9 +21,10 @@ import {
 } from 'react-icons/fa6';
 import { WiFlood } from 'react-icons/wi';
 import { MdAddLocation, MdLocationOn, MdLightbulb } from 'react-icons/md';
-import ErrorToast from '../components/common/ErrorToast';
-import SearchAutoComplete from '../components/common/SearchAutoComplete';
-import { searchAddressSuggestionsInHcm, fetchAddressFromCoords, resolveGeocodePlaceSelection, clearGeocodeAutocompleteSessionToken } from '../utils/geocode';
+import ErrorToast from '../../components/common/ErrorToast';
+import SearchAutoComplete from '../../components/common/SearchAutoComplete';
+import { searchAddressSuggestionsInHcm, fetchAddressFromCoords, resolveGeocodePlaceSelection, clearGeocodeAutocompleteSessionToken } from '../../utils/geocode';
+import { useTranslation } from 'react-i18next';
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
 // Mapbox: [lng, lat]; DEFAULT_CENTER là [lat, lng]
@@ -31,6 +32,7 @@ const defaultLng = DEFAULT_CENTER[1];
 const defaultLat = DEFAULT_CENTER[0];
 
 const NewReportPage = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const authenticated = isAuthenticated();
   const currentUser = getCurrentUser();
@@ -61,13 +63,15 @@ const NewReportPage = () => {
     }
   });
   
-  // Flood level options for Combobox
-  const floodLevelOptions = [
-    { id: '', name: '-- Chọn mức độ --' },
-    { id: 'Nhẹ', name: 'Nhẹ (đến mắt cá ~10cm)' },
-    { id: 'Trung bình', name: 'Trung bình (đến đầu gối ~30cm)' },
-    { id: 'Nặng', name: 'Nặng (ngập nửa xe ~50cm)' },
-  ];
+  const floodLevelOptions = useMemo(
+    () => [
+      { id: '', name: t('newReport.levelPick') },
+      { id: 'Nhẹ', name: t('newReport.levelNhe') },
+      { id: 'Trung bình', name: t('newReport.levelTb') },
+      { id: 'Nặng', name: t('newReport.levelNang') }
+    ],
+    [t]
+  );
   
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -76,17 +80,17 @@ const NewReportPage = () => {
 
     // Khách phải nhập tên; user đăng nhập không gửi name (BE lấy từ tài khoản)
     if (!authenticated && (!formData.name || formData.name.trim().length < 2)) {
-      setError('Vui lòng nhập tên của bạn (ít nhất 2 ký tự) hoặc đăng nhập để dùng tên tài khoản.');
+      setError(t('newReport.errName'));
       return;
     }
 
     if (!['Nhẹ', 'Trung bình', 'Nặng'].includes(formData.level)) {
-      setError('Vui lòng chọn mức độ ngập hợp lệ');
+      setError(t('newReport.errLevel'));
       return;
     }
 
     if (!formData.lng || !formData.lat) {
-      setError('Vui lòng chọn vị trí trên bản đồ (click vào bản đồ)');
+      setError(t('newReport.errMap'));
       return;
     }
 
@@ -96,7 +100,7 @@ const NewReportPage = () => {
       for (const item of photoList) {
         const uploadResult = await uploadReportImage(item.file);
         if (!uploadResult.success) {
-          setError(uploadResult.error || 'Tải ảnh lên thất bại');
+          setError(uploadResult.error || t('newReport.errUpload'));
           setLoading(false);
           return;
         }
@@ -118,10 +122,10 @@ const NewReportPage = () => {
         setResult(response);
         setTimeout(() => navigate('/reports'), 2000);
       } else {
-        setError(response.error || 'Có lỗi xảy ra');
+        setError(response.error || t('newReport.errGeneric'));
       }
     } catch (err) {
-      setError(err?.message || 'Lỗi kết nối');
+      setError(err?.message || t('newReport.errNetwork'));
     } finally {
       setLoading(false);
     }
@@ -133,7 +137,7 @@ const NewReportPage = () => {
     if (files.length === 0) return;
     setError(null);
     const valid = files.filter(f => f.type.startsWith('image/'));
-    if (valid.length < files.length) setError('Một số file không phải ảnh đã bỏ qua.');
+    if (valid.length < files.length) setError(t('newReport.errNonImages'));
     const toAdd = valid.slice(0, MAX_PHOTOS - photoList.length).map(file => ({
       id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
       file,
@@ -244,7 +248,7 @@ const NewReportPage = () => {
           display_name: result.display_name
         });
         if (!resolved) {
-          setError('Không lấy được tọa độ cho địa điểm đã chọn. Vui lòng thử lại hoặc chọn trên bản đồ.');
+          setError(t('newReport.errGeocodePick'));
           return;
         }
         lat = resolved.lat;
@@ -254,7 +258,7 @@ const NewReportPage = () => {
       }
     }
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-      setError('Không lấy được tọa độ. Vui lòng chọn gợi ý khác hoặc click trên bản đồ.');
+      setError(t('newReport.errGeocodeSuggest'));
       return;
     }
     setFormData({ ...formData, lat, lng });
@@ -363,7 +367,7 @@ const NewReportPage = () => {
           position: 'relative',
           zIndex: 1
         }}>
-          Báo cáo ngập lụt
+          {t('newReport.pageTitle')}
         </h1>
         <p style={{ 
           margin: '0', 
@@ -375,7 +379,7 @@ const NewReportPage = () => {
           position: 'relative',
           zIndex: 1
         }}>
-          Giúp cộng đồng cập nhật tình trạng ngập lụt
+          {t('newReport.pageSubtitle')}
         </p>
       </div>
 
@@ -408,7 +412,7 @@ const NewReportPage = () => {
                   fontSize: '14px',
                   color: '#0369a1'
                 }}>
-                  Báo cáo sẽ hiển thị với tên: <strong>{currentUser?.full_name || currentUser?.username || 'Bạn'}</strong>
+                  {t('newReport.displayNameHint')} <strong>{currentUser?.full_name || currentUser?.username || t('reportUi.you')}</strong>
                 </div>
               ) : (
                 <div style={{ marginBottom: '16px' }}>
@@ -419,13 +423,13 @@ const NewReportPage = () => {
                     color: '#2c3e50',
                     fontSize: '13px'
                   }}>
-                    Tên người báo cáo *
+                    {t('newReport.reporterNameLabel')}
                   </label>
                   <input
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="VD: Nguyễn Văn A"
+                    placeholder={t('newReport.namePh')}
                     required
                     minLength={2}
                     style={{
@@ -451,7 +455,7 @@ const NewReportPage = () => {
                   color: '#2c3e50',
                   fontSize: '13px'
                 }}>
-                  Mức độ ngập *
+                  {t('newReport.levelLabel')}
                 </label>
                 <FilterDropdown
                   value={formData.level}
@@ -459,7 +463,7 @@ const NewReportPage = () => {
                   options={floodLevelOptions}
                   optionLabel="name"
                   optionValue="id"
-                  placeholder="Chọn mức độ ngập"
+                  placeholder={t('newReport.levelPh')}
                   className="filter-dropdown-toolbar w-full"
                 />
               </div>
@@ -473,12 +477,12 @@ const NewReportPage = () => {
                   color: '#2c3e50',
                   fontSize: '13px'
                 }}>
-                  Nội dung mô tả mức độ ngập (tùy chọn)
+                  {t('newReport.contentLabel')}
                 </label>
                 <textarea
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
-                  placeholder="VD: Nước ngập đến bánh xe, không di chuyển được..."
+                  placeholder={t('newReport.contentPh')}
                   rows={3}
                   maxLength={500}
                   style={{
@@ -492,7 +496,7 @@ const NewReportPage = () => {
                     boxSizing: 'border-box'
                   }}
                 />
-                <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>{content.length}/500 ký tự</div>
+                <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>{t('newReport.charCount', { n: content.length })}</div>
               </div>
 
               {/* Hình ảnh hiện trường (optional, tối đa 5 ảnh) */}
@@ -504,7 +508,7 @@ const NewReportPage = () => {
                   color: '#2c3e50',
                   fontSize: '13px'
                 }}>
-                  <FaImage style={{ marginRight: '6px' }} /> Hình ảnh hiện trường (tùy chọn, tối đa {MAX_PHOTOS} ảnh)
+                  <FaImage style={{ marginRight: '6px' }} /> {t('newReport.photosLabel', { max: MAX_PHOTOS })}
                 </label>
                 <input
                   type="file"
@@ -521,7 +525,7 @@ const NewReportPage = () => {
                       className="report-photo-add-btn"
                     >
                       <FaImage style={{ fontSize: '20px', marginBottom: '4px' }} />
-                      <span>Chọn ảnh</span>
+                      <span>{t('newReport.selectPhotoBtn')}</span>
                     </label>
                   )}
                   {photoList.length > 0 && (
@@ -533,8 +537,8 @@ const NewReportPage = () => {
                             type="button"
                             className="report-photo-remove"
                             onClick={() => removePhoto(item.id)}
-                            title="Xóa ảnh"
-                            aria-label="Xóa ảnh"
+                            title={t('newReport.removePhoto')}
+                            aria-label={t('newReport.removePhoto')}
                           >
                             <FaXmark style={{ fontSize: '14px' }} />
                           </button>
@@ -544,7 +548,7 @@ const NewReportPage = () => {
                   )}
                   {photoList.length > 0 && (
                     <button type="button" onClick={clearAllPhotos} className="report-photo-clear-all">
-                      Xóa tất cả ảnh
+                      {t('newReport.clearAllPhotos')}
                     </button>
                   )}
                 </div>
@@ -558,7 +562,7 @@ const NewReportPage = () => {
                   color: '#2c3e50',
                   fontSize: '13px'
                 }}>
-                  Vị trí *
+                  {t('newReport.addressLabel')}
                 </label>
                 
                 <div style={{ marginBottom: '10px' }}>
@@ -570,7 +574,7 @@ const NewReportPage = () => {
                     dataKey="id"
                     minLength={2}
                     delay={400}
-                    placeholder="Nhập địa chỉ để tìm (VD: Đường 3 tháng 2, Quận 10)"
+                    placeholder={t('newReport.addressSearchPh')}
                     className="w-full text-sm"
                     inputClassName="rounded border border-gray-300 px-2 py-2 text-sm"
                     onChange={(ev) => {
@@ -582,7 +586,7 @@ const NewReportPage = () => {
                     onSelect={(ev) => handleSelectSearchResult(ev.value)}
                   />
                   {searchingAddress && (
-                    <div style={{ marginTop: '6px', fontSize: '12px', color: '#64748b' }}>Đang tìm gợi ý…</div>
+                    <div style={{ marginTop: '6px', fontSize: '12px', color: '#64748b' }}>{t('newReport.searchingSuggest')}</div>
                   )}
                 </div>
 
@@ -598,11 +602,11 @@ const NewReportPage = () => {
                   {formData.lat && formData.lng ? (
                     <>
                       <div style={{ color: '#28a745', fontWeight: 'bold', marginBottom: '5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <FaCheck /> Đã chọn vị trí
+                        <FaCheck /> {t('newReport.locationSelected')}
                       </div>
                       {fetchingLocation ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#999' }}>
-                          <FaClock style={{ fontSize: '12px' }} /> Đang lấy địa chỉ...
+                          <FaClock style={{ fontSize: '12px' }} /> {t('newReport.resolvingAddr')}
                         </div>
                       ) : locationDescription ? (
                         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
@@ -612,13 +616,13 @@ const NewReportPage = () => {
                       ) : (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#999' }}>
                           <MdLocationOn style={{ fontSize: '14px' }} />
-                          Lat: {formData.lat.toFixed(6)}, Lng: {formData.lng.toFixed(6)}
+                          {t('newReport.latLngRaw', { lat: formData.lat.toFixed(6), lng: formData.lng.toFixed(6) })}
                         </div>
                       )}
                     </>
                   ) : (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <MdAddLocation /> Click vào bản đồ hoặc tìm kiếm địa chỉ ở trên để chọn vị trí ngập
+                      <MdAddLocation /> {t('newReport.pickLocationHint')}
                     </div>
                   )}
                 </div>
@@ -636,14 +640,14 @@ const NewReportPage = () => {
                   fontSize: '14px'
                 }}>
                   <strong style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <FaCheck /> Báo cáo thành công!
+                    <FaCheck /> {t('newReport.successTitle')}
                   </strong>
                   <div style={{ marginTop: '8px' }}>
-                    {result.message || 'Cảm ơn bạn đã đóng góp thông tin!'}
+                    {result.message || t('newReport.thanks')}
                   </div>
                   {(result.data?.verified_by_sensor || result.data?.sensor_verified) && (
                     <div style={{ marginTop: '5px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <FaBullseye /> Báo cáo đã được xác minh bởi cảm biến gần đó
+                      <FaBullseye /> {t('newReport.verifiedBanner')}
                     </div>
                   )}
                 </div>
@@ -684,7 +688,7 @@ const NewReportPage = () => {
                     }
                   }}
                 >
-                  Hủy
+                  {t('newReport.cancelBtn')}
                 </button>
                 <button
                   type="submit"
@@ -702,7 +706,7 @@ const NewReportPage = () => {
                     transition: 'background 0.3s'
                   }}
                 >
-                  {loading ? 'Đang gửi...' : result?.success ? 'Đã gửi' : 'Gửi báo cáo'}
+                  {loading ? t('newReport.sending') : result?.success ? t('newReport.sent') : t('newReport.submit')}
                 </button>
               </div>
             </form>
@@ -725,7 +729,7 @@ const NewReportPage = () => {
               alignItems: 'center',
               gap: '8px'
             }}>
-              <FaMap /> Chọn vị trí ngập
+              <FaMap /> {t('newReport.mapPickHeading')}
             </h3>
             <div style={{
               height: '500px',
@@ -770,7 +774,7 @@ const NewReportPage = () => {
                     e.currentTarget.style.borderColor = '#dc3545';
                     e.currentTarget.style.transform = 'scale(1)';
                   }}
-                  title="Xóa vị trí đã chọn"
+                  title={t('newReport.clearLocationTitle')}
                 >
                   <FaTrash style={{ fontSize: '16px', display: 'block' }} />
                 </button>
@@ -839,16 +843,16 @@ const NewReportPage = () => {
                             <div style={{ width: '20px', height: '20px', background: '#14b8a6', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '12px', fontWeight: 'bold', flexShrink: 0 }}>
                               <WiFlood style={{ fontSize: '14px' }} />
                             </div>
-                            <span style={{ fontWeight: '600', fontSize: '14px', color: '#333' }}>Vị trí ngập lụt</span>
+                            <span style={{ fontWeight: '600', fontSize: '14px', color: '#333' }}>{t('newReport.popupTitle')}</span>
                           </div>
                           <div style={{ padding: 0 }}>
-                            <div style={{ fontSize: '13px', color: '#333', marginBottom: '6px', fontWeight: '500' }}>{formData.name || 'Chưa có tên'}</div>
+                            <div style={{ fontSize: '13px', color: '#333', marginBottom: '6px', fontWeight: '500' }}>{formData.name || t('reportUi.noName')}</div>
                             <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px', display: 'flex', alignItems: 'flex-start', gap: '4px' }}>
                               <MdLocationOn style={{ fontSize: '14px', marginTop: '2px', flexShrink: 0 }} />
-                              <span>{locationDescription || `Lat: ${formData.lat.toFixed(6)}, Lng: ${formData.lng.toFixed(6)}`}</span>
+                              <span>{locationDescription || t('newReport.latLngRaw', { lat: formData.lat.toFixed(6), lng: formData.lng.toFixed(6) })}</span>
                             </div>
                             {formData.level && (
-                              <div style={{ fontSize: '12px', color: '#666', display: 'flex', alignItems: 'center', gap: '4px' }}>Mức độ: {formData.level}</div>
+                              <div style={{ fontSize: '12px', color: '#666', display: 'flex', alignItems: 'center', gap: '4px' }}>{t('newReport.popupLevelShort')} {formData.level}</div>
                             )}
                           </div>
                         </div>
@@ -858,7 +862,7 @@ const NewReportPage = () => {
                 </Map>
               ) : (
                 <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f0f0f0', color: '#666' }}>
-                  Chưa cấu hình Mapbox token (VITE_MAPBOX_TOKEN trong .env)
+                  {t('newReport.mapboxMissingEnv')}
                 </div>
               )}
             </div>
@@ -872,11 +876,11 @@ const NewReportPage = () => {
               gap: '4px'
             }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}>
-                <MdLightbulb /> Click vào bản đồ để đánh dấu vị trí ngập lụt
+                <MdLightbulb /> {t('newReport.mapClickMark')}
               </span>
               {sensors.length > 0 && (
                 <span style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}>
-                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: statusColors.normal, border: '1px solid #fff', boxShadow: '0 1px 2px rgba(0,0,0,0.2)' }} /> Chấm tròn = vị trí cảm biến (báo cáo gần cảm biến sẽ được xác minh)
+                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: statusColors.normal, border: '1px solid #fff', boxShadow: '0 1px 2px rgba(0,0,0,0.2)' }} /> {t('newReport.sensorNote')}
                 </span>
               )}
             </div>

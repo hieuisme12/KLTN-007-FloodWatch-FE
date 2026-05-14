@@ -2,6 +2,26 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  :root {
+    --fs-font-sans: ui-sans-serif, system-ui, 'Inter', 'Segoe UI', sans-serif;
+    --fs-color-primary: 221 83% 53%;
+    --fs-color-primary-foreground: 0 0% 100%;
+    --fs-color-success: 142 76% 36%;
+    --fs-color-warning: 38 92% 50%;
+    --fs-color-danger: 0 72% 51%;
+    --fs-color-muted: 215 16% 47%;
+    --fs-color-surface: 210 20% 98%;
+    --fs-color-border: 214 32% 91%;
+    --fs-radius-card: 0.75rem;
+    --fs-shadow-card: 0 1px 2px rgb(15 23 42 / 0.06), 0 1px 3px rgb(15 23 42 / 0.08);
+  }
+
+  html {
+    font-family: var(--fs-font-sans);
+  }
+}
+
 /* PrimeReact — dropdown bộ lọc */
 .filter-dropdown-root.p-dropdown {
   border: 1px solid #dfe1e6;

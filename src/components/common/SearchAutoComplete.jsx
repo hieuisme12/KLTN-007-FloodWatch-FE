@@ -9,7 +9,6 @@ const SearchAutoComplete = React.forwardRef(function SearchAutoComplete(
     appendTo = 'self',
     delay = 300,
     className = '',
-    completeOnFocus: _completeOnFocus,
     ...rest
   },
   ref

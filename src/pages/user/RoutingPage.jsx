@@ -2,10 +2,10 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom';
 import Map, { Marker, Source, Layer, Popup } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { DEFAULT_CENTER, DEFAULT_ZOOM, statusColors } from '../utils/constants';
-import { fetchSafePath, fetchFloodData, fetchCrowdReports } from '../services/api';
-import ErrorToast from '../components/common/ErrorToast';
-import SearchAutoComplete from '../components/common/SearchAutoComplete';
+import { DEFAULT_CENTER, DEFAULT_ZOOM, statusColors } from '../../utils/constants';
+import { fetchSafePath, fetchFloodData, fetchCrowdReports } from '../../services/api';
+import ErrorToast from '../../components/common/ErrorToast';
+import SearchAutoComplete from '../../components/common/SearchAutoComplete';
 import {
   FaArrowRightArrowLeft,
   FaCarSide,
@@ -19,14 +19,20 @@ import {
   FaTrash,
   FaXmark
 } from 'react-icons/fa6';
-import { fetchAddressFromCoords, resolveGeocodePlaceSelection, searchPlacesUnified } from '../utils/geocode';
-import { POLLING_INTERVALS, CROWD_REPORT_MAP_DISPLAY_HOURS } from '../config/apiConfig';
-import { filterNonExpiredReports } from '../utils/reportHelpers';
-import SensorMarker from '../components/map/SensorMarker';
-import UserLocationMarker from '../components/map/UserLocationMarker';
-import { useMapboxGlResize } from '../hooks/useMapboxGlResize';
-import { getMapboxToken } from '../utils/mapboxToken';
+import { getSafeUserFacingError } from '../../utils/safeErrorMessage';
+import {
+  fetchAddressFromCoords,
+  resolveGeocodePlaceSelection,
+  searchPlacesUnified
+} from '../../utils/geocode';
+import { POLLING_INTERVALS, CROWD_REPORT_MAP_DISPLAY_HOURS } from '../../config/apiConfig';
+import { filterNonExpiredReports } from '../../utils/reportHelpers';
+import SensorMarker from '../../components/map/SensorMarker';
+import UserLocationMarker from '../../components/map/UserLocationMarker';
+import { useMapboxGlResize } from '../../hooks/useMapboxGlResize';
+import { getMapboxToken } from '../../utils/mapboxToken';
 import { Slab } from 'react-loading-indicators';
+import { useTranslation } from 'react-i18next';
 
 const MAPBOX_TOKEN = getMapboxToken();
 const defaultLng = DEFAULT_CENTER[1];
@@ -51,28 +57,6 @@ const getCrowdMarkerColor = (report) => {
   if (report.verified_by_sensor || displayStatus === 'cross_verified') return '#28a745';
   if (displayStatus === 'verified') return '#17a2b8';
   return '#6c757d';
-};
-
-const VEHICLES = [
-  { id: 'motorbike', label: 'Xe máy' },
-  { id: 'car', label: 'Ô tô' },
-  { id: 'suv', label: 'SUV' }
-];
-
-const TRANSPORT_TABS = [
-  { id: 'motorbike', label: 'Xe máy', icon: FaMotorcycle, note: 'Phổ biến' },
-  { id: 'car', label: 'Ô tô', icon: FaCarSide, note: 'Tốt nhất' },
-  { id: 'suv', label: 'SUV', icon: FaTruck, note: 'An toàn hơn' }
-];
-
-const FLOOD_SOURCE_LABELS = {
-  crowd_report_hours: 'Khoảng thời gian crowd report (giờ)',
-  crowd_edge_buffer_m: 'Vùng đệm cạnh đường từ report (m)',
-  crowd_recency_half_life_hours: 'Bán rã theo thời gian report (giờ)',
-  crowd_min_reliability: 'Độ tin cậy crowd report tối thiểu (%)',
-  crowd_max_boost: 'Mức tăng trọng số tối đa',
-  sensor_flood_radius_m: 'Bán kính “bọng” nước quanh trạm sensor (m)',
-  sensor_flood_decay: 'Suy giảm nước theo khoảng cách (linear | plateau)'
 };
 
 const toNum = (x) => {
@@ -172,6 +156,27 @@ function mergeSafePathLegs(legResults) {
 }
 
 export default function RoutingPage() {
+  const { t, i18n } = useTranslation();
+  const transportTabs = useMemo(
+    () => [
+      { id: 'motorbike', label: t('routing.vehicleMotorbike'), icon: FaMotorcycle, note: t('routing.tabMotorbikeNote') },
+      { id: 'car', label: t('routing.vehicleCar'), icon: FaCarSide, note: t('routing.tabCarNote') },
+      { id: 'suv', label: t('routing.vehicleSuv'), icon: FaTruck, note: t('routing.tabSuvNote') }
+    ],
+    [t]
+  );
+  const floodSourceLabels = useMemo(
+    () => ({
+      crowd_report_hours: t('routing.floodSource.crowd_report_hours'),
+      crowd_edge_buffer_m: t('routing.floodSource.crowd_edge_buffer_m'),
+      crowd_recency_half_life_hours: t('routing.floodSource.crowd_recency_half_life_hours'),
+      crowd_min_reliability: t('routing.floodSource.crowd_min_reliability'),
+      crowd_max_boost: t('routing.floodSource.crowd_max_boost'),
+      sensor_flood_radius_m: t('routing.floodSource.sensor_flood_radius_m'),
+      sensor_flood_decay: t('routing.floodSource.sensor_flood_decay')
+    }),
+    [t]
+  );
   const [startLat, setStartLat] = useState(null);
   const [startLng, setStartLng] = useState(null);
   const [endLat, setEndLat] = useState(null);
@@ -223,11 +228,11 @@ export default function RoutingPage() {
   const MY_LOCATION_OPTION = useMemo(
     () => ({
       id: '__my_location__',
-      name: 'Dùng vị trí của tôi',
-      fullAddress: 'Dùng vị trí của tôi',
+      name: t('routing.myLocation'),
+      fullAddress: t('routing.myLocation'),
       isMyLocation: true
     }),
-    []
+    [t]
   );
 
   const persistSearchHistory = useCallback((nextHistory) => {
@@ -295,28 +300,31 @@ export default function RoutingPage() {
   const numberFormatter = useMemo(
     () =>
       typeof Intl !== 'undefined'
-        ? new Intl.NumberFormat('vi-VN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+        ? new Intl.NumberFormat(i18n.language === 'en' ? 'en-US' : 'vi-VN', {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 2
+          })
         : { format: (v) => (typeof v === 'number' ? v.toFixed(2) : String(v)) },
-    []
+    [i18n.language]
   );
   const floodSources = result?.flood_sources;
   const floodSourcesSummary = useMemo(() => {
     if (!floodSources || typeof floodSources !== 'object') return [];
     if (Array.isArray(floodSources)) {
       return floodSources.map((item, idx) => ({
-        label: item?.source || item?.name || `Nguồn ${idx + 1}`,
+        label: item?.source || item?.name || t('routing.sourceFallback', { n: idx + 1 }),
         value: item?.count ?? item?.value ?? JSON.stringify(item)
       }));
     }
     return Object.entries(floodSources).map(([k, v]) => {
       if (typeof v === 'object' && v != null) {
         return {
-          label: FLOOD_SOURCE_LABELS[k] || k,
+          label: floodSourceLabels[k] || k,
           value: JSON.stringify(v)
         };
       }
       if (v == null) {
-        return { label: FLOOD_SOURCE_LABELS[k] || k, value: '—' };
+        return { label: floodSourceLabels[k] || k, value: '—' };
       }
       let formatted;
       const num = Number(v);
@@ -325,26 +333,26 @@ export default function RoutingPage() {
           formatted = Number.isFinite(num) ? `${num}%` : String(v);
           break;
         case 'crowd_report_hours':
-          formatted = Number.isFinite(num) ? `${num} giờ` : String(v);
+          formatted = Number.isFinite(num) ? t('routing.unitHours', { n: num }) : String(v);
           break;
         case 'crowd_edge_buffer_m':
-          formatted = Number.isFinite(num) ? `${num} m` : String(v);
+          formatted = Number.isFinite(num) ? t('routing.unitMeters', { n: num }) : String(v);
           break;
         case 'crowd_max_boost':
           formatted = Number.isFinite(num) ? `x${num}` : String(v);
           break;
         case 'sensor_flood_radius_m':
-          formatted = Number.isFinite(num) ? `${num} m` : String(v);
+          formatted = Number.isFinite(num) ? t('routing.unitMeters', { n: num }) : String(v);
           break;
         default:
           formatted = String(v);
       }
       return {
-        label: FLOOD_SOURCE_LABELS[k] || k,
+        label: floodSourceLabels[k] || k,
         value: formatted
       };
     });
-  }, [floodSources]);
+  }, [floodSources, floodSourceLabels, t]);
   const vehicle = result?.vehicle || null;
   const vehicleName = vehicle?.name || null;
   const vehicleMaxDepthCm =
@@ -401,7 +409,7 @@ export default function RoutingPage() {
 
   const setMyLocationTo = (type = 'from', extraStopId = null) => {
     if (!navigator.geolocation) {
-      setError('Trình duyệt không hỗ trợ định vị.');
+      setError(t('routing.geoNotSupported'));
       return;
     }
     setError('');
@@ -409,7 +417,7 @@ export default function RoutingPage() {
       (pos) => {
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
-        const coordLabel = `Vị trí của tôi (${lat.toFixed(5)}, ${lng.toFixed(5)})`;
+        const coordLabel = t('routing.myLocationCoords', { lat: lat.toFixed(5), lng: lng.toFixed(5) });
         if (type === 'from') {
           setStartLat(lat);
           setStartLng(lng);
@@ -451,7 +459,7 @@ export default function RoutingPage() {
             .catch(() => {});
         }
       },
-      () => setError('Không lấy được vị trí hiện tại. Kiểm tra quyền truy cập vị trí của trình duyệt.'),
+      () => setError(t('routing.geoError')),
       { enableHighAccuracy: true, timeout: 20000, maximumAge: 60000 }
     );
   };
@@ -839,7 +847,7 @@ export default function RoutingPage() {
       return (
         <div className="flex items-center gap-3 px-3 py-2 text-sm text-[#202124]">
           <FaLocationCrosshairs className="text-[#1a73e8]" />
-          <span>Dùng vị trí của tôi</span>
+          <span>{t('routing.myLocation')}</span>
         </div>
       );
     }
@@ -847,7 +855,7 @@ export default function RoutingPage() {
       return (
         <div className="px-3 py-2 text-sm text-[#202124]">
           <div className="truncate">{option?.fullAddress || option?.name || ''}</div>
-          <div className="text-[11px] text-[#5f6368]">Lịch sử tìm kiếm</div>
+          <div className="text-[11px] text-[#5f6368]">{t('routing.searchHistory')}</div>
         </div>
       );
     }
@@ -882,7 +890,7 @@ export default function RoutingPage() {
           field="fullAddress"
           minLength={0}
           delay={350}
-          placeholder="Nhập điểm đi"
+          placeholder={t('routing.placeholderFrom')}
           className="w-full"
           inputClassName="rounded-md border border-[#dadce0] bg-white px-3 py-2 text-sm"
           onFocus={() => {
@@ -920,12 +928,12 @@ export default function RoutingPage() {
         field="fullAddress"
         minLength={0}
         delay={350}
-        placeholder="Nhập điểm đến"
+          placeholder={t('routing.placeholderTo')}
         className="w-full"
         inputClassName="rounded-md border border-[#dadce0] bg-white px-3 py-2 text-sm"
         onFocus={() => {
           if (!hasChosenStart) {
-            setError('Vui long chon diem di truoc (dia chi hoac ban do).');
+            setError(t('routing.errPickStartFirst'));
             return;
           }
           setPickMode('end');
@@ -946,13 +954,13 @@ export default function RoutingPage() {
 
   const searchRoute = async () => {
     if (startLat == null || startLng == null || endLat == null || endLng == null) {
-      setError('Vui lòng chọn đầy đủ điểm đi và điểm đến (địa chỉ hoặc trên bản đồ).');
+      setError(t('routing.needBothPoints'));
       return;
     }
     if (extraStops.length > 0) {
       const incomplete = extraStops.some((s) => s.lat == null || s.lng == null);
       if (incomplete) {
-        setError('Vui lòng chọn đủ vị trí cho mọi điểm đến đã thêm, hoặc xóa ô chưa dùng.');
+        setError(t('routing.needAllExtraStops'));
         return;
       }
     }
@@ -994,12 +1002,9 @@ export default function RoutingPage() {
           // Gỡ overlay trước khi setResult — tránh React 18 batch chung một paint với bản đồ nặng
           flushSync(() => setLoading(false));
           setResult(legsData.length ? mergeSafePathLegs(legsData) : null);
-          const base = res.error || 'Không gọi được API tìm đường an toàn.';
-          const hint400 =
-            res.status === 400
-              ? ' Nếu vẫn lỗi: điểm có thể nằm ngoài vùng đồ thị đường trên máy chủ — chọn điểm gần trung tâm TP.HCM hoặc chỗ đã có lưới đường.'
-              : '';
-          setError(`Chặng ${i + 1}: ${base}${hint400}`);
+          const base = getSafeUserFacingError(res.error, t('routing.safePathError'));
+          const hint400 = res.status === 400 ? t('routing.safePathHint400') : '';
+          setError(t('routing.legError', { n: i + 1, msg: `${base}${hint400}` }));
           return;
         }
         const data = res.data || null;
@@ -1018,7 +1023,7 @@ export default function RoutingPage() {
     } catch (e) {
       flushSync(() => setLoading(false));
       setResult(null);
-      setError(e instanceof Error ? e.message : 'Lỗi khi xử lý tuyến đường.');
+      setError(getSafeUserFacingError(e, t('routing.routeProcessError')));
     } finally {
       setLoading(false);
     }
@@ -1050,22 +1055,21 @@ export default function RoutingPage() {
           aria-busy="true"
         >
           <div className="rounded-2xl bg-white/92 px-10 py-9 shadow-[0_12px_40px_rgba(15,23,42,0.18)]">
-            <Slab color="#318dcc" size="medium" text="Đang tìm lộ trình phù hợp..." textColor="" />
+            <Slab color="#318dcc" size="medium" text={t('routing.loadingRoute')} textColor="" />
           </div>
         </div>
       )}
       {error && <ErrorToast message={error} onClose={() => setError('')} />}
       {showRouteToast && found && (
         <div className="pointer-events-none fixed left-1/2 top-20 z-[2000] -translate-x-1/2 rounded-md bg-[#333] px-4 py-2 text-sm text-white shadow-lg transition-opacity duration-300">
-          Thời gian dự kiến: {etaMin ?? '-'} phút - Quãng đường:{' '}
-          {distanceKm != null ? `${numberFormatter.format(distanceKm)} km` : '-'}
+          {t('routing.etaDistance', { eta: etaMin ?? '-', dist: distanceKm != null ? `${numberFormatter.format(distanceKm)} km` : '-' })}
         </div>
       )}
       <div className="flex h-full w-full">
         <aside className="h-full w-full max-w-[440px] shrink-0 overflow-y-auto border-r border-[#e8eaed] bg-white shadow-[2px_0_10px_rgba(60,64,67,0.18)]">
           <div className="flex items-start justify-between border-b border-[#e8eaed] px-4 pt-4">
             <div className="flex flex-1 items-center gap-4 overflow-x-auto pb-2">
-              {TRANSPORT_TABS.map((tab) => {
+              {transportTabs.map((tab) => {
                 const Icon = tab.icon;
                 const active = vehicleType === tab.id;
                 return (
@@ -1112,7 +1116,7 @@ export default function RoutingPage() {
                   setSwapIconOrder((v) => !v);
                 }}
                 className="absolute right-0 top-1/2 z-10 -translate-y-1/2 rounded-full p-2 text-[#5f6368] hover:bg-[#e8eaed]"
-                title="Đảo điểm đi/đến"
+                title={t('routing.swapPoints')}
               >
                 <FaArrowRightArrowLeft />
               </button>
@@ -1183,20 +1187,20 @@ export default function RoutingPage() {
                           field="fullAddress"
                           minLength={0}
                           delay={350}
-                          placeholder={`Điểm đến ${idx + 2}`}
+                          placeholder={t('routing.placeholderExtra', { n: idx + 2 })}
                           className="w-full"
                           inputClassName="rounded-md border border-[#dadce0] bg-white px-3 py-2 text-sm"
                           onFocus={() => {
                             if (!hasChosenStart) {
-                              setError('Vui long chon diem di truoc (dia chi hoac ban do).');
+                              setError(t('routing.errPickStartFirst'));
                               return;
                             }
                             if (!hasPrimaryDestination) {
-                              setError('Vui lòng chọn điểm đến đầu tiên trước khi thêm điểm tiếp theo.');
+                              setError(t('routing.errPickMainDestFirst'));
                               return;
                             }
                             if (!canFocusExtraStop(idx)) {
-                              setError('Vui lòng nhập đủ các điểm đến phía trên.');
+                              setError(t('routing.errFillUpperStops'));
                               return;
                             }
                             setPickMode('extra');
@@ -1216,7 +1220,7 @@ export default function RoutingPage() {
                       </div>
                       <button
                         type="button"
-                        title="Xóa điểm đến này"
+                        title={t('routing.removeStopTitle')}
                         onClick={() => {
                           delete skipIdleOpenOnFocusExtraRef.current[stop.id];
                           delete extraStopAutocompleteRefs.current[stop.id];
@@ -1231,7 +1235,7 @@ export default function RoutingPage() {
                 ))}
 
                 {(searchingFrom || searchingTo || searchingExtra) && (
-                  <div className="pl-8 text-[11px] text-[#5f6368]">Dang goi y dia chi trong TP.HCM...</div>
+                  <div className="pl-8 text-[11px] text-[#5f6368]">{t('routing.searchingPlaces')}</div>
                 )}
               </div>
             </div>
@@ -1250,7 +1254,7 @@ export default function RoutingPage() {
                   +
                 </span>
               </span>
-              <span>{extraStops.length >= 6 ? 'Tối đa 6 điểm đến phụ' : 'Thêm điểm đến'}</span>
+              <span>{extraStops.length >= 6 ? t('routing.maxExtraStops') : t('routing.addStop')}</span>
             </button>
           </div>
 
@@ -1269,7 +1273,7 @@ export default function RoutingPage() {
                   setNearestNodeMaxM(Math.min(5000, Math.max(150, n)));
                 }}
                 className="w-24 rounded-md border border-[#dadce0] px-2 py-1.5 text-xs text-[#3c4043]"
-                title="Ban kinh snap (m)"
+                title={t('routing.snapRadiusTitle')}
               />
               <button
                 type="button"
@@ -1278,22 +1282,22 @@ export default function RoutingPage() {
                 className="inline-flex flex-1 items-center justify-center gap-2 rounded-md bg-[#1a73e8] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#1558d6] disabled:opacity-60"
               >
                 <FaRoute />
-                {loading ? 'Đang tìm...' : 'Tìm đường an toàn'}
+                {loading ? t('routing.finding') : t('routing.findSafeRoute')}
               </button>
               </div>
-              <p className="text-[11px] text-[#5f6368]">Bán kính Snap: 150-5000 m (mặc định 1200).</p>
+              <p className="text-[11px] text-[#5f6368]">{t('routing.snapHintLine')}</p>
               <div className="pointer-events-none absolute left-0 top-full z-50 mt-2 w-[360px] rounded bg-[#333] px-3 py-2 text-[12px] leading-snug text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100">
-                Bán kính Snap (Snap Radius) là khoảng cách tối đa để hệ thống tự động bắt (snap) tọa độ điểm bạn chọn vào mạng lưới đường giao thông hợp lệ gần nhất. Tính năng này giúp tránh lỗi không tìm được đường khi điểm chọn rơi vào khu vực không có đường đi (như sông, hồ, giữa tòa nhà...). Cấu hình hệ thống: Tối thiểu 150m, Tối đa 5000m. Mặc định: 1200m.
+                {t('routing.snapTooltip')}
               </div>
             </div>
           </div>
 
           <div className="flex items-center gap-4 border-b border-[#e8eaed] px-4 py-3 text-xs text-[#1a73e8]">
             <button type="button" disabled className="inline-flex cursor-not-allowed items-center gap-2 opacity-50">
-              <FaLocationCrosshairs /> Gửi đường đi tới điện thoại
+              <FaLocationCrosshairs /> {t('routing.sendToPhone')}
             </button>
             <button type="button" disabled className="inline-flex cursor-not-allowed items-center gap-2 opacity-50">
-              <FaLink /> Sao chép liên kết
+              <FaLink /> {t('routing.copyLink')}
             </button>
           </div>
 
@@ -1331,11 +1335,11 @@ export default function RoutingPage() {
           <div className="border-t border-[#e8eaed] px-4 py-3">
             {result && !found && (
               <div className="mt-2 rounded-md border border-[#f9ab00] bg-[#fef7e0] px-2 py-1.5 text-xs text-[#5f370e]">
-                Khong tim thay lo trinh an toan, thu SUV hoac doi diem di/den.
+                {t('routing.noSafeRoute')}
               </div>
             )}
             <button type="button" onClick={() => setShowAdvancedInfo((v) => !v)} className="mt-2 hidden text-[11px] text-[#5f6368] underline">
-              {showAdvancedInfo ? 'An thong tin ky thuat' : 'Xem thong tin ky thuat'}
+              {showAdvancedInfo ? t('routing.hideTech') : t('routing.showTech')}
             </button>
             {showAdvancedInfo && (
               <div className="mt-2 space-y-1 text-[11px] text-[#5f6368]">
@@ -1365,7 +1369,7 @@ export default function RoutingPage() {
             >
               {startLat != null && startLng != null && (
                 <Marker longitude={startLng} latitude={startLat} anchor="center">
-                  <div className="h-4 w-4 rounded-full border-2 border-white bg-[#1a73e8]" title="Diem di" />
+                  <div className="h-4 w-4 rounded-full border-2 border-white bg-[#1a73e8]" title={t('routing.markerStart')} />
                 </Marker>
               )}
               {userLocation &&
@@ -1383,7 +1387,7 @@ export default function RoutingPage() {
                 )}
               {endLat != null && endLng != null && (
                 <Marker longitude={endLng} latitude={endLat} anchor="bottom">
-                  <FaLocationDot className="text-xl text-[#d93025]" title="Diem den" />
+                  <FaLocationDot className="text-xl text-[#d93025]" title={t('routing.markerEnd')} />
                 </Marker>
               )}
               {extraStops.map((stop) =>
@@ -1392,7 +1396,7 @@ export default function RoutingPage() {
                 Number.isFinite(stop.lat) &&
                 Number.isFinite(stop.lng) ? (
                   <Marker key={`extra-${stop.id}`} longitude={stop.lng} latitude={stop.lat} anchor="bottom">
-                    <FaLocationDot className="text-lg text-[#d93025]" title="Diem den bo sung" />
+                    <FaLocationDot className="text-lg text-[#d93025]" title={t('routing.markerExtra')} />
                   </Marker>
                 ) : null
               )}
@@ -1410,7 +1414,7 @@ export default function RoutingPage() {
                 const color = getCrowdMarkerColor(report);
                 return (
                   <Marker key={`crowd-${report.id}`} longitude={lng} latitude={lat} anchor="bottom">
-                    <div className="flex flex-col items-center" title={report.location_description || 'Bao cao tu nguoi dan'}>
+                    <div className="flex flex-col items-center" title={report.location_description || t('routing.crowdMarkerTitle')}>
                       <div className="rounded-full border-2 border-white" style={{ width: 18, height: 18, backgroundColor: color }} />
                       <div style={{ width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: `8px solid ${color}`, marginTop: -2 }} />
                     </div>
@@ -1482,7 +1486,7 @@ export default function RoutingPage() {
                 >
                   <div className="rounded-md border border-[#dadce0] bg-white px-2.5 py-1.5 text-xs shadow-md">
                     <div className="font-semibold leading-tight text-[#202124]">
-                      {etaMin != null ? `${etaMin} phút` : '—'}
+                      {etaMin != null ? t('routing.minutesShort', { n: etaMin }) : '—'}
                     </div>
                     <div className="mt-0.5 text-[11px] leading-tight text-[#5f6368]">
                       {distanceKm != null ? `${numberFormatter.format(distanceKm)} km` : '—'}

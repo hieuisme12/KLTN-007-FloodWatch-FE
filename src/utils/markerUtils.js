@@ -37,18 +37,26 @@ export const createCustomIcon = (color, isBlinking = false) => {
 };
 
 // Định dạng trạng thái (không có icon, icon sẽ được xử lý ở component)
-export const getStatusLabel = (status) => {
+export const getStatusLabel = (status, t) => {
+  const keyMap = { normal: 'normal', warning: 'warning', danger: 'danger', offline: 'offline' };
+  const sub = keyMap[status];
+  if (typeof t === 'function' && sub) return t(`reportUi.sensorStatus.${sub}`);
   const labels = {
     normal: 'Bình thường',
     warning: 'Cảnh báo',
     danger: 'Nguy hiểm',
     offline: 'Mất kết nối'
   };
-  return labels[status] || 'Không xác định';
+  return labels[status] || (typeof t === 'function' ? t('reportUi.moderation.unknown') : 'Không xác định');
 };
 
 // Định dạng velocity (không có icon, icon sẽ được xử lý ở component)
-export const getVelocityLabel = (velocity) => {
+export const getVelocityLabel = (velocity, t) => {
+  if (typeof t === 'function') {
+    if (velocity > 0) return t('reportUi.velocity.rising', { value: Number(velocity).toFixed(1) });
+    if (velocity < 0) return t('reportUi.velocity.falling', { value: Number(velocity).toFixed(1) });
+    return t('reportUi.velocity.stable');
+  }
   if (velocity > 0) return `Dâng: +${velocity.toFixed(1)} cm/phút`;
   if (velocity < 0) return `Rút: ${velocity.toFixed(1)} cm/phút`;
   return 'Ổn định';

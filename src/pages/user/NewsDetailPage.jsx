@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { FaArrowLeft, FaClock } from 'react-icons/fa6';
-import ErrorToast from '../components/common/ErrorToast';
+import ErrorToast from '../../components/common/ErrorToast';
 import Skeleton from 'react-loading-skeleton';
 const NewsDetailPage = () => {
   const { id } = useParams();

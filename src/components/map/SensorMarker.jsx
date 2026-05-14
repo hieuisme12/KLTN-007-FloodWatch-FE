@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Marker, Popup } from 'react-map-gl/mapbox';
 import { getSensorDisplayAddress, getSensorDisplayPosition, getSensorDisplayName } from '../../data/sensorOverrides';
 import { fetchAddressFromCoords } from '../../utils/geocode';
@@ -26,6 +27,7 @@ const SensorMarker = ({
   onHoverChange,
   reportHoverId
 }) => {
+  const { t } = useTranslation();
   const { lat, lng } = getSensorDisplayPosition(item);
   const overrideAddress = getSensorDisplayAddress(item);
   const displayName = getSensorDisplayName(item);
@@ -175,15 +177,19 @@ const SensorMarker = ({
             </h3>
             <div style={{ fontSize: '12px', color: '#333', display: 'flex', alignItems: 'flex-start', gap: '4px' }}>
               <MdLocationOn style={{ flexShrink: 0, marginTop: '2px' }} />
-              <span>{address === null && !overrideAddress ? 'Đang tải địa chỉ...' : (address || displayName || `${lat.toFixed(6)}, ${lng.toFixed(6)}`)}</span>
+              <span>
+                {address === null && !overrideAddress
+                  ? t('reportUi.addressLoading')
+                  : (address || displayName || t('reportUi.coordLabel', { lat: lat.toFixed(6), lng: lng.toFixed(6) }))}
+              </span>
             </div>
             <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
-              Nhiệt độ: {item.temperature != null ? `${item.temperature.toFixed(1)} °C` : '—'}
+              {t('reportUi.popupTemperature')}: {item.temperature != null ? `${item.temperature.toFixed(1)} °C` : '—'}
               {' · '}
-              Độ ẩm: {item.humidity != null ? `${item.humidity.toFixed(0)} %` : '—'}
+              {t('reportUi.popupHumidity')}: {item.humidity != null ? `${item.humidity.toFixed(0)} %` : '—'}
             </div>
             <div style={{ fontSize: '11px', color: '#999', marginTop: '4px' }}>
-              Tọa độ: {lat.toFixed(6)}, {lng.toFixed(6)}
+              {t('reportUi.coordLabel', { lat: lat.toFixed(6), lng: lng.toFixed(6) })}
             </div>
           </div>
         </Popup>

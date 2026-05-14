@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { isAuthenticated } from '../../utils/auth';
 import { isGuestBrowseMode } from '../../utils/guestSession';
 import { FaLock, FaPenToSquare, FaBars } from 'react-icons/fa6';
 import { getOnlineUsersCount, getMonthlyVisitsCount } from '../../services/api';
 import { cn } from '@/lib/cn';
 import { useSidebar } from '@/context/SidebarProvider';
+import LanguageSwitcher from '@/components/common/LanguageSwitcher';
 
 const Header = () => {
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { openMobileDrawer } = useSidebar();
   const authenticated = isAuthenticated();
@@ -39,12 +42,13 @@ const Header = () => {
   }, [guestBrowse]);
 
   const formatDate = (date) => {
-    const days = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
-    const dayName = days[date.getDay()];
-    const day = date.getDate().toString().padStart(2, '0');
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const year = date.getFullYear();
-    return `${dayName}, ngày ${day} tháng ${month}, năm ${year}`;
+    const loc = i18n.language?.startsWith('en') ? 'en-GB' : 'vi-VN';
+    return new Intl.DateTimeFormat(loc, {
+      weekday: 'long',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    }).format(date);
   };
 
   const formatTime = (date) => {
@@ -69,7 +73,7 @@ const Header = () => {
               e.stopPropagation();
               openMobileDrawer();
             }}
-            aria-label="Mở menu điều hướng"
+            aria-label={t('header.openMenu')}
           >
             <FaBars className="h-5 w-5" />
           </button>
@@ -81,13 +85,13 @@ const Header = () => {
               <img src="/iuh.png" alt="IUH Logo" className="h-full w-full object-contain p-1" />
             </div>
             <span className="hidden text-base font-semibold text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.2)] lg:inline xl:text-lg">
-              FLOODSIGHT THÀNH PHỐ HỒ CHÍ MINH
+              {t('app.brand')}
             </span>
           </div>
         </div>
 
-        <div className="absolute right-2 z-[1001] flex h-[61px] max-w-[calc(100%-8rem)] items-center gap-2 sm:right-4 sm:max-w-none sm:gap-4 md:right-5 md:gap-6">
-          <div className="flex min-w-0 items-center gap-4 sm:gap-5 md:gap-8">
+        <div className="absolute right-2 z-[1001] flex h-[61px] max-w-[calc(100%-8rem)] items-center gap-2 sm:right-4 sm:max-w-none sm:gap-3 md:right-5 md:gap-4">
+          <div className="flex min-w-0 items-center gap-3 sm:gap-4 md:gap-6">
             <div className="hidden flex-col gap-0.5 md:flex">
               <div className="text-xs font-normal leading-tight text-[#666] max-lg:text-[11px]">
                 {formatDate(currentTime)}
@@ -98,10 +102,10 @@ const Header = () => {
             </div>
 
             {!guestBrowse && (
-              <div className="hidden items-center gap-6 lg:flex xl:gap-8">
+              <div className="hidden items-center gap-4 lg:flex xl:gap-6">
                 <div className="flex flex-col gap-0.5">
                   <div className="text-xs font-normal leading-tight text-[#666] max-lg:text-[11px]">
-                    Lượt truy cập
+                    {t('header.visits')}
                   </div>
                   <div className="font-[Arial] text-lg font-bold leading-tight text-[#1976d2] max-lg:text-base">
                     {formatNumber(totalVisits)}
@@ -110,7 +114,7 @@ const Header = () => {
 
                 <div className="flex flex-col gap-0.5">
                   <div className="text-xs font-normal leading-tight text-[#666] max-lg:text-[11px]">
-                    Lượt truy cập tháng
+                    {t('header.monthlyVisits')}
                   </div>
                   <div className="font-[Arial] text-lg font-bold leading-tight text-[#1976d2] max-lg:text-base">
                     {formatNumber(monthlyVisits)}
@@ -119,6 +123,8 @@ const Header = () => {
               </div>
             )}
           </div>
+
+          <LanguageSwitcher className="inline-flex" />
 
           {!authenticated && (
             <div className="flex flex-shrink-0 items-center gap-1 sm:gap-2">
@@ -131,7 +137,7 @@ const Header = () => {
                 )}
                 onClick={() => navigate('/login')}
               >
-                <FaLock /> <span className="max-[380px]:hidden sm:inline">Đăng nhập</span>
+                <FaLock /> <span className="max-[380px]:hidden sm:inline">{t('header.login')}</span>
               </button>
               <button
                 type="button"
@@ -142,7 +148,7 @@ const Header = () => {
                 )}
                 onClick={() => navigate('/register')}
               >
-                <FaPenToSquare /> <span className="max-[380px]:hidden sm:inline">Đăng ký</span>
+                <FaPenToSquare /> <span className="max-[380px]:hidden sm:inline">{t('header.register')}</span>
               </button>
             </div>
           )}

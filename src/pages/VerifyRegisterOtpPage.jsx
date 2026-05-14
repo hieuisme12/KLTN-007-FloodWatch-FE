@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { FaEnvelope, FaKey } from 'react-icons/fa6';
 import { verifyOtp, resendOtp } from '../services/api';
 import ErrorToast from '../components/common/ErrorToast';
@@ -7,6 +8,7 @@ import AuthLoadingScreen from '../components/common/AuthLoadingScreen';
 import AuthSplitShell from '../components/auth/AuthSplitShell';
 
 const VerifyRegisterOtpPage = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state || {};
@@ -36,11 +38,11 @@ const VerifyRegisterOtpPage = () => {
     setInfo('');
     const em = email.trim().toLowerCase();
     if (!em) {
-      setError('Vui lòng nhập email đã đăng ký.');
+      setError(t('auth.verify.errEmail'));
       return;
     }
     if (!otp.trim()) {
-      setError('Vui lòng nhập mã OTP.');
+      setError(t('auth.verify.errOtp'));
       return;
     }
 
@@ -53,19 +55,19 @@ const VerifyRegisterOtpPage = () => {
           state: {
             postVerifyMessage:
               result.message ||
-              'Đã xác minh email. Bạn có thể đăng nhập.',
+              t('auth.verify.postVerify'),
             username: usernameHint
           }
         });
         return;
       }
       if (result.success && !result.data?.registration_completed) {
-        setError('Xác minh chưa hoàn tất. Vui lòng thử lại hoặc liên hệ hỗ trợ.');
+        setError(t('auth.verify.errIncomplete'));
         return;
       }
-      setError(result.error || 'Mã OTP không đúng hoặc đã hết hạn.');
+      setError(result.error || t('auth.verify.errOtpBad'));
     } catch {
-      setError('Có lỗi xảy ra. Vui lòng thử lại.');
+      setError(t('errors.generic'));
     } finally {
       setLoading(false);
     }
@@ -76,19 +78,19 @@ const VerifyRegisterOtpPage = () => {
     setInfo('');
     const em = email.trim().toLowerCase();
     if (!em) {
-      setError('Nhập email đã đăng ký trước khi gửi lại mã.');
+      setError(t('auth.verify.errResendEmail'));
       return;
     }
     setResendLoading(true);
     try {
       const result = await resendOtp(em);
       if (result.success) {
-        setInfo(result.message || 'Đã gửi mã OTP mới qua email.');
+        setInfo(result.message || t('auth.verify.infoResent'));
       } else {
-        setError(result.error || 'Không gửi lại được mã.');
+        setError(result.error || t('auth.forgot.errResendFail'));
       }
     } catch {
-      setError('Có lỗi xảy ra. Vui lòng thử lại.');
+      setError(t('errors.generic'));
     } finally {
       setResendLoading(false);
     }
@@ -112,17 +114,16 @@ const VerifyRegisterOtpPage = () => {
         <form className="login-split-form" onSubmit={handleVerify}>
           <div className="login-split-title-row">
             <img src="/iuh.png" alt="" className="login-split-brand-logo" width={56} height={56} />
-            <h2 className="login-split-title">Xác minh email</h2>
+            <h2 className="login-split-title">{t('auth.verify.title')}</h2>
           </div>
 
           <p className="verify-otp-subtitle verify-otp-subtitle--light">
-            Nhập mã OTP đã gửi tới email của bạn. Sau khi xác minh, hãy đăng nhập
-            bằng tên đăng nhập và mật khẩu.
+            {t('auth.verify.subtitle')}
           </p>
 
           <div className="login-field">
             <label className="login-field-label" htmlFor="verify-email">
-              Email
+              {t('auth.verify.email')}
             </label>
             <div className="login-input-shell login-input-shell--user">
               <FaEnvelope className="login-input-icon" aria-hidden />
@@ -132,7 +133,7 @@ const VerifyRegisterOtpPage = () => {
                 className={`login-input ${emailLocked ? 'verify-email-readonly' : ''}`}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="email@example.com"
+                placeholder={t('auth.register.emailPlaceholder')}
                 required
                 readOnly={emailLocked}
                 autoComplete="email"
@@ -142,7 +143,7 @@ const VerifyRegisterOtpPage = () => {
 
           <div className="login-field">
             <label className="login-field-label" htmlFor="otp">
-              Mã OTP
+              {t('auth.verify.otp')}
             </label>
             <div className="login-input-shell login-input-shell--pass">
               <FaKey className="login-input-icon" aria-hidden />
@@ -152,7 +153,7 @@ const VerifyRegisterOtpPage = () => {
                 className="login-input"
                 value={otp}
                 onChange={(e) => setOtp(e.target.value)}
-                placeholder="Nhập mã trong email"
+                placeholder={t('auth.verify.otpPh')}
                 required
                 autoComplete="one-time-code"
                 inputMode="numeric"
@@ -161,7 +162,7 @@ const VerifyRegisterOtpPage = () => {
           </div>
 
           <button type="submit" className="login-btn-primary login-btn-primary--spaced" disabled={loading}>
-            {loading ? 'Đang xác minh…' : 'Xác minh'}
+            {loading ? t('auth.verify.submitting') : t('auth.verify.submit')}
           </button>
 
           <button
@@ -170,14 +171,14 @@ const VerifyRegisterOtpPage = () => {
             onClick={handleResend}
             disabled={resendLoading}
           >
-            {resendLoading ? 'Đang gửi…' : 'Gửi lại mã OTP'}
+            {resendLoading ? t('auth.forgot.sending') : t('auth.verify.resend')}
           </button>
 
           <div className="login-footer-split">
             <p>
-              <Link to="/login">Đăng nhập</Link>
+              <Link to="/login">{t('auth.verify.login')}</Link>
               {' · '}
-              <Link to="/register">Đăng ký lại</Link>
+              <Link to="/register">{t('auth.verify.registerAgain')}</Link>
             </p>
           </div>
         </form>

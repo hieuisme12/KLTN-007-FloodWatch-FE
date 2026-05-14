@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { getConfidenceTier } from '../../utils/scoringDisplay';
 import { cn } from '../../lib/cn';
 
@@ -6,10 +7,12 @@ import { cn } from '../../lib/cn';
  * Badge độ tin báo cáo (0–100). breakdown: object từ API (optional).
  */
 export default function ConfidenceBadge({ confidence, breakdown, className = '', showBreakdownToggle = false }) {
+  const { t } = useTranslation();
   const tier = getConfidenceTier(confidence);
   const [open, setOpen] = useState(false);
   if (confidence == null || Number.isNaN(Number(confidence))) return null;
   const n = Math.round(Number(confidence));
+  const tierLabel = tier?.tierKey ? t(`reportUi.confidenceTier.${tier.tierKey}`) : '';
   const entries =
     breakdown && typeof breakdown === 'object'
       ? Object.entries(breakdown).filter(([, v]) => v != null && !Number.isNaN(Number(v)))
@@ -24,10 +27,10 @@ export default function ConfidenceBadge({ confidence, breakdown, className = '',
           backgroundColor: tier?.bg || '#f1f5f9',
           borderColor: `${tier?.color || '#cbd5e1'}40`
         }}
-        title={`Độ tin báo cáo: ${n}/100`}
+        title={t('reportUi.confidenceBadge.title', { n })}
       >
-        Tin cậy: <strong>{n}</strong>/100
-        {tier ? ` · ${tier.label}` : ''}
+        {t('reportUi.confidenceBadge.label')}: <strong>{n}</strong>/100
+        {tierLabel ? ` · ${tierLabel}` : ''}
       </span>
       {showBreakdownToggle && entries.length > 0 && (
         <>
@@ -36,7 +39,7 @@ export default function ConfidenceBadge({ confidence, breakdown, className = '',
             className="border-0 bg-transparent p-0 text-[11px] text-blue-600 underline cursor-pointer"
             onClick={() => setOpen((v) => !v)}
           >
-            {open ? 'Ẩn chi tiết' : 'Chi tiết điểm'}
+            {open ? t('reportUi.confidenceBadge.hideDetails') : t('reportUi.confidenceBadge.showDetails')}
           </button>
           {open && (
             <ul className="m-0 max-w-full list-none rounded-lg border border-slate-200 bg-slate-50 p-2 text-[11px]">

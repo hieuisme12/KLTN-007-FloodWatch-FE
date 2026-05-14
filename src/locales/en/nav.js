@@ -1,0 +1,27 @@
+/** @type {Record<string, unknown>} */
+export default {
+  nav: {
+    home: 'Home',
+    mapDetail: 'Detailed map',
+    routing: 'Routing',
+    reports: 'Reports',
+    newReport: 'New report',
+    emergency: 'Emergency alerts',
+    guestMode: 'Guest mode',
+    admin: 'Administrator',
+    moderator: 'Moderator',
+    user: 'User',
+    expandSidebar: 'Expand sidebar',
+    collapseSidebar: 'Collapse sidebar',
+    closeMenu: 'Close menu',
+    logout: 'Log out',
+    login: 'Log in',
+    exitGuest: 'Exit guest mode',
+    staffPortalAdmin: 'Admin portal',
+    staffPortalMod: 'Operations portal',
+    staffPortalTitle: '{{label}} (opens new tab)',
+    quickSummary: 'Quick summary (in-app)',
+    quickSummaryTitle: 'In-app summary only (not the full admin portal)',
+    floodsightTitle: 'FLOODSIGHT HO CHI MINH CITY',
+  },
+};

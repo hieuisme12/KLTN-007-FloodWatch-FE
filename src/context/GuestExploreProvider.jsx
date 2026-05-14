@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { clearGuestExploreMode } from '../utils/guestSession';
 import { GuestExploreContext } from './guestExploreContext';
 
@@ -50,6 +51,7 @@ function GuestModalPortal({ open, title, description, primaryLabel, onPrimary, s
 }
 
 export function GuestExploreProvider({ children }) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [dialog, setDialog] = useState(null);
 
@@ -59,16 +61,21 @@ export function GuestExploreProvider({ children }) {
     setDialog({ kind: 'welcome' });
   }, []);
 
-  const openRequireLogin = useCallback((payload) => {
-    const defaultMsg =
-      'Bạn cần đăng nhập để dùng tính năng này. Đăng nhập để gửi báo cáo, quản lý tài khoản và nhận cảnh báo khẩn.';
-    if (payload && typeof payload === 'object' && typeof payload.featureLabel === 'string') {
-      setDialog({ kind: 'requireLogin', featureLabel: payload.featureLabel.trim() || 'Tính năng này' });
-      return;
-    }
-    const msg = typeof payload === 'string' && payload.trim() ? payload : defaultMsg;
-    setDialog({ kind: 'requireLogin', message: msg });
-  }, []);
+  const openRequireLogin = useCallback(
+    (payload) => {
+      const defaultMsg = t('guest.requireDefault');
+      if (payload && typeof payload === 'object' && typeof payload.featureLabel === 'string') {
+        setDialog({
+          kind: 'requireLogin',
+          featureLabel: payload.featureLabel.trim() || t('guest.defaultFeature'),
+        });
+        return;
+      }
+      const msg = typeof payload === 'string' && payload.trim() ? payload : defaultMsg;
+      setDialog({ kind: 'requireLogin', message: msg });
+    },
+    [t]
+  );
 
   const goLogin = useCallback(() => {
     clearGuestExploreMode();
@@ -95,30 +102,24 @@ export function GuestExploreProvider({ children }) {
       {children}
       <GuestModalPortal
         open={open && isWelcome}
-        title="Đang xem với tư cách khách"
-        description="Giao diện hiển thị đầy đủ các mục như khi đã đăng nhập. Các thao tác như tạo báo cáo mới, hồ sơ cá nhân, cảnh báo khẩn hoặc tin tức chi tiết chỉ thực hiện được sau khi đăng nhập — hệ thống sẽ nhắc và có thể chuyển bạn tới trang đăng nhập."
-        primaryLabel="Đăng nhập"
+        title={t('guest.welcomeTitle')}
+        description={t('guest.welcomeDesc')}
+        primaryLabel={t('guest.login')}
         onPrimary={goLogin}
-        secondaryLabel="Đã hiểu, tiếp tục xem"
+        secondaryLabel={t('guest.welcomeContinue')}
         onSecondary={closeDialog}
       />
       <GuestModalPortal
         open={open && isRequire}
-        title="Cần đăng nhập"
+        title={t('guest.requireTitle')}
         description={
-          dialog?.featureLabel ? (
-            <>
-              Tính năng{' '}
-              <strong className="font-bold text-slate-900">{dialog.featureLabel}</strong> cần đăng nhập (và đúng
-              quyền tài khoản nếu có). Bạn có thể đăng nhập để tiếp tục.
-            </>
-          ) : (
-            dialog?.message || ''
-          )
+          dialog?.featureLabel
+            ? t('guest.requireFeatureBody', { label: dialog.featureLabel })
+            : dialog?.message || ''
         }
-        primaryLabel="Đăng nhập"
+        primaryLabel={t('guest.login')}
         onPrimary={goLogin}
-        secondaryLabel="Đóng"
+        secondaryLabel={t('guest.close')}
         onSecondary={closeDialog}
       />
     </GuestExploreContext.Provider>

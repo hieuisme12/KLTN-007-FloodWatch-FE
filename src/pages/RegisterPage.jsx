@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { Trans, useTranslation } from 'react-i18next';
 import { FaUser, FaLock, FaEnvelope, FaPhone } from 'react-icons/fa6';
 import { register } from '../services/api';
 import ErrorToast from '../components/common/ErrorToast';
@@ -7,6 +8,7 @@ import AuthLoadingScreen from '../components/common/AuthLoadingScreen';
 import AuthSplitShell from '../components/auth/AuthSplitShell';
 
 const RegisterPage = () => {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -31,12 +33,12 @@ const RegisterPage = () => {
     setError('');
 
     if (formData.password !== formData.confirmPassword) {
-      setError('Mật khẩu xác nhận không khớp');
+      setError(t('errors.passwordMismatch'));
       return;
     }
 
     if (formData.password.length < 6) {
-      setError('Mật khẩu phải có ít nhất 6 ký tự');
+      setError(t('errors.passwordMin6'));
       return;
     }
 
@@ -62,10 +64,10 @@ const RegisterPage = () => {
           }
         });
       } else {
-        setError(result.error || 'Đăng ký thất bại');
+        setError(result.error || t('errors.registerFailed'));
       }
     } catch {
-      setError('Có lỗi xảy ra. Vui lòng thử lại.');
+      setError(t('errors.generic'));
     } finally {
       setLoading(false);
     }
@@ -82,12 +84,12 @@ const RegisterPage = () => {
         <form className="login-split-form" onSubmit={handleSubmit}>
           <div className="login-split-title-row">
             <img src="/iuh.png" alt="" className="login-split-brand-logo" width={56} height={56} />
-            <h2 className="login-split-title">Đăng ký</h2>
+            <h2 className="login-split-title">{t('auth.register.title')}</h2>
           </div>
 
           <div className="login-field">
             <label className="login-field-label" htmlFor="reg-username">
-              Tên đăng nhập <span className="login-field-req">*</span>
+              {t('auth.register.username')} <span className="login-field-req">*</span>
             </label>
             <div className="login-input-shell login-input-shell--user">
               <FaUser className="login-input-icon" aria-hidden />
@@ -98,7 +100,7 @@ const RegisterPage = () => {
                 className="login-input"
                 value={formData.username}
                 onChange={handleChange}
-                placeholder="Tên đăng nhập"
+                placeholder={t('auth.register.usernamePh')}
                 required
                 autoFocus
                 autoComplete="username"
@@ -108,7 +110,7 @@ const RegisterPage = () => {
 
           <div className="login-field">
             <label className="login-field-label" htmlFor="reg-email">
-              Email <span className="login-field-req">*</span>
+              {t('auth.register.email')} <span className="login-field-req">*</span>
             </label>
             <div className="login-input-shell login-input-shell--user">
               <FaEnvelope className="login-input-icon" aria-hidden />
@@ -119,7 +121,7 @@ const RegisterPage = () => {
                 className="login-input"
                 value={formData.email}
                 onChange={handleChange}
-                placeholder="email@example.com"
+                placeholder={t('auth.register.emailPlaceholder')}
                 required
                 autoComplete="email"
               />
@@ -128,7 +130,7 @@ const RegisterPage = () => {
 
           <div className="login-field">
             <label className="login-field-label" htmlFor="reg-full_name">
-              Họ và tên
+              {t('auth.register.fullName')}
             </label>
             <div className="login-input-shell login-input-shell--pass">
               <FaUser className="login-input-icon" aria-hidden />
@@ -139,7 +141,7 @@ const RegisterPage = () => {
                 className="login-input"
                 value={formData.full_name}
                 onChange={handleChange}
-                placeholder="Nguyễn Văn A"
+                placeholder={t('auth.register.fullNamePh')}
                 autoComplete="name"
               />
             </div>
@@ -147,7 +149,7 @@ const RegisterPage = () => {
 
           <div className="login-field">
             <label className="login-field-label" htmlFor="reg-phone">
-              Số điện thoại
+              {t('auth.register.phone')}
             </label>
             <div className="login-input-shell login-input-shell--pass">
               <FaPhone className="login-input-icon" aria-hidden />
@@ -158,7 +160,7 @@ const RegisterPage = () => {
                 className="login-input"
                 value={formData.phone}
                 onChange={handleChange}
-                placeholder="0xxx xxx xxx"
+                placeholder={t('auth.register.phonePh')}
                 autoComplete="tel"
               />
             </div>
@@ -166,7 +168,7 @@ const RegisterPage = () => {
 
           <div className="login-field">
             <label className="login-field-label" htmlFor="reg-password">
-              Mật khẩu <span className="login-field-req">*</span>
+              {t('auth.register.password')} <span className="login-field-req">*</span>
             </label>
             <div className="login-input-shell login-input-shell--pass">
               <FaLock className="login-input-icon" aria-hidden />
@@ -177,7 +179,7 @@ const RegisterPage = () => {
                 className="login-input"
                 value={formData.password}
                 onChange={handleChange}
-                placeholder="Tối thiểu 6 ký tự"
+                placeholder={t('auth.register.passwordPh')}
                 required
                 autoComplete="new-password"
               />
@@ -186,7 +188,7 @@ const RegisterPage = () => {
 
           <div className="login-field">
             <label className="login-field-label" htmlFor="reg-confirmPassword">
-              Xác nhận mật khẩu <span className="login-field-req">*</span>
+              {t('auth.register.confirmPassword')} <span className="login-field-req">*</span>
             </label>
             <div className="login-input-shell login-input-shell--pass">
               <FaLock className="login-input-icon" aria-hidden />
@@ -197,7 +199,7 @@ const RegisterPage = () => {
                 className="login-input"
                 value={formData.confirmPassword}
                 onChange={handleChange}
-                placeholder="Nhập lại mật khẩu"
+                placeholder={t('auth.register.confirmPh')}
                 required
                 autoComplete="new-password"
               />
@@ -209,12 +211,15 @@ const RegisterPage = () => {
             className="login-btn-primary login-btn-primary--spaced"
             disabled={loading}
           >
-            {loading ? 'Đang đăng ký…' : 'Đăng ký'}
+            {loading ? t('auth.register.submitting') : t('auth.register.submit')}
           </button>
 
           <div className="login-footer-split">
             <p>
-              Đã có tài khoản? <Link to="/login">Đăng nhập</Link>
+              <Trans
+                i18nKey="auth.register.footer"
+                components={{ 1: <Link to="/login" /> }}
+              />
             </p>
           </div>
         </form>
