@@ -1,48 +1,44 @@
 import React, { useState, useEffect } from 'react';
-import { VOV_GT_RSS_PROXY_PATH } from '../../config/rssConfig';
+import { fetchNewsFeed } from '../../services/api';
 import { FaClock } from 'react-icons/fa6';
 import Skeleton from 'react-loading-skeleton';
 
-const RSS_POLL_MS = 15 * 60 * 1000;
+/** Gần với `Cache-Control: max-age` mặc định phía BE (900s); tránh gọi quá dày. */
+const NEWS_POLL_MS = 15 * 60 * 1000;
 
-/** Khối tin RSS 24h (dashboard) — không còn thống kê mực nước trong card này. */
+/** Khối tin RSS dashboard — `GET /api/news` (VnExpress / Tuổi Trẻ / Người Lao Động, tối đa 15 bài). */
 const WaterLevelStatistics = () => {
-  const [rssItems, setRssItems] = useState([]);
-  const [rssLoading, setRssLoading] = useState(true);
-  const [rssError, setRssError] = useState(null);
-  const [rssTried, setRssTried] = useState(null);
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
 
-    const loadRss = async () => {
+    const load = async () => {
       try {
-        setRssLoading(true);
-        setRssError(null);
-        const res = await fetch(VOV_GT_RSS_PROXY_PATH, { credentials: 'same-origin' });
-        const json = await res.json().catch(() => ({}));
+        setLoading(true);
+        setError(null);
+        const result = await fetchNewsFeed();
         if (cancelled) return;
-        if (!json.ok) {
-          setRssItems([]);
-          setRssTried(null);
-          setRssError(json.error || 'Không tải được RSS');
+        if (!result.success) {
+          setItems([]);
+          setError(result.error || 'Không thể tải tin tức.');
           return;
         }
-        setRssItems(Array.isArray(json.items) ? json.items : []);
-        setRssTried(Array.isArray(json.tried) ? json.tried : null);
+        setItems(Array.isArray(result.data) ? result.data : []);
       } catch (e) {
         if (!cancelled) {
-          setRssItems([]);
-          setRssTried(null);
-          setRssError(e?.message || 'Lỗi mạng khi tải tin');
+          setItems([]);
+          setError(e?.message || 'Lỗi mạng khi tải tin');
         }
       } finally {
-        if (!cancelled) setRssLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
-    loadRss();
-    const iv = setInterval(loadRss, RSS_POLL_MS);
+    void load();
+    const iv = setInterval(() => void load(), NEWS_POLL_MS);
     return () => {
       cancelled = true;
       clearInterval(iv);
@@ -52,41 +48,39 @@ const WaterLevelStatistics = () => {
   return (
     <div className="water-level-statistics water-level-statistics--news-only">
       <h3 className="statistics-title">
-        <FaClock aria-hidden /> Tin tức 24h
+        <FaClock aria-hidden /> Tin thời sự TP.HCM
       </h3>
+      <p className="news-feed-hint">
+        Ngập nước & thời tiết — nguồn hiển thị theo từng bài (VnExpress, Tuổi Trẻ, Người Lao Động).
+      </p>
 
       <div className="vov-rss-section vov-rss-section--solo">
-        {rssLoading ? (
+        {loading ? (
           <div className="vov-rss-loading">
-            <Skeleton count={6} height={14} style={{ marginBottom: 10 }} />
+            <Skeleton count={8} height={14} style={{ marginBottom: 10 }} />
           </div>
-        ) : rssError ? (
-          <div className="vov-rss-error">{rssError}</div>
-        ) : rssItems.length === 0 ? (
+        ) : error ? (
+          <div className="vov-rss-error">{error}</div>
+        ) : items.length === 0 ? (
           <div className="vov-rss-empty">
-            <p>Chưa có tin trong feed. Thử lại sau.</p>
-            {rssTried && rssTried.length > 0 ? (
-              <ul className="vov-rss-tried" title="Chi tiết thử từng nguồn">
-                {rssTried.map((line, i) => (
-                  <li key={i}>{line}</li>
-                ))}
-              </ul>
-            ) : null}
+            <p>Chưa có tin. Thử lại sau.</p>
           </div>
         ) : (
           <ul className="vov-rss-list">
-            {rssItems.map((it, idx) => (
+            {items.map((it, idx) => (
               <li key={`${it.link}-${idx}`} className="vov-rss-item">
                 <a
                   className="vov-rss-link"
                   href={it.link}
                   target="_blank"
                   rel="noopener noreferrer"
-                  title={it.description || it.title}
+                  title={it.title}
                 >
                   {it.title}
                 </a>
-                {it.pubDate ? <div className="vov-rss-meta">{it.pubDate}</div> : null}
+                <div className="vov-rss-meta">
+                  {[it.pubDate, it.source].filter(Boolean).join(' · ')}
+                </div>
               </li>
             ))}
           </ul>

@@ -123,6 +123,35 @@ apiClient.interceptors.response.use(
   }
 );
 
+/**
+ * Tin RSS ngập nước / thời tiết TP.HCM (`GET /api/news`) — public, không bắt buộc JWT.
+ * @returns {{ success: boolean, data?: Array<{ title: string, link: string, pubDate: string, source: string }>, error?: string }}
+ */
+export const fetchNewsFeed = async () => {
+  try {
+    const response = await apiClient.get(API_ENDPOINTS.NEWS);
+    const body = response.data;
+    if (body?.success && Array.isArray(body.data)) {
+      return { success: true, data: body.data };
+    }
+    return {
+      success: false,
+      error: typeof body?.error === 'string' ? body.error : 'Không thể tải tin tức.',
+      data: Array.isArray(body?.data) ? body.data : []
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error.response?.data?.error ||
+        error.response?.data?.message ||
+        error.message ||
+        'Không thể tải tin tức.',
+      data: []
+    };
+  }
+};
+
 // Chuẩn hóa dữ liệu từ API
 const normalizeFloodData = (data) => {
   return data.map((item) => {
@@ -803,6 +832,7 @@ export const postAuthLocation = async ({ lat, lng, accuracy_m }) => {
   }
 };
 
+/** Lấy profile user hiện tại — `GET /api/auth/profile` (chỉ đọc). */
 export const getProfile = async () => {
   try {
     const response = await apiClient.get(API_ENDPOINTS.AUTH_PROFILE);
@@ -848,9 +878,10 @@ export const getProfileIcons = async () => {
   }
 };
 
+/** Cập nhật profile — `PUT /api/auth/profile/edit` (GET `/api/auth/profile` chỉ đọc). */
 export const updateProfile = async (profileData) => {
   try {
-    const response = await apiClient.put(API_ENDPOINTS.AUTH_PROFILE, profileData);
+    const response = await apiClient.put(API_ENDPOINTS.AUTH_PROFILE_EDIT, profileData);
     
     if (response.data && response.data.success) {
       if (response.data.data) {

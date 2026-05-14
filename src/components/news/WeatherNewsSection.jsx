@@ -2,7 +2,7 @@ import React from 'react';
 import WeatherHcmWidget from '../weather/WeatherHcmWidget';
 import WaterLevelStatistics from '../stats/WaterLevelStatistics';
 /**
- * Hàng dashboard: thời tiết TP.HCM + tin tức 24h (cùng chiều cao cột).
+ * Hàng dashboard: thời tiết TP.HCM + tin RSS (`GET /api/news`).
  */
 const WeatherNewsSection = () => {
   return (

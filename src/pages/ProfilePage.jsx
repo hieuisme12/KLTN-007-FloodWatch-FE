@@ -64,22 +64,32 @@ const ProfilePage = () => {
     });
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  /** Chỉ gọi khi user bấm nút Lưu (không dùng submit form để tránh lưu nhầm khi bấm Chỉnh sửa / Enter). */
+  const saveProfile = async () => {
+    if (!isEditing || saving) return;
+
     setError('');
     setSuccess('');
     setSaving(true);
 
-    const result = await updateProfile(formData);
-    
-    if (result.success) {
-      setUser(result.data);
-      setSuccess('Cập nhật thông tin thành công!');
-      setIsEditing(false);
-    } else {
-      setError(result.error || 'Cập nhật thất bại');
+    try {
+      const result = await updateProfile(formData);
+
+      if (result.success) {
+        setUser(result.data);
+        setFormData({
+          full_name: result.data.full_name || '',
+          email: result.data.email || '',
+          phone: result.data.phone || ''
+        });
+        setSuccess('Cập nhật thông tin thành công!');
+        setIsEditing(false);
+      } else {
+        setError(result.error || 'Cập nhật thất bại');
+      }
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   const handleCancel = () => {
@@ -170,7 +180,7 @@ const ProfilePage = () => {
           </div>
         )}
 
-        <form className="profile-form" onSubmit={handleSubmit}>
+        <div className="profile-form">
           <div className="profile-form-layout">
             {/* Left Side - Photo (chọn từ icon có sẵn) */}
             <div className="profile-photo-section">
@@ -286,24 +296,31 @@ const ProfilePage = () => {
               Hủy
             </button>
             {isEditing ? (
-              <button 
-                type="submit" 
+              <button
+                type="button"
                 className="btn-save"
                 disabled={saving}
+                onClick={() => {
+                  void saveProfile();
+                }}
               >
                 {saving ? 'Đang lưu...' : 'Lưu'}
               </button>
             ) : (
-              <button 
-                type="button" 
+              <button
+                type="button"
                 className="btn-edit"
-                onClick={() => setIsEditing(true)}
+                onClick={() => {
+                  setError('');
+                  setSuccess('');
+                  setIsEditing(true);
+                }}
               >
                 Chỉnh sửa
               </button>
             )}
           </div>
-        </form>
+        </div>
 
         {/* Modal chọn ảnh đại diện từ danh sách icon có sẵn */}
         {showAvatarPicker && (

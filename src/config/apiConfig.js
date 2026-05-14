@@ -105,11 +105,17 @@ export const API_ENDPOINTS = {
   AUTH_RESET_PASSWORD: '/api/auth/reset-password',
   AUTH_REFRESH: '/api/auth/refresh',
   AUTH_LOGOUT: '/api/auth/logout',
+  /** Chỉ đọc thông tin user (JWT). */
   AUTH_PROFILE: '/api/auth/profile',
+  /** Cập nhật profile (full_name, phone, email, avatar, …). */
+  AUTH_PROFILE_EDIT: '/api/auth/profile/edit',
   /** Lưu GPS sau Geolocation (JSON body: lat, lng, accuracy_m) */
   AUTH_LOCATION: '/api/auth/location',
   AUTH_PROFILE_ICONS: '/api/auth/profile-icons',
   AUTH_CHANGE_PASSWORD: '/api/auth/change-password',
+
+  /** Tin RSS tổng hợp (ngập nước / thời tiết TP.HCM) — public, không bắt buộc JWT */
+  NEWS: '/api/news',
 
   // Stats
   STATS_ONLINE_USERS: '/api/stats/online-users',
