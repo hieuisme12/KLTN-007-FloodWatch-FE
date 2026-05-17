@@ -9,6 +9,7 @@ const SearchAutoComplete = React.forwardRef(function SearchAutoComplete(
     appendTo = 'self',
     delay = 300,
     className = '',
+    dataKey: _dataKey,
     ...rest
   },
   ref

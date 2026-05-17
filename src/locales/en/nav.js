@@ -1,7 +1,10 @@
 /** @type {Record<string, unknown>} */
 export default {
   nav: {
+    mainNav: 'Main navigation',
     home: 'Home',
+    overview: 'Overview',
+    reportList: 'Report list',
     mapDetail: 'Detailed map',
     routing: 'Routing',
     reports: 'Reports',

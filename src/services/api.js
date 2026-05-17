@@ -1212,8 +1212,15 @@ export const moderateReport = async (reportId, action, rejectionReason = null) =
  */
 export const fetchReliabilityRanking = async (limit = 100) => {
   try {
-    const response = await apiClient.get(`${API_ENDPOINTS.REPORTS_RELIABILITY_RANKING}?limit=${limit}`);
-    
+    const response = await apiClient.get(
+      `${API_ENDPOINTS.REPORTS_RELIABILITY_RANKING}?limit=${limit}`,
+      { validateStatus: (status) => status === 200 || status === 403 || status === 401 }
+    );
+
+    if (response.status === 403 || response.status === 401) {
+      return { success: false, data: [], forbidden: true };
+    }
+
     if (response.data && response.data.success) {
       return { success: true, data: response.data.data || [] };
     }

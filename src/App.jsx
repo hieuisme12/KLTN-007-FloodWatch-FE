@@ -128,9 +128,7 @@ function App() {
           element={
             <UserLayout>
               <Layout>
-                <ProtectedRoute>
-                  <NewReportPage />
-                </ProtectedRoute>
+                <NewReportPage />
               </Layout>
             </UserLayout>
           }

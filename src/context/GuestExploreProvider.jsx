@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { clearGuestExploreMode } from '../utils/guestSession';
 import { GuestExploreContext } from './guestExploreContext';
+import { CancelButton, PrimaryButton } from '../components/common/Button';
 
 function GuestModalPortal({ open, title, description, primaryLabel, onPrimary, secondaryLabel, onSecondary }) {
   if (!open || typeof document === 'undefined') return null;
@@ -29,20 +30,12 @@ function GuestModalPortal({ open, title, description, primaryLabel, onPrimary, s
         </h2>
         <div className="mt-3 text-sm leading-relaxed text-slate-600">{description}</div>
         <div className="mt-6 flex flex-wrap items-center justify-end gap-2">
-          <button
-            type="button"
-            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-            onClick={onSecondary}
-          >
+          <CancelButton type="button" onClick={onSecondary}>
             {secondaryLabel}
-          </button>
-          <button
-            type="button"
-            className="rounded-lg bg-[#1976d2] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#1565c0]"
-            onClick={onPrimary}
-          >
+          </CancelButton>
+          <PrimaryButton type="button" onClick={onPrimary}>
             {primaryLabel}
-          </button>
+          </PrimaryButton>
         </div>
       </div>
     </div>,

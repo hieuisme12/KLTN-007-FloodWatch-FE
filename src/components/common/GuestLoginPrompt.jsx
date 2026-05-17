@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
 import { FaLock } from 'react-icons/fa6';
-import { cn } from '@/lib/cn';
+import { CancelButton, PrimaryButton } from './Button';
 
 const GuestLoginPrompt = ({ message, onClose }) => {
   const { t } = useTranslation();
@@ -30,26 +30,12 @@ const GuestLoginPrompt = ({ message, onClose }) => {
           {message || t('guest.promptDefault')}
         </p>
         <div className="mb-5 flex flex-wrap justify-center gap-3 max-md:flex-col">
-          <button
-            type="button"
-            className={cn(
-              'cursor-pointer rounded-lg border-2 border-[#e0e0e0] bg-[#f5f5f5] px-8 py-3 text-base font-semibold text-[#666] transition-all duration-300',
-              'hover:bg-[#e0e0e0] focus:outline-none max-md:w-full'
-            )}
-            onClick={onClose}
-          >
+          <CancelButton type="button" className="max-md:w-full px-8" onClick={onClose}>
             {t('guest.close')}
-          </button>
-          <button
-            type="button"
-            className={cn(
-              'cursor-pointer rounded-lg border-none bg-gradient-to-br from-[#1E3A8A] to-[#FFA500] px-8 py-3 text-base font-semibold text-white transition-all duration-300',
-              'hover:-translate-y-0.5 hover:shadow-[0_6px_20px_rgba(102,126,234,0.4)] focus:outline-none max-md:w-full'
-            )}
-            onClick={() => navigate('/login')}
-          >
+          </CancelButton>
+          <PrimaryButton type="button" className="max-md:w-full px-8" onClick={() => navigate('/login')}>
             {t('guest.loginNow')}
-          </button>
+          </PrimaryButton>
         </div>
         <p className="m-0 text-sm text-[#666]">
           <Trans

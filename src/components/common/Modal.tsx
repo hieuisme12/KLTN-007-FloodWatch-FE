@@ -8,7 +8,7 @@ export interface ModalProps {
   title?: React.ReactNode;
   description?: React.ReactNode;
   children: React.ReactNode;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
   /** Nếu false, click overlay không đóng */
   closeOnOverlay?: boolean;
@@ -17,7 +17,8 @@ export interface ModalProps {
 const sizeClass: Record<NonNullable<ModalProps['size']>, string> = {
   sm: 'max-w-sm',
   md: 'max-w-md',
-  lg: 'max-w-lg'
+  lg: 'max-w-lg',
+  xl: 'max-w-6xl'
 };
 
 export function Modal({

@@ -13,6 +13,7 @@ import { POLLING_INTERVALS, CROWD_REPORT_MAP_DISPLAY_HOURS } from '../../config/
 import { filterNonExpiredReports } from '../../utils/reportHelpers';
 import { getSafeUserFacingError } from '../../utils/safeErrorMessage';
 import { useTranslation } from 'react-i18next';
+import MapView from '../../components/map/MapView';
 
 const MapPage = () => {
   const { t } = useTranslation();
@@ -127,7 +128,7 @@ const MapPage = () => {
   return (
     <div className="map-page-layout map-page-layout--in-app">
       <div className="map-page-container">
-        {/* Filter Panel - Left Side */}
+        {/* Bộ lọc (cột phải — CSS order: 2) */}
         <div className="map-filter-panel">
           <div className="filter-panel-header">
             <h3 className="filter-title">{t('mapPage.filterTitle')}</h3>
@@ -255,7 +256,7 @@ const MapPage = () => {
           )}
         </div>
 
-        {/* Map View - Right Side */}
+        {/* Bản đồ (cột trái — CSS order: 1) */}
         <div className="map-view-container">
           <MapView
             floodData={filteredFloodData}

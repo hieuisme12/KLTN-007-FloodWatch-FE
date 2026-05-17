@@ -5,6 +5,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import { FaPenToSquare, FaCheck, FaXmark, FaClock, FaPaperPlane, FaXmark as FaClose } from 'react-icons/fa6';
 import { submitFloodReport } from '../../services/api';
 import ErrorToast from '../common/ErrorToast';
+import { PrimaryButton } from '../common/Button';
 import { isAuthenticated, getCurrentUser } from '../../utils/auth';
 import { DEFAULT_CENTER, DEFAULT_ZOOM } from '../../utils/constants';
 import { fetchAddressFromCoords } from '../../utils/geocode';
@@ -331,27 +332,16 @@ const ReportFloodForm = ({ onSuccess, onClose }) => {
           </div>
         )}
 
-        {/* Submit button */}
-        <button
+        <PrimaryButton
           type="submit"
+          className="w-full"
           disabled={loading || cooldownSecondsLeft > 0}
+          loading={loading}
           title={
             cooldownSecondsLeft > 0
               ? `Có thể gửi lại sau ${cooldownSecondsLeft} giây`
               : undefined
           }
-          style={{
-            width: '100%',
-            padding: '12px',
-            background: loading || cooldownSecondsLeft > 0 ? '#6c757d' : '#007bff',
-            color: 'white',
-            border: 'none',
-            borderRadius: '6px',
-            fontSize: '16px',
-            fontWeight: 'bold',
-            cursor: loading || cooldownSecondsLeft > 0 ? 'not-allowed' : 'pointer',
-            transition: 'background 0.3s'
-          }}
         >
           {loading ? (
             <>
@@ -366,7 +356,7 @@ const ReportFloodForm = ({ onSuccess, onClose }) => {
               <FaPaperPlane /> Gửi báo cáo
             </>
           )}
-        </button>
+        </PrimaryButton>
       </form>
     </div>
   );

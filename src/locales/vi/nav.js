@@ -1,7 +1,10 @@
 /** @type {Record<string, unknown>} */
 export default {
   nav: {
+    mainNav: 'Điều hướng chính',
     home: 'Trang chủ',
+    overview: 'Tổng quan',
+    reportList: 'Danh sách báo cáo',
     mapDetail: 'Bản đồ chi tiết',
     routing: 'Tìm đường',
     reports: 'Báo cáo',

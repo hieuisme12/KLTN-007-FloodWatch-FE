@@ -1,6 +1,6 @@
 import React from 'react';
 import { Modal } from './Modal';
-import { Button } from './Button';
+import { Button, CancelButton } from './Button';
 
 export interface ConfirmDialogProps {
   open: boolean;
@@ -26,10 +26,12 @@ export default function ConfirmDialog({
   return (
     <Modal open={open} onClose={onCancel} title={title} description={description} size="md">
       <div className="flex flex-wrap items-center justify-end gap-2">
-        <Button variant="secondary" onClick={onCancel}>
-          {cancelLabel}
-        </Button>
-        <Button variant={variant === 'danger' ? 'danger' : 'primary'} onClick={onConfirm}>
+        <CancelButton onClick={onCancel}>{cancelLabel}</CancelButton>
+        <Button
+          color={variant === 'danger' ? 'danger' : 'primary-destructive'}
+          size="md"
+          onClick={onConfirm}
+        >
           {confirmLabel}
         </Button>
       </div>

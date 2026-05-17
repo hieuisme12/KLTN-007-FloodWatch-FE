@@ -9,6 +9,7 @@ import MapView from '../../components/map/MapView';
 import ChatBot from '../../components/common/ChatBot';
 import SensorDetailPanel from '../../components/map/SensorDetailPanel';
 import WeatherNewsSection from '../../components/news/WeatherNewsSection';
+import { PrimaryButton } from '../../components/common/Button';
 const DashboardPage = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -106,12 +107,9 @@ const DashboardPage = () => {
         <div className="dashboard-banner">
           <div className="dashboard-banner-content">
             <h2 className="dashboard-banner-title">{t('dashboard.mapBannerTitle')}</h2>
-            <button 
-              className="dashboard-banner-button"
-              onClick={() => navigate('/map')}
-            >
+            <PrimaryButton type="button" size="lg" onClick={() => navigate('/map')}>
               {t('dashboard.mapBannerCta')}
-            </button>
+            </PrimaryButton>
           </div>
         </div>
 

@@ -5,7 +5,7 @@ import { isAuthenticated } from '../../utils/auth';
 import { isGuestBrowseMode } from '../../utils/guestSession';
 import { FaLock, FaPenToSquare, FaBars } from 'react-icons/fa6';
 import { getOnlineUsersCount, getMonthlyVisitsCount } from '../../services/api';
-import { cn } from '@/lib/cn';
+import { Button, PrimaryButton } from '../common/Button';
 import { useSidebar } from '@/context/SidebarProvider';
 import LanguageSwitcher from '@/components/common/LanguageSwitcher';
 
@@ -128,28 +128,23 @@ const Header = () => {
 
           {!authenticated && (
             <div className="flex flex-shrink-0 items-center gap-1 sm:gap-2">
-              <button
+              <Button
                 type="button"
-                className={cn(
-                  'inline-flex items-center gap-1 whitespace-nowrap rounded-lg border-2 border-[#1976d2] bg-white px-2 py-1.5 text-xs font-medium text-[#1976d2] shadow-[0_1px_3px_rgba(0,0,0,0.1)] transition-all sm:gap-2 sm:px-4 sm:py-2 sm:text-sm',
-                  'hover:-translate-y-px hover:bg-[#1976d2] hover:text-white hover:shadow-[0_2px_6px_rgba(25,118,210,0.4)]',
-                  'focus:outline-none'
-                )}
+                color="secondary-destructive"
+                size="sm"
+                className="gap-1 whitespace-nowrap sm:gap-2 sm:px-4"
                 onClick={() => navigate('/login')}
               >
                 <FaLock /> <span className="max-[380px]:hidden sm:inline">{t('header.login')}</span>
-              </button>
-              <button
+              </Button>
+              <PrimaryButton
                 type="button"
-                className={cn(
-                  'inline-flex items-center gap-1 whitespace-nowrap rounded-lg border-2 border-[#1976d2] bg-[#1976d2] px-2 py-1.5 text-xs font-medium text-white shadow-[0_1px_3px_rgba(0,0,0,0.1)] transition-all sm:gap-2 sm:px-4 sm:py-2 sm:text-sm',
-                  'hover:-translate-y-px hover:border-[#1565c0] hover:bg-[#1565c0] hover:shadow-[0_2px_6px_rgba(25,118,210,0.4)]',
-                  'focus:outline-none'
-                )}
+                size="sm"
+                className="gap-1 whitespace-nowrap sm:gap-2 sm:px-4"
                 onClick={() => navigate('/register')}
               >
                 <FaPenToSquare /> <span className="max-[380px]:hidden sm:inline">{t('header.register')}</span>
-              </button>
+              </PrimaryButton>
             </div>
           )}
         </div>

@@ -17,17 +17,21 @@ import { DEFAULT_CENTER, DEFAULT_ZOOM, statusColors } from '../../utils/constant
 import SensorMarker from '../../components/map/SensorMarker';
 import ErrorToast from '../../components/common/ErrorToast';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
+import { CancelButton, ConfirmButton, PrimaryButton } from '../../components/common/Button';
+import { Edit03, Trash01 } from '@untitledui/icons';
+import { ButtonGroup, ButtonGroupItem } from '@/components/base/button-group/button-group';
 import { cn } from '@/lib/cn';
 import {
   FaLink,
   FaTrash,
-  FaPen,
   FaLocationCrosshairs,
   FaMagnifyingGlass,
   FaXmark,
   FaMapLocationDot
 } from 'react-icons/fa6';
+import { MdLocationOn } from 'react-icons/md';
 import { getMapboxToken } from '../../utils/mapboxToken';
+import { fetchAddressFromCoords } from '../../utils/geocode';
 import { getReporterAvatarUrl } from '../../utils/reporterAvatarUrl';
 import { getCurrentUser } from '../../utils/auth';
 import Skeleton from 'react-loading-skeleton';
@@ -43,6 +47,16 @@ const TELEGRAM_METHODS = ['telegram'];
 
 /** Khớp API: name trim, tối đa 200 ký tự; rỗng → null khi gửi POST/PUT. */
 const EMERGENCY_SUB_NAME_MAX = 200;
+const RADIUS_MIN = 100;
+const RADIUS_MAX = 5000;
+const RADIUS_STEP = 100;
+
+function clampSubscriptionRadius(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return RADIUS_MIN;
+  const stepped = Math.round(n / RADIUS_STEP) * RADIUS_STEP;
+  return Math.min(RADIUS_MAX, Math.max(RADIUS_MIN, stepped));
+}
 
 function getDisplayMeta(sub) {
   if (!sub || typeof sub !== 'object') return null;
@@ -99,6 +113,47 @@ function getSubscriptionTitleStyle(sub) {
 /** Chỉ hiển thị Telegram trong UI (ẩn email/webhook trên giao diện). */
 function subscriptionChannelLine() {
   return 'Telegram';
+}
+
+function SubscriptionLocationCell({ lat, lng }) {
+  const { t } = useTranslation();
+  const [address, setAddress] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (lat == null || lng == null || !Number.isFinite(Number(lat)) || !Number.isFinite(Number(lng))) {
+      setAddress(null);
+      setLoading(false);
+      return undefined;
+    }
+    let cancelled = false;
+    setLoading(true);
+    void fetchAddressFromCoords(Number(lat), Number(lng), { mapboxToken: MAPBOX_TOKEN }).then((addr) => {
+      if (cancelled) return;
+      setLoading(false);
+      setAddress(typeof addr === 'string' && addr.trim() ? addr.trim() : null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [lat, lng]);
+
+  return (
+    <div className="reports-location-cell emergency-subs-location-cell">
+      <div className="reports-location-inner">
+        <MdLocationOn size={18} />
+        {loading ? (
+          <span className="reports-reporter-meta">{t('emergency.locationGeocodeLoading')}</span>
+        ) : address ? (
+          <span>{address}</span>
+        ) : (
+          <span className="tabular-nums reports-reporter-meta">
+            {Number(lat).toFixed(4)}, {Number(lng).toFixed(4)}
+          </span>
+        )}
+      </div>
+    </div>
+  );
 }
 
 /** Cùng logic hiển thị với marker báo cáo người dân trên MapView (tên + avatar/icon + mũi pin). */
@@ -207,16 +262,16 @@ function ToggleSwitch({ checked, onChange, disabled }) {
 }
 
 /** Modal form cùng phong cách overlay với ConfirmDialog / bản đồ cảnh báo */
-function EmergencyStackModal({ open, title, description, onClose, children, footer }) {
+function EmergencyStackModal({ open, title, description, onClose, children, footer, suppressClose = false }) {
   const { t } = useTranslation();
   useEffect(() => {
-    if (!open) return undefined;
+    if (!open || suppressClose) return undefined;
     const onKey = (e) => {
       if (e.key === 'Escape') onClose?.();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+  }, [open, onClose, suppressClose]);
 
   if (!open || typeof document === 'undefined') return null;
 
@@ -226,7 +281,7 @@ function EmergencyStackModal({ open, title, description, onClose, children, foot
       role="presentation"
       style={{ backgroundColor: 'rgba(2, 6, 23, 0.88)' }}
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose?.();
+        if (!suppressClose && e.target === e.currentTarget) onClose?.();
       }}
     >
       <div
@@ -339,7 +394,7 @@ function EmergencyMapModal({
 
   return (
     <div
-      className="fixed inset-0 z-[4000] flex items-center justify-center p-4"
+      className="fixed inset-0 z-[4800] flex items-center justify-center p-4"
       role="presentation"
       style={{ backgroundColor: 'rgba(2, 6, 23, 0.88)' }}
       onMouseDown={(e) => {
@@ -470,13 +525,9 @@ function EmergencyMapModal({
               <FaLocationCrosshairs className="h-4 w-4 text-sky-600" />
               {t('emergency.getGps')}
             </button>
-            <button
-              type="button"
-              onClick={() => (onConfirm ? onConfirm() : onClose())}
-              className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"
-            >
+            <ConfirmButton type="button" onClick={() => (onConfirm ? onConfirm() : onClose())}>
               {t('emergency.done')}
-            </button>
+            </ConfirmButton>
           </div>
         </div>
       </div>
@@ -505,8 +556,12 @@ export default function EmergencyAlertsPage() {
   /** true: đóng bản đồ bằng «Xong» sẽ gọi API tạo đăng ký (sau khi đã kiểm tra Telegram). */
   const [pendingCreateAfterPick, setPendingCreateAfterPick] = useState(false);
   const pendingCreateNameRef = useRef('');
-  const [createNameModalOpen, setCreateNameModalOpen] = useState(false);
+  const [createSubModalOpen, setCreateSubModalOpen] = useState(false);
   const [createNameInput, setCreateNameInput] = useState('');
+  const [createLocationAddress, setCreateLocationAddress] = useState(null);
+  const [createLocationAddressLoading, setCreateLocationAddressLoading] = useState(false);
+  const createGeocodeReqRef = useRef(0);
+  const mapPickReturnsToCreateRef = useRef(false);
   const [subSearch, setSubSearch] = useState('');
 
   /** null | subscription — sửa trong popup */
@@ -577,13 +632,37 @@ export default function EmergencyAlertsPage() {
     if (res.success) {
       setSuccess(res.message || t('emergency.createdOk'));
       await loadAll();
-    } else {
-      setError(res.error || t('emergency.createFail'));
+      return true;
     }
+    setError(res.error || t('emergency.createFail'));
+    return false;
   }, [formLat, formLng, radius, loadAll, t]);
 
-  const handleCreate = async (e) => {
-    e.preventDefault();
+  const refreshCreateLocationAddress = useCallback(async (lat, lng) => {
+    if (lat == null || lng == null || !Number.isFinite(Number(lat)) || !Number.isFinite(Number(lng))) {
+      setCreateLocationAddress(null);
+      setCreateLocationAddressLoading(false);
+      return;
+    }
+    const reqId = ++createGeocodeReqRef.current;
+    setCreateLocationAddressLoading(true);
+    const addr = await fetchAddressFromCoords(Number(lat), Number(lng), { mapboxToken: MAPBOX_TOKEN });
+    if (createGeocodeReqRef.current !== reqId) return;
+    setCreateLocationAddressLoading(false);
+    setCreateLocationAddress(typeof addr === 'string' && addr.trim() ? addr.trim() : null);
+  }, []);
+
+  const closeCreateSubModal = () => {
+    setCreateSubModalOpen(false);
+    setCreateNameInput('');
+    setCreateLocationAddress(null);
+    setCreateLocationAddressLoading(false);
+    mapPickReturnsToCreateRef.current = false;
+    setPendingCreateAfterPick(false);
+    pendingCreateNameRef.current = '';
+  };
+
+  const openCreateSubModal = () => {
     setError('');
     setSuccess('');
     if (!profile?.telegram_linked) {
@@ -591,41 +670,80 @@ export default function EmergencyAlertsPage() {
       return;
     }
     setCreateNameInput('');
-    setCreateNameModalOpen(true);
+    setRadius(500);
+    setFormLat(defaultLat);
+    setFormLng(defaultLng);
+    setUserGps(null);
+    setCreateLocationAddress(null);
+    mapPickReturnsToCreateRef.current = false;
+    setCreateSubModalOpen(true);
+    void refreshCreateLocationAddress(defaultLat, defaultLng);
   };
 
-  const cancelCreateNameModal = () => {
-    setCreateNameModalOpen(false);
-    setCreateNameInput('');
-  };
-
-  const confirmCreateNameAndOpenMap = () => {
+  const confirmCreateSubModal = () => {
     setError('');
     pendingCreateNameRef.current = clipEmergencySubscriptionName(createNameInput);
-    setCreateNameModalOpen(false);
-    setCreateNameInput('');
+    mapPickReturnsToCreateRef.current = true;
     setPendingCreateAfterPick(true);
     setMapPickerOpen(true);
   };
 
-  const openMapPickerOnly = () => {
+  const openMapPickerFromCreateModal = () => {
+    pendingCreateNameRef.current = clipEmergencySubscriptionName(createNameInput);
+    mapPickReturnsToCreateRef.current = true;
     setPendingCreateAfterPick(false);
     setMapPickerOpen(true);
   };
 
   const closeMapPicker = () => {
     setMapPickerOpen(false);
+    if (mapPickReturnsToCreateRef.current) {
+      setPendingCreateAfterPick(false);
+      return;
+    }
     setPendingCreateAfterPick(false);
     pendingCreateNameRef.current = '';
   };
 
   const confirmMapPicker = () => {
+    const lat = Number(formLat);
+    const lng = Number(formLng);
+    const returnsToCreate = mapPickReturnsToCreateRef.current;
+    const shouldSubmit = pendingCreateAfterPick;
+
     setMapPickerOpen(false);
-    if (pendingCreateAfterPick) {
-      setPendingCreateAfterPick(false);
-      void submitCreateSubscription();
+    setPendingCreateAfterPick(false);
+
+    if (returnsToCreate) {
+      void refreshCreateLocationAddress(lat, lng);
+      if (shouldSubmit) {
+        pendingCreateNameRef.current = clipEmergencySubscriptionName(createNameInput);
+        void (async () => {
+          const ok = await submitCreateSubscription();
+          if (ok) {
+            mapPickReturnsToCreateRef.current = false;
+            setCreateSubModalOpen(false);
+            setCreateNameInput('');
+            setCreateLocationAddress(null);
+          } else {
+            mapPickReturnsToCreateRef.current = true;
+          }
+        })();
+      }
+      return;
     }
+
+    mapPickReturnsToCreateRef.current = false;
+    pendingCreateNameRef.current = '';
   };
+
+  useEffect(() => {
+    if (!createSubModalOpen || mapPickerOpen) return undefined;
+    const timer = window.setTimeout(() => {
+      void refreshCreateLocationAddress(formLat, formLng);
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [formLat, formLng, createSubModalOpen, mapPickerOpen, refreshCreateLocationAddress]);
 
   const openEditModal = (sub) => {
     setEditModalSub(sub);
@@ -670,6 +788,24 @@ export default function EmergencyAlertsPage() {
 
   const removeSub = (id) => {
     setConfirmDialog({ type: 'delete', id });
+  };
+
+  const handleSubscriptionToggle = async (sub, isActive) => {
+    setError('');
+    const body = {
+      radius: Number(sub.radius),
+      notification_methods: TELEGRAM_METHODS,
+      is_active: isActive,
+      lat: Number(sub.lat),
+      lng: Number(sub.lng)
+    };
+    const res = await updateEmergencySubscription(sub.id, body);
+    if (res.success) {
+      setSuccess(isActive ? t('emergency.subOn') : t('emergency.subOff'));
+      await loadAll();
+    } else {
+      setError(res.error || t('emergency.toggleFail'));
+    }
   };
 
   const confirmDeleteSub = async () => {
@@ -722,17 +858,22 @@ export default function EmergencyAlertsPage() {
     }
   };
 
-  const useMyLocationInline = () => {
+  const applyGpsToCreateForm = () => {
     if (!navigator.geolocation) {
       setError(t('emergency.geoUnsupported'));
       return;
     }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setFormLat(pos.coords.latitude);
-        setFormLng(pos.coords.longitude);
-        setUserGps({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        setSuccess(t('emergency.gpsOk'));
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        setFormLat(lat);
+        setFormLng(lng);
+        setUserGps({ lat, lng });
+        if (createSubModalOpen) {
+          setSuccess(t('emergency.gpsOk'));
+          void refreshCreateLocationAddress(lat, lng);
+        }
       },
       () => setError(t('emergency.gpsError'))
     );
@@ -856,41 +997,120 @@ export default function EmergencyAlertsPage() {
       />
 
       <EmergencyStackModal
-        open={createNameModalOpen}
-        title={t('emergency.nameModalTitle')}
-        description={t('emergency.nameModalDesc')}
-        onClose={cancelCreateNameModal}
+        open={createSubModalOpen}
+        suppressClose={mapPickerOpen}
+        title={t('emergency.createModalTitle')}
+        description={t('emergency.createModalDesc')}
+        onClose={closeCreateSubModal}
         footer={
           <>
-            <button
-              type="button"
-              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-              onClick={cancelCreateNameModal}
-            >
+            <CancelButton type="button" onClick={closeCreateSubModal}>
               {t('emergency.cancelBtn')}
-            </button>
-            <button
-              type="button"
-              className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"
-              onClick={confirmCreateNameAndOpenMap}
-            >
+            </CancelButton>
+            <PrimaryButton type="button" onClick={confirmCreateSubModal}>
               {t('emergency.continuePick')}
-            </button>
+            </PrimaryButton>
           </>
         }
       >
-        <label className="block text-sm font-medium text-slate-800">
-          {t('emergency.nameFieldLabel')}
-          <input
-            type="text"
-            value={createNameInput}
-            onChange={(e) => setCreateNameInput(e.target.value)}
-            maxLength={EMERGENCY_SUB_NAME_MAX}
-            autoFocus
-            className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-            placeholder={t('emergency.namePlaceholder')}
-          />
-        </label>
+        <div className="space-y-5">
+          <label className="block text-sm font-medium text-slate-800">
+            {t('emergency.nameFieldLabel')}
+            <input
+              type="text"
+              value={createNameInput}
+              onChange={(e) => setCreateNameInput(e.target.value)}
+              maxLength={EMERGENCY_SUB_NAME_MAX}
+              autoFocus
+              className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+              placeholder={t('emergency.namePlaceholder')}
+            />
+          </label>
+
+          <div>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-sm font-medium text-slate-800">{t('emergency.radiusLabelShort')}</span>
+              <span className="text-sm tabular-nums text-slate-600">{t('emergency.radiusMeters', { radius })}</span>
+            </div>
+            <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <input
+                type="range"
+                min={RADIUS_MIN}
+                max={RADIUS_MAX}
+                step={RADIUS_STEP}
+                value={radius}
+                onChange={(e) => setRadius(clampSubscriptionRadius(e.target.value))}
+                className="min-w-0 flex-1 accent-sky-600"
+              />
+              <label className="flex shrink-0 items-center gap-2 text-sm text-slate-700">
+                <span className="sr-only">{t('emergency.radiusInputLabel')}</span>
+                <input
+                  type="number"
+                  min={RADIUS_MIN}
+                  max={RADIUS_MAX}
+                  step={RADIUS_STEP}
+                  value={radius}
+                  onChange={(e) => setRadius(clampSubscriptionRadius(e.target.value))}
+                  className="w-24 rounded-lg border border-slate-200 px-3 py-2 text-sm tabular-nums text-slate-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                />
+                <span className="text-slate-500">m</span>
+              </label>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4">
+            <div className="text-sm font-medium text-slate-800">{t('emergency.centerLabel')}</div>
+            {createLocationAddressLoading ? (
+              <p className="mt-1 text-sm text-slate-500">{t('emergency.locationGeocodeLoading')}</p>
+            ) : createLocationAddress ? (
+              <p className="mt-1 text-sm leading-snug text-slate-800">{createLocationAddress}</p>
+            ) : null}
+            <p className="mt-1 text-xs tabular-nums text-slate-500 sm:text-sm">
+              {Number(formLat).toFixed(5)}, {Number(formLng).toFixed(5)}
+              {userGps ? t('emergency.gpsSuffix') : ''}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <PrimaryButton type="button" className="gap-2" onClick={openMapPickerFromCreateModal}>
+                <FaMapLocationDot className="h-4 w-4" />
+                {t('emergency.openMapPick')}
+              </PrimaryButton>
+              <button
+                type="button"
+                onClick={applyGpsToCreateForm}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-800 hover:bg-slate-50"
+              >
+                <FaLocationCrosshairs className="h-4 w-4 text-sky-600" />
+                {t('emergency.quickGps')}
+              </button>
+            </div>
+            {!MAPBOX_TOKEN && (
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <label className="text-sm text-slate-700">
+                  {t('emergency.lat')}
+                  <input
+                    type="number"
+                    step="any"
+                    value={formLat}
+                    onChange={(e) => setFormLat(Number(e.target.value))}
+                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
+                  />
+                </label>
+                <label className="text-sm text-slate-700">
+                  {t('emergency.lng')}
+                  <input
+                    type="number"
+                    step="any"
+                    value={formLng}
+                    onChange={(e) => setFormLng(Number(e.target.value))}
+                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
+                  />
+                </label>
+              </div>
+            )}
+          </div>
+
+          <p className="text-xs leading-relaxed text-slate-500">{t('emergency.channelTelegramCreate')}</p>
+        </div>
       </EmergencyStackModal>
 
       <EmergencyStackModal
@@ -909,21 +1129,17 @@ export default function EmergencyAlertsPage() {
         onClose={closeEditModal}
         footer={
           <>
-            <button
-              type="button"
-              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-              onClick={closeEditModal}
-            >
+            <CancelButton type="button" onClick={closeEditModal}>
               {t('emergency.cancelBtn')}
-            </button>
-            <button
+            </CancelButton>
+            <ConfirmButton
               type="button"
               disabled={editSaving}
-              className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+              loading={editSaving}
               onClick={() => void saveEditModal()}
             >
               {editSaving ? t('emergency.saving') : t('emergency.save')}
-            </button>
+            </ConfirmButton>
           </>
         }
       >
@@ -1024,18 +1240,16 @@ export default function EmergencyAlertsPage() {
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button
+              <PrimaryButton
                 type="button"
                 disabled={tgBusy}
+                loading={tgBusy}
+                className="gap-2"
                 onClick={onTelegramLink}
-                className={cn(
-                  'inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-medium text-white',
-                  'hover:bg-sky-700 disabled:opacity-50'
-                )}
               >
                 <FaLink className="h-4 w-4" />
                 {tgBusy ? t('emergency.tgBusy') : t('emergency.tgOpenLink')}
-              </button>
+              </PrimaryButton>
               {profile?.telegram_linked && (
                 <button
                   type="button"
@@ -1050,90 +1264,17 @@ export default function EmergencyAlertsPage() {
           </div>
         </div>
 
-        <form onSubmit={handleCreate} className="border-b border-slate-200">
-          <div className="border-b border-slate-100 px-4 py-4 sm:px-6">
-            <h3 className="text-base font-semibold text-slate-900">{t('emergency.newSubTitle')}</h3>
-            <p className="mt-2 text-sm leading-relaxed text-slate-600">{t('emergency.newSubHelp')}</p>
-          </div>
-          <div className="min-w-0 divide-y divide-slate-100">
-              <div className="px-4 py-4 sm:px-6 sm:py-5">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-sm font-medium text-slate-800">{t('emergency.radiusLabelShort')}</span>
-                  <span className="text-sm tabular-nums text-slate-600">{t('emergency.radiusMeters', { radius })}</span>
-                </div>
-                <input
-                  type="range"
-                  min={100}
-                  max={5000}
-                  step={100}
-                  value={radius}
-                  onChange={(e) => setRadius(Number(e.target.value))}
-                  className="mt-3 w-full accent-sky-600"
-                />
-              </div>
-              <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-5">
-                <div className="min-w-0">
-                  <div className="text-sm font-medium text-slate-800">{t('emergency.centerLabel')}</div>
-                  <p className="mt-0.5 text-xs text-slate-500 sm:text-sm">
-                    {Number(formLat).toFixed(5)}, {Number(formLng).toFixed(5)}
-                    {userGps ? t('emergency.gpsSuffix') : ''}
-                  </p>
-                </div>
-                <div className="flex shrink-0 flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={openMapPickerOnly}
-                    className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-800 shadow-sm hover:bg-slate-50"
-                  >
-                    <FaMapLocationDot className="h-4 w-4 text-sky-600" />
-                    {t('emergency.openMapPick')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={useMyLocationInline}
-                    className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-800 hover:bg-slate-50"
-                  >
-                    <FaLocationCrosshairs className="h-4 w-4 text-sky-600" />
-                    {t('emergency.quickGps')}
-                  </button>
-                </div>
-              </div>
-              {!MAPBOX_TOKEN && (
-                <div className="grid gap-3 px-4 py-4 sm:grid-cols-2 sm:px-6">
-                  <label className="text-sm text-slate-700">
-                    {t('emergency.lat')}
-                    <input
-                      type="number"
-                      step="any"
-                      value={formLat}
-                      onChange={(e) => setFormLat(Number(e.target.value))}
-                      className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
-                    />
-                  </label>
-                  <label className="text-sm text-slate-700">
-                    {t('emergency.lng')}
-                    <input
-                      type="number"
-                      step="any"
-                      value={formLng}
-                      onChange={(e) => setFormLng(Number(e.target.value))}
-                      className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
-                    />
-                  </label>
-                </div>
-              )}
-              <div className="space-y-2 px-4 py-4 sm:px-6 sm:py-5">
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="rounded-lg bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
-                >
-                  {submitting ? t('emergency.submitting') : t('emergency.createSub')}
-                </button>
-                <p className="max-w-xl text-xs leading-relaxed text-slate-500">{t('emergency.channelTelegramCreate')}</p>
-              </div>
+        <div className="border-b border-slate-200 px-4 py-5 sm:px-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3 className="text-base font-semibold text-slate-900">{t('emergency.newSubTitle')}</h3>
+              <p className="mt-1 text-sm text-slate-600">{t('emergency.newSubHelp')}</p>
             </div>
-        </form>
+            <PrimaryButton type="button" className="shrink-0 gap-2" onClick={openCreateSubModal}>
+              {t('emergency.createSub')}
+            </PrimaryButton>
+          </div>
+        </div>
 
         <div className="flex-1">
           <div className="border-b border-slate-100 px-4 py-4 sm:px-6">
@@ -1142,72 +1283,102 @@ export default function EmergencyAlertsPage() {
               {t('emergency.subListCount', { shown: filteredSubs.length, total: subs.length })}
             </p>
           </div>
-          <div className="min-w-0 divide-y divide-slate-100">
-              {filteredSubs.length === 0 ? (
-                <div className="px-4 py-8 text-sm text-slate-500 sm:px-6">
-                  {subs.length === 0 ? t('emergency.noSubs') : t('emergency.noSearchMatch')}
-                </div>
-              ) : (
-                filteredSubs.map((sub) => (
-                  <div key={sub.id} className="px-4 py-4 sm:px-6 sm:py-5">
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                      <div className="flex min-w-0 flex-1 items-start gap-4">
-                        <ToggleSwitch
-                          checked={sub.is_active !== false}
-                          onChange={async (v) => {
-                            setError('');
-                            const body = {
-                              radius: Number(sub.radius),
-                              notification_methods: TELEGRAM_METHODS,
-                              is_active: v,
-                              lat: Number(sub.lat),
-                              lng: Number(sub.lng)
-                            };
-                            const res = await updateEmergencySubscription(sub.id, body);
-                            if (res.success) {
-                              setSuccess(v ? t('emergency.subOn') : t('emergency.subOff'));
-                              await loadAll();
-                            } else {
-                              setError(res.error || t('emergency.toggleFail'));
-                            }
-                          }}
-                        />
-                        <div className="min-w-0">
-                          <div
-                            className="font-medium text-slate-900"
-                            style={getSubscriptionTitleStyle(sub)}
-                          >
-                            {getSubscriptionDisplayName(sub)} {t('emergency.subRadiusSuffix', { radius: sub.radius })}
-                          </div>
-                          <p className="mt-0.5 text-sm text-slate-500">
-                            {subscriptionChannelLine()} · {Number(sub.lat).toFixed(4)},{' '}
-                            {Number(sub.lng).toFixed(4)}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex shrink-0 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => openEditModal(sub)}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
-                        >
-                          <FaPen className="h-3.5 w-3.5" /> {t('emergency.editDetails')}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => removeSub(sub.id)}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
-                        >
-                          <FaTrash className="h-3.5 w-3.5" /> {t('emergency.delete')}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
+          <div className="reports-list-table-wrap">
+            {filteredSubs.length === 0 ? (
+              <div className="reports-list-empty px-4 sm:px-6">
+                <p>{subs.length === 0 ? t('emergency.noSubs') : t('emergency.noSearchMatch')}</p>
+              </div>
+            ) : (
+              <div className="reports-list-table-scroll">
+                <table className="reports-list-table emergency-subs-table">
+                  <colgroup>
+                    <col className="emergency-subs-col-active" />
+                    <col className="emergency-subs-col-name" />
+                    <col className="emergency-subs-col-radius" />
+                    <col className="emergency-subs-col-channel" />
+                    <col className="emergency-subs-col-location" />
+                    <col className="emergency-subs-col-actions" />
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th className="emergency-subs-col-active">{t('emergency.colActive')}</th>
+                      <th className="emergency-subs-col-name">{t('emergency.colName')}</th>
+                      <th className="emergency-subs-col-radius">{t('emergency.colRadius')}</th>
+                      <th className="emergency-subs-col-channel">{t('emergency.colChannel')}</th>
+                      <th className="emergency-subs-col-location">{t('emergency.colLocation')}</th>
+                      <th className="emergency-subs-col-actions">{t('emergency.colActions')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredSubs.map((sub) => {
+                      const isActive = sub.is_active !== false;
+                      return (
+                        <tr key={sub.id}>
+                          <td>
+                            <div className="flex items-center gap-3">
+                              <ToggleSwitch
+                                checked={isActive}
+                                onChange={(v) => void handleSubscriptionToggle(sub, v)}
+                              />
+                              <span
+                                className="reports-status-pill"
+                                style={{
+                                  background: isActive ? '#ecfdf5' : '#f1f5f9',
+                                  color: isActive ? '#047857' : '#64748b',
+                                  border: `1px solid ${isActive ? '#a7f3d0' : '#e2e8f0'}`
+                                }}
+                              >
+                                {isActive ? t('emergency.statusOn') : t('emergency.statusOff')}
+                              </span>
+                            </div>
+                          </td>
+                          <td>
+                            <div
+                              className="reports-reporter-name font-medium"
+                              style={getSubscriptionTitleStyle(sub)}
+                            >
+                              {getSubscriptionDisplayName(sub)}
+                            </div>
+                          </td>
+                          <td className="emergency-subs-col-radius">
+                            <span className="reports-datetime tabular-nums">
+                              {t('emergency.radiusMeters', { radius: sub.radius ?? '—' })}
+                            </span>
+                          </td>
+                          <td className="emergency-subs-col-channel">
+                            <span className="reports-reporter-meta">{subscriptionChannelLine()}</span>
+                          </td>
+                          <td className="emergency-subs-col-location">
+                            <SubscriptionLocationCell lat={sub.lat} lng={sub.lng} />
+                          </td>
+                          <td className="emergency-subs-col-actions">
+                            <ButtonGroup selectedKeys={new Set()} className="shrink-0">
+                              <ButtonGroupItem
+                                id={`edit-${sub.id}`}
+                                iconLeading={Edit03}
+                                onPress={() => openEditModal(sub)}
+                              >
+                                {t('emergency.editDetails')}
+                              </ButtonGroupItem>
+                              <ButtonGroupItem
+                                id={`delete-${sub.id}`}
+                                iconLeading={Trash01}
+                                onPress={() => removeSub(sub.id)}
+                              >
+                                {t('emergency.delete')}
+                              </ButtonGroupItem>
+                            </ButtonGroup>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       </div>
+    </div>
   );
 }

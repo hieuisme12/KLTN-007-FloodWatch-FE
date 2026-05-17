@@ -1,107 +1,114 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
-import FilterDropdown from '../../components/common/FilterDropdown';
-import { fetchCrowdReports, fetchAllCrowdReports } from '../../services/api';
-import { POLLING_INTERVALS, CROWD_REPORT_MAP_DISPLAY_HOURS } from '../../config/apiConfig';
-import { isReportExpired } from '../../utils/reportHelpers';
-import { useNavigate } from 'react-router-dom';
-import { getCurrentUser } from '../../utils/auth';
-import { isGuestBrowseMode } from '../../utils/guestSession';
-import { useGuestExplore } from '../../hooks/useGuestExplore';
-import { useReporterRanking } from '../../context/ReporterRankingProvider';
-import { 
-  FaMobileScreen, 
-  FaCheck, 
-  FaXmark, 
-  FaClock, 
+import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { useTranslation } from "react-i18next";
+import FilterDropdown from "../../components/common/FilterDropdown";
+import { fetchCrowdReports, fetchAllCrowdReports } from "../../services/api";
+import {
+  POLLING_INTERVALS,
+  CROWD_REPORT_MAP_DISPLAY_HOURS,
+} from "../../config/apiConfig";
+import { isReportExpired } from "../../utils/reportHelpers";
+import { useSearchParams } from "react-router-dom";
+import { getCurrentUser } from "../../utils/auth";
+import CreateReportModal from "../../components/reports/CreateReportModal";
+import { PrimaryButton } from "../../components/common/Button";
+import { isGuestBrowseMode } from "../../utils/guestSession";
+import { useGuestExplore } from "../../hooks/useGuestExplore";
+import { useReporterRanking } from "../../context/ReporterRankingProvider";
+import {
+  FaCheck,
+  FaXmark,
+  FaClock,
   FaCircleQuestion,
   FaStar,
   FaCircle,
-  FaTriangleExclamation,
-  FaPenToSquare,
-  FaClock as FaClockIcon
-} from 'react-icons/fa6';
-import { WiFlood } from 'react-icons/wi';
-import { MdLocationOn } from 'react-icons/md';
-import ConfidenceBadge from '../../components/common/ConfidenceBadge';
-import SearchAutoComplete from '../../components/common/SearchAutoComplete';
-import Skeleton from 'react-loading-skeleton';
-import { fetchAddressFromCoords, formatAddressForUiDisplay } from '../../utils/geocode';
+} from "react-icons/fa6";
+import { WiFlood } from "react-icons/wi";
+import { MdLocationOn } from "react-icons/md";
+import ConfidenceBadge from "../../components/common/ConfidenceBadge";
+import SearchAutoComplete from "../../components/common/SearchAutoComplete";
+import Skeleton from "react-loading-skeleton";
+import {
+  fetchAddressFromCoords,
+  formatAddressForUiDisplay,
+} from "../../utils/geocode";
 const ReportsPage = () => {
   const { t } = useTranslation();
-  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { openRequireLogin } = useGuestExplore();
+  const reloadReportsRef = useRef(null);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [createFormKey, setCreateFormKey] = useState(0);
   const { getReporterReliability } = useReporterRanking();
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('all'); // all, verified, pending
-  const [expiryFilter, setExpiryFilter] = useState('active'); // all, active, expired
-  const [searchText, setSearchText] = useState('');
+  const [filter, setFilter] = useState("all"); // all, verified, pending
+  const [expiryFilter, setExpiryFilter] = useState("active"); // all, active, expired
+  const [searchText, setSearchText] = useState("");
   const [reportSuggestions, setReportSuggestions] = useState([]);
-  const [confidenceBand, setConfidenceBand] = useState('all');
-  const [confidenceSort, setConfidenceSort] = useState('none');
+  const [confidenceBand, setConfidenceBand] = useState("all");
+  const [confidenceSort, setConfidenceSort] = useState("none");
 
   const filterOptions = useMemo(
     () => [
-      { id: 'all', name: t('reportsPage.modAll') },
-      { id: 'verified', name: t('reportsPage.modVerified') },
-      { id: 'pending', name: t('reportsPage.modPending') }
+      { id: "all", name: t("reportsPage.modAll") },
+      { id: "verified", name: t("reportsPage.modVerified") },
+      { id: "pending", name: t("reportsPage.modPending") },
     ],
-    [t]
+    [t],
   );
 
   const expiryFilterOptions = useMemo(
     () => [
-      { id: 'all', name: t('reportsPage.expAll') },
-      { id: 'active', name: t('reportsPage.expActive') },
-      { id: 'expired', name: t('reportsPage.expExpired') }
+      { id: "all", name: t("reportsPage.expAll") },
+      { id: "active", name: t("reportsPage.expActive") },
+      { id: "expired", name: t("reportsPage.expExpired") },
     ],
-    [t]
+    [t],
   );
 
   const confidenceBandOptions = useMemo(
     () => [
-      { id: 'all', name: t('reportsPage.confAll') },
-      { id: 'low', name: t('reportsPage.confLow') },
-      { id: 'mid', name: t('reportsPage.confMid') },
-      { id: 'high', name: t('reportsPage.confHigh') }
+      { id: "all", name: t("reportsPage.confAll") },
+      { id: "low", name: t("reportsPage.confLow") },
+      { id: "mid", name: t("reportsPage.confMid") },
+      { id: "high", name: t("reportsPage.confHigh") },
     ],
-    [t]
+    [t],
   );
   const confidenceSortOptions = useMemo(
     () => [
-      { id: 'none', name: t('reportsPage.sortNone') },
-      { id: 'desc', name: t('reportsPage.sortDesc') },
-      { id: 'asc', name: t('reportsPage.sortAsc') }
+      { id: "none", name: t("reportsPage.sortNone") },
+      { id: "desc", name: t("reportsPage.sortDesc") },
+      { id: "asc", name: t("reportsPage.sortAsc") },
     ],
-    [t]
+    [t],
   );
 
   const [locationCache, setLocationCache] = useState(() => {
     // Load cache từ localStorage khi khởi tạo
     try {
-      const saved = localStorage.getItem('locationCache');
+      const saved = localStorage.getItem("locationCache");
       return saved ? JSON.parse(saved) : {};
     } catch {
       return {};
     }
   });
-  const [hoveredCardId, setHoveredCardId] = useState(null); // Track card đang được hover
   const [fetchingLocations, setFetchingLocations] = useState(new Set()); // Track các location đang được fetch
 
   // Hàm lấy địa chỉ từ tọa độ với cache và debounce (BE Google → Mapbox → Nominatim; không hiển thị mã bưu chính)
   const fetchLocationDescription = async (lat, lng) => {
     const cacheKey = `${lat.toFixed(6)},${lng.toFixed(6)}`;
-    
+
     // Kiểm tra cache trước (cả trong state và localStorage)
     if (locationCache[cacheKey]) {
       const normalized =
-        formatAddressForUiDisplay(locationCache[cacheKey]) || locationCache[cacheKey];
+        formatAddressForUiDisplay(locationCache[cacheKey]) ||
+        locationCache[cacheKey];
       if (normalized !== locationCache[cacheKey]) {
         const newCache = { ...locationCache, [cacheKey]: normalized };
         setLocationCache(newCache);
         try {
-          localStorage.setItem('locationCache', JSON.stringify(newCache));
+          localStorage.setItem("locationCache", JSON.stringify(newCache));
         } catch {
           /* ignore */
         }
@@ -109,15 +116,15 @@ const ReportsPage = () => {
       }
       return locationCache[cacheKey];
     }
-    
+
     // Kiểm tra xem đang fetch location này chưa (tránh duplicate requests)
     if (fetchingLocations.has(cacheKey)) {
       return null; // Đang fetch rồi, không fetch lại
     }
-    
+
     // Đánh dấu đang fetch
-    setFetchingLocations(prev => new Set(prev).add(cacheKey));
-    
+    setFetchingLocations((prev) => new Set(prev).add(cacheKey));
+
     try {
       // Thêm delay nhỏ để tránh rate limiting
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -131,7 +138,7 @@ const ReportsPage = () => {
 
         // Lưu vào localStorage để persist
         try {
-          localStorage.setItem('locationCache', JSON.stringify(newCache));
+          localStorage.setItem("locationCache", JSON.stringify(newCache));
         } catch {
           // Quota or private mode — state cache still holds the address
         }
@@ -144,7 +151,7 @@ const ReportsPage = () => {
       return null;
     } finally {
       // Xóa khỏi set đang fetch
-      setFetchingLocations(prev => {
+      setFetchingLocations((prev) => {
         const newSet = new Set(prev);
         newSet.delete(cacheKey);
         return newSet;
@@ -152,101 +159,129 @@ const ReportsPage = () => {
     }
   };
 
+  const mergeReportsWithCachedLocations = useCallback((incoming) => {
+    const currentCache = JSON.parse(
+      localStorage.getItem("locationCache") || "{}",
+    );
+    return incoming.map((report) => {
+      if (report.location_description || !report.lat || !report.lng) {
+        return report;
+      }
+      const cacheKey = `${report.lat.toFixed(6)},${report.lng.toFixed(6)}`;
+      const cached = currentCache[cacheKey];
+      return cached ? { ...report, location_description: cached } : report;
+    });
+  }, []);
+
   useEffect(() => {
-    const loadReports = async () => {
-      setLoading(true);
+    let cancelled = false;
+
+    const loadReports = async (silent = false) => {
+      if (!silent) {
+        setLoading(true);
+      }
       try {
-        // Lấy user hiện tại
         const currentUser = getCurrentUser();
 
         let result;
-        // Đã đăng nhập: /api/crowd-reports/all — lọc theo reporter_id (cả user / admin / moderator trên FE công khai)
-        // Khách: /api/crowd-reports (24h, public)
         if (currentUser) {
           result = await fetchAllCrowdReports({ limit: 1000 });
         } else {
           result = await fetchCrowdReports();
         }
 
+        if (cancelled) return;
+
         if (result.success && result.data) {
           let filteredReports = result.data;
           if (currentUser) {
-            // User thường: chỉ hiển thị báo cáo của chính họ (kể cả đang chờ xem xét)
-            filteredReports = result.data.filter(report => {
-              // Chỉ filter dựa trên reporter_id (không dùng fallback)
+            filteredReports = result.data.filter((report) => {
               const reportReporterId = report.reporter_id;
               const userId = currentUser.id;
-              
-              // Chỉ match khi có reporter_id và khớp với user.id
-              if (!reportReporterId) {
-                return false; // Không có reporter_id thì không match
-              }
-              
-              return String(reportReporterId) === String(userId) || 
-                     Number(reportReporterId) === Number(userId);
+              if (!reportReporterId) return false;
+              return (
+                String(reportReporterId) === String(userId) ||
+                Number(reportReporterId) === Number(userId)
+              );
             });
           }
 
-          setReports(filteredReports);
-          
-          // Lấy địa chỉ cho các báo cáo không có location_description (tối ưu với cache)
-          // Chỉ fetch cho các report chưa có trong cache
-          const reportsWithoutLocation = filteredReports.filter(
-            report => {
+          setReports((prev) => {
+            const prevById = new Map(prev.map((r) => [r.id, r]));
+            const merged = mergeReportsWithCachedLocations(filteredReports).map(
+              (report) => {
+                const old = prevById.get(report.id);
+                if (old?.location_description && !report.location_description) {
+                  return {
+                    ...report,
+                    location_description: old.location_description,
+                  };
+                }
+                return report;
+              },
+            );
+            return merged;
+          });
+
+          if (!silent) {
+            const reportsWithoutLocation = filteredReports.filter((report) => {
               if (!report.lat || !report.lng) return false;
-              if (report.location_description) return false; // Đã có địa chỉ rồi
-              
-              // Kiểm tra cache
+              if (report.location_description) return false;
               const cacheKey = `${report.lat.toFixed(6)},${report.lng.toFixed(6)}`;
-              const currentCache = JSON.parse(localStorage.getItem('locationCache') || '{}');
-              if (currentCache[cacheKey]) {
-                // Có trong cache, cập nhật ngay
-                setReports(prevReports => 
-                  prevReports.map(r => 
-                    r.id === report.id ? { ...r, location_description: currentCache[cacheKey] } : r
-                  )
-                );
-                return false; // Không cần fetch
-              }
-              
-              return true; // Cần fetch
-            }
-          );
-          
-          // Giới hạn 2 báo cáo mỗi lần để tránh rate limit
-          const reportsToFetch = reportsWithoutLocation.slice(0, 2);
-          
-          // Fetch tuần tự (không parallel) để tránh rate limiting
-          for (const report of reportsToFetch) {
-            const address = await fetchLocationDescription(report.lat, report.lng);
-            if (address) {
-              // Cập nhật report với địa chỉ mới
-              setReports(prevReports => 
-                prevReports.map(r => 
-                  r.id === report.id ? { ...r, location_description: address } : r
-                )
+              const currentCache = JSON.parse(
+                localStorage.getItem("locationCache") || "{}",
               );
-            }
-            // Delay giữa các request để tránh rate limiting (Nominatim yêu cầu 1 request/giây)
-            if (reportsToFetch.indexOf(report) < reportsToFetch.length - 1) {
-              await new Promise(resolve => setTimeout(resolve, 1100));
+              return !currentCache[cacheKey];
+            });
+
+            const reportsToFetch = reportsWithoutLocation.slice(0, 2);
+            for (const report of reportsToFetch) {
+              if (cancelled) break;
+              const address = await fetchLocationDescription(
+                report.lat,
+                report.lng,
+              );
+              if (address && !cancelled) {
+                setReports((prevReports) =>
+                  prevReports.map((r) =>
+                    r.id === report.id
+                      ? { ...r, location_description: address }
+                      : r,
+                  ),
+                );
+              }
+              if (reportsToFetch.indexOf(report) < reportsToFetch.length - 1) {
+                await new Promise((resolve) => setTimeout(resolve, 1100));
+              }
             }
           }
-        } else {
+        } else if (!silent) {
           setReports([]);
         }
       } catch {
-        setReports([]);
+        if (!silent) {
+          setReports([]);
+        }
       } finally {
-        setLoading(false);
+        if (!silent && !cancelled) {
+          setLoading(false);
+        }
       }
     };
 
-    loadReports();
-    const interval = setInterval(loadReports, POLLING_INTERVALS.CROWD_REPORTS);
-    return () => clearInterval(interval);
+    reloadReportsRef.current = () => loadReports(true);
+    loadReports(false);
+    const interval = setInterval(
+      () => loadReports(true),
+      POLLING_INTERVALS.CROWD_REPORTS,
+    );
+    return () => {
+      cancelled = true;
+      reloadReportsRef.current = null;
+      clearInterval(interval);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Chỉ chạy 1 lần khi mount, không phụ thuộc vào cache để tránh infinite loop
+  }, [mergeReportsWithCachedLocations]);
 
   // Hàm lấy status info - ưu tiên moderation_status theo logic đúng
   const getStatusInfo = (report) => {
@@ -254,88 +289,180 @@ const ReportsPage = () => {
     // Nếu moderation_status = 'pending' hoặc null, hiển thị validation_status
     const moderationStatus = report.moderation_status;
     const validationStatus = report.validation_status;
-    
+
     // Nếu đã được moderator xử lý (approved hoặc rejected), ưu tiên hiển thị
-    if (moderationStatus === 'approved' || moderationStatus === 'rejected') {
-      if (moderationStatus === 'rejected') {
-        return { text: t('reportUi.moderation.rejected'), color: '#dc3545', icon: FaXmark };
+    if (moderationStatus === "approved" || moderationStatus === "rejected") {
+      if (moderationStatus === "rejected") {
+        return {
+          text: t("reportUi.moderation.rejected"),
+          color: "#dc3545",
+          icon: FaXmark,
+        };
       }
       // Đã duyệt: màu theo mức độ ngập (Nặng / Trung bình / Nhẹ)
       const levelColors = {
-        'Nặng': '#dc3545',
-        'Trung bình': '#ffc107',
-        'Nhẹ': '#17a2b8'
+        Nặng: "#dc3545",
+        "Trung bình": "#ffc107",
+        Nhẹ: "#17a2b8",
       };
-      const level = report.flood_level && levelColors[report.flood_level] ? report.flood_level : null;
-      const color = level ? levelColors[level] : '#28a745';
-      return { text: t('reportUi.moderation.approved'), color, icon: FaCheck };
+      const level =
+        report.flood_level && levelColors[report.flood_level]
+          ? report.flood_level
+          : null;
+      const color = level ? levelColors[level] : "#28a745";
+      return { text: t("reportUi.moderation.approved"), color, icon: FaCheck };
     }
-    
+
     // Nếu moderation_status = 'pending' hoặc null, hiển thị validation_status
-    const displayStatus = moderationStatus === 'pending' || !moderationStatus 
-      ? validationStatus 
-      : moderationStatus;
-    
+    const displayStatus =
+      moderationStatus === "pending" || !moderationStatus
+        ? validationStatus
+        : moderationStatus;
+
     // Badge mapping cho validation_status
     const statusConfig = {
-      pending: { text: t('reportUi.moderation.pending'), color: '#ffc107', icon: FaClock },
-      verified: { text: t('reportUi.moderation.verified'), color: '#17a2b8', icon: FaCheck },
-      cross_verified: { text: t('reportUi.moderation.cross_verified'), color: '#28a745', icon: FaCheck }
+      pending: {
+        text: t("reportUi.moderation.pending"),
+        color: "#ffc107",
+        icon: FaClock,
+      },
+      verified: {
+        text: t("reportUi.moderation.verified"),
+        color: "#17a2b8",
+        icon: FaCheck,
+      },
+      cross_verified: {
+        text: t("reportUi.moderation.cross_verified"),
+        color: "#28a745",
+        icon: FaCheck,
+      },
     };
-    
+
     // Nếu có verified_by_sensor, ưu tiên hiển thị cross_verified
     if (report.verified_by_sensor) {
       return statusConfig.cross_verified;
     }
-    
-    return statusConfig[displayStatus] || { text: t('reportUi.moderation.unknown'), color: '#6c757d', icon: FaCircleQuestion };
+
+    return (
+      statusConfig[displayStatus] || {
+        text: t("reportUi.moderation.unknown"),
+        color: "#6c757d",
+        icon: FaCircleQuestion,
+      }
+    );
   };
 
   const getReliabilityBadge = (score) => {
-    if (score >= 81) return { color: '#28a745', text: t('reportUi.confidence.veryHigh'), icon: FaStar };
-    if (score >= 61) return { color: '#17a2b8', text: t('reportUi.confidence.high'), icon: FaCircle };
-    if (score >= 31) return { color: '#ffc107', text: t('reportUi.confidence.medium'), icon: FaCircle };
-    return { color: '#dc3545', text: t('reportUi.confidence.low'), icon: FaCircle };
+    if (score >= 81)
+      return {
+        color: "#28a745",
+        text: t("reportUi.confidence.veryHigh"),
+        icon: FaStar,
+      };
+    if (score >= 61)
+      return {
+        color: "#17a2b8",
+        text: t("reportUi.confidence.high"),
+        icon: FaCircle,
+      };
+    if (score >= 31)
+      return {
+        color: "#ffc107",
+        text: t("reportUi.confidence.medium"),
+        icon: FaCircle,
+      };
+    return {
+      color: "#dc3545",
+      text: t("reportUi.confidence.low"),
+      icon: FaCircle,
+    };
   };
 
   const getFloodLevelInfo = (level) => {
-    const descFor = (lv) => (lv ? t(`reportUi.floodDepth.${lv}`, { defaultValue: lv }) : '');
+    const descFor = (lv) =>
+      lv ? t(`reportUi.floodDepth.${lv}`, { defaultValue: lv }) : "";
     const levels = {
-      'Nhẹ': { 
-        color: '#17a2b8', 
-        icon: WiFlood, 
-        desc: descFor('Nhẹ'),
-        gradient: 'linear-gradient(180deg, #4FC3F7 0%, #29B6F6 100%)', // Light blue gradient
-        gradientDark: 'linear-gradient(180deg, #29B6F6 0%, #0288D1 100%)'
+      Nhẹ: {
+        color: "#17a2b8",
+        pillBg: "rgba(23, 162, 184, 0.12)",
+        pillText: "#0e7490",
+        pillBorder: "rgba(23, 162, 184, 0.35)",
+        icon: WiFlood,
+        desc: descFor("Nhẹ"),
       },
-      'Trung bình': { 
-        color: '#ffc107', 
-        icon: WiFlood, 
-        desc: descFor('Trung bình'),
-        gradient: 'linear-gradient(180deg, #FFB74D 0%, #FF9800 100%)', // Orange gradient
-        gradientDark: 'linear-gradient(180deg, #FF9800 0%, #F57C00 100%)'
+      "Trung bình": {
+        color: "#ffc107",
+        pillBg: "rgba(255, 193, 7, 0.15)",
+        pillText: "#b45309",
+        pillBorder: "rgba(255, 193, 7, 0.45)",
+        icon: WiFlood,
+        desc: descFor("Trung bình"),
       },
-      'Nặng': { 
-        color: '#dc3545', 
-        icon: WiFlood, 
-        desc: descFor('Nặng'),
-        gradient: 'linear-gradient(180deg, #EF5350 0%, #E53935 100%)', // Red gradient
-        gradientDark: 'linear-gradient(180deg, #E53935 0%, #C62828 100%)'
+      Nặng: {
+        color: "#dc3545",
+        pillBg: "rgba(220, 53, 69, 0.1)",
+        pillText: "#b91c1c",
+        pillBorder: "rgba(220, 53, 69, 0.35)",
+        icon: WiFlood,
+        desc: descFor("Nặng"),
+      },
+    };
+    return (
+      levels[level] || {
+        color: "#6c757d",
+        pillBg: "#f1f5f9",
+        pillText: "#475569",
+        pillBorder: "#e2e8f0",
+        icon: FaCircleQuestion,
+        desc: descFor(level) || level || "—",
       }
-    };
-    return levels[level] || { 
-      color: '#6c757d', 
-      icon: FaCircleQuestion, 
-      desc: descFor(level) || level,
-      gradient: 'linear-gradient(180deg, #9E9E9E 0%, #757575 100%)',
-      gradientDark: 'linear-gradient(180deg, #757575 0%, #616161 100%)'
-    };
+    );
   };
+
+  const getStatusPillStyle = (statusInfo) => {
+    const byColor = {
+      "#dc3545": { bg: "#fee2e2", text: "#b91c1c", border: "#fecaca" },
+      "#ffc107": { bg: "#fef3c7", text: "#b45309", border: "#fde68a" },
+      "#17a2b8": { bg: "#e0f7fa", text: "#0e7490", border: "#b2ebf2" },
+      "#28a745": { bg: "#dcfce7", text: "#15803d", border: "#bbf7d0" },
+      "#6c757d": { bg: "#f1f5f9", text: "#475569", border: "#e2e8f0" },
+    };
+    return (
+      byColor[statusInfo.color] || {
+        bg: "#f1f5f9",
+        text: statusInfo.color,
+        border: "#e2e8f0",
+      }
+    );
+  };
+
+  const openCreateModal = useCallback(() => {
+    if (isGuestBrowseMode()) {
+      openRequireLogin(t("reportsPage.loginToCreate"));
+      return;
+    }
+    setCreateFormKey((k) => k + 1);
+    setCreateModalOpen(true);
+  }, [openRequireLogin, t]);
+
+  useEffect(() => {
+    if (searchParams.get("create") !== "1") return;
+    setSearchParams({}, { replace: true });
+    if (isGuestBrowseMode()) {
+      openRequireLogin(t("reportsPage.loginToCreate"));
+      return;
+    }
+    setCreateFormKey((k) => k + 1);
+    setCreateModalOpen(true);
+  }, [searchParams, setSearchParams, openRequireLogin, t]);
+
+  const handleCreateReport = openCreateModal;
 
   /** Địa chỉ hiển thị/tìm: từ API hoặc cache reverse geocoding */
   const getReportAddressForSearch = useCallback(
     (report) => {
-      if (report?.location_description) return String(report.location_description);
+      if (report?.location_description)
+        return String(report.location_description);
       if (report?.lat != null && report?.lng != null) {
         const lat = Number(report.lat);
         const lng = Number(report.lng);
@@ -345,9 +472,21 @@ const ReportsPage = () => {
           if (cached) return String(cached);
         }
       }
-      return '';
+      return "";
     },
-    [locationCache]
+    [locationCache],
+  );
+
+  const getReportLocationText = useCallback(
+    (report) => {
+      const addr = getReportAddressForSearch(report);
+      if (addr) return addr;
+      if (report.lat != null && report.lng != null) {
+        return `${Number(report.lat).toFixed(6)}, ${Number(report.lng).toFixed(6)}`;
+      }
+      return t("reportUi.noLocationInfo");
+    },
+    [getReportAddressForSearch, t],
   );
 
   const completeReportSearch = useCallback(
@@ -378,12 +517,13 @@ const ReportsPage = () => {
       };
       for (const r of reports) {
         if (out.length >= 12) break;
-        const idStr = r.id != null ? String(r.id) : '';
+        const idStr = r.id != null ? String(r.id) : "";
         if (idStr && idStr.toLowerCase().includes(q)) add(idStr);
       }
       for (const r of reports) {
         if (out.length >= 12) break;
-        if (r.reporter_name && r.reporter_name.toLowerCase().includes(q)) add(r.reporter_name);
+        if (r.reporter_name && r.reporter_name.toLowerCase().includes(q))
+          add(r.reporter_name);
       }
       for (const r of reports) {
         if (out.length >= 12) break;
@@ -391,7 +531,8 @@ const ReportsPage = () => {
       }
       for (const r of reports) {
         if (out.length >= 12) break;
-        if (r.flood_level && r.flood_level.toLowerCase().includes(q)) add(r.flood_level);
+        if (r.flood_level && r.flood_level.toLowerCase().includes(q))
+          add(r.flood_level);
       }
       for (const r of reports) {
         if (out.length >= 12) break;
@@ -400,173 +541,180 @@ const ReportsPage = () => {
       }
       setReportSuggestions(out);
     },
-    [reports, getReportAddressForSearch]
+    [reports, getReportAddressForSearch],
   );
 
-  const filteredReports = reports.filter(report => {
+  const filteredReports = reports.filter((report) => {
     // Filter by expiry (thời hạn)
     const expired = isReportExpired(report, CROWD_REPORT_MAP_DISPLAY_HOURS);
-    if (expiryFilter === 'active' && expired) return false;
-    if (expiryFilter === 'expired' && !expired) return false;
+    if (expiryFilter === "active" && expired) return false;
+    if (expiryFilter === "expired" && !expired) return false;
 
     // Filter by status
     let matchesFilter = true;
-    if (filter === 'verified') {
-      matchesFilter = report.moderation_status === 'approved';
-    } else if (filter === 'pending') {
-      matchesFilter = report.moderation_status === 'pending' || !report.moderation_status;
+    if (filter === "verified") {
+      matchesFilter = report.moderation_status === "approved";
+    } else if (filter === "pending") {
+      matchesFilter =
+        report.moderation_status === "pending" || !report.moderation_status;
     }
-    
-    if (confidenceBand !== 'all') {
+
+    if (confidenceBand !== "all") {
       const n = report.confidence != null ? Number(report.confidence) : null;
       if (n == null || Number.isNaN(n)) return false;
-      if (confidenceBand === 'low' && n >= 40) return false;
-      if (confidenceBand === 'mid' && (n < 40 || n >= 70)) return false;
-      if (confidenceBand === 'high' && n < 70) return false;
+      if (confidenceBand === "low" && n >= 40) return false;
+      if (confidenceBand === "mid" && (n < 40 || n >= 70)) return false;
+      if (confidenceBand === "high" && n < 70) return false;
     }
 
     // Filter by search text (gồm địa chỉ đã có hoặc trong cache)
     if (searchText.trim()) {
       const searchLower = searchText.toLowerCase();
       const addr = getReportAddressForSearch(report);
-      const matchesSearch = 
-        (report.id && report.id.toString().toLowerCase().includes(searchLower)) ||
-        (report.reporter_name && report.reporter_name.toLowerCase().includes(searchLower)) ||
-        (report.flood_level && report.flood_level.toLowerCase().includes(searchLower)) ||
-        (report.description && report.description.toLowerCase().includes(searchLower)) ||
+      const matchesSearch =
+        (report.id &&
+          report.id.toString().toLowerCase().includes(searchLower)) ||
+        (report.reporter_name &&
+          report.reporter_name.toLowerCase().includes(searchLower)) ||
+        (report.flood_level &&
+          report.flood_level.toLowerCase().includes(searchLower)) ||
+        (report.description &&
+          report.description.toLowerCase().includes(searchLower)) ||
         (addr && addr.toLowerCase().includes(searchLower));
-      
+
       return matchesFilter && matchesSearch;
     }
-    
+
     return matchesFilter;
   });
 
   const sortedReports = [...filteredReports].sort((a, b) => {
-    if (confidenceSort === 'none') return 0;
+    if (confidenceSort === "none") return 0;
     const ca = a.confidence != null ? Number(a.confidence) : -1;
     const cb = b.confidence != null ? Number(b.confidence) : -1;
-    if (confidenceSort === 'desc') return cb - ca;
-    if (confidenceSort === 'asc') return ca - cb;
+    if (confidenceSort === "desc") return cb - ca;
+    if (confidenceSort === "asc") return ca - cb;
     return 0;
   });
 
   return (
-    <div style={{ 
-      minHeight: 'calc(100vh - 60px)', // Subtract header height
-      display: 'flex',
-      flexDirection: 'column',
-      background: '#f5f5f5',
-      padding: '20px'
-    }}>
+    <div
+      style={{
+        minHeight: "calc(100vh - 60px)", // Subtract header height
+        display: "flex",
+        flexDirection: "column",
+        background: "#f5f5f5",
+        padding: "20px",
+      }}
+    >
       {/* Page Title */}
-      <div style={{
-        backgroundImage: 'url(/report.png)',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
-        marginBottom: '24px',
-        boxShadow: '0 4px 12px rgba(25, 118, 210, 0.15)',
-        position: 'relative',
-        overflow: 'hidden',
-        width: '100%',
-        minHeight: '200px',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        padding: '32px 40px'
-      }}>
-        <h1 style={{ 
-          margin: '0 0 12px 0', 
-          fontSize: '2rem', 
-          color: 'white', 
-          fontWeight: '700', 
-          letterSpacing: '0.5px',
-          textShadow: '0 2px 4px rgba(0,0,0,0.5)',
-          position: 'relative',
-          zIndex: 1
-        }}>
-          {t('reportsPage.pageTitle')}
+      <div
+        style={{
+          backgroundImage: "url(/report.png)",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat",
+          marginBottom: "24px",
+          boxShadow: "0 4px 12px rgba(25, 118, 210, 0.15)",
+          position: "relative",
+          overflow: "hidden",
+          width: "100%",
+          minHeight: "200px",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          padding: "32px 40px",
+        }}
+      >
+        <h1
+          style={{
+            margin: "0 0 12px 0",
+            fontSize: "2rem",
+            color: "white",
+            fontWeight: "700",
+            letterSpacing: "0.5px",
+            textShadow: "0 2px 4px rgba(0,0,0,0.5)",
+            position: "relative",
+            zIndex: 1,
+          }}
+        >
+          {t("reportsPage.pageTitle")}
         </h1>
-        <p style={{ 
-          margin: '0', 
-          color: 'rgba(255, 255, 255, 0.95)', 
-          fontSize: '15px',
-          fontWeight: '400',
-          lineHeight: '1.6',
-          textShadow: '0 1px 2px rgba(0,0,0,0.5)',
-          position: 'relative',
-          zIndex: 1
-        }}>
-          {t('reportsPage.pageSubtitle')}
+        <p
+          style={{
+            margin: "0",
+            color: "rgba(255, 255, 255, 0.95)",
+            fontSize: "15px",
+            fontWeight: "400",
+            lineHeight: "1.6",
+            textShadow: "0 1px 2px rgba(0,0,0,0.5)",
+            position: "relative",
+            zIndex: 1,
+          }}
+        >
+          {t("reportsPage.pageSubtitle")}
         </p>
       </div>
 
       {/* Main Content Area */}
       <div style={{ flex: 1 }}>
-        <div style={{ maxWidth: '100%', margin: '0 auto' }}>
-          {/* Filters - Jira Style */}
-          <div style={{ 
-            background: 'white',
-            padding: '12px 16px',
-            borderRadius: '8px',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-            border: '1px solid #dfe1e6',
-            marginBottom: '20px',
-            position: 'relative',
-            zIndex: 10
-          }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              flexWrap: 'wrap'
-            }}>
-              <div style={{ minWidth: '200px', zIndex: 50 }}>
+        <div className="reports-list-shell">
+          <div className="reports-list-header">
+            <h2>{t("reportsPage.listTitle")}</h2>
+            <PrimaryButton type="button" onClick={handleCreateReport}>
+              {t("reportsPage.createReportBtn")}
+            </PrimaryButton>
+          </div>
+
+          <div className="reports-list-toolbar">
+            <div className="reports-list-toolbar-inner">
+              <div style={{ minWidth: "180px", zIndex: 50 }}>
                 <FilterDropdown
                   value={filter}
                   onChange={(e) => setFilter(e.value)}
                   options={filterOptions}
                   optionLabel="name"
                   optionValue="id"
-                  placeholder={t('reportsPage.phStatus')}
+                  placeholder={t("reportsPage.phStatus")}
                   className="filter-dropdown-toolbar w-full"
                 />
               </div>
 
-              <div style={{ minWidth: '200px', zIndex: 49 }}>
+              <div style={{ minWidth: "200px", zIndex: 49 }}>
                 <FilterDropdown
                   value={expiryFilter}
                   onChange={(e) => setExpiryFilter(e.value)}
                   options={expiryFilterOptions}
                   optionLabel="name"
                   optionValue="id"
-                  placeholder={t('reportsPage.phExpiry')}
+                  placeholder={t("reportsPage.phExpiry")}
                   className="filter-dropdown-toolbar w-full"
                 />
               </div>
 
-              <div style={{
-                flex: 1,
-                minWidth: '200px',
-                position: 'relative',
-                zIndex: 48
-              }}>
+              <div
+                style={{
+                  flex: 1,
+                  minWidth: "200px",
+                  position: "relative",
+                  zIndex: 48,
+                }}
+              >
                 <SearchAutoComplete
                   value={searchText}
                   suggestions={reportSuggestions}
                   completeMethod={completeReportSearch}
                   minLength={0}
                   delay={200}
-                  placeholder={t('reportsPage.phSearch')}
+                  placeholder={t("reportsPage.phSearch")}
                   className="w-full reports-toolbar-search"
                   onChange={(ev) => {
                     const v = ev.value;
-                    setSearchText(typeof v === 'string' ? v : '');
+                    setSearchText(typeof v === "string" ? v : "");
                   }}
                   onSelect={(ev) => {
                     const v = ev.value;
-                    setSearchText(typeof v === 'string' ? v : searchText);
+                    setSearchText(typeof v === "string" ? v : searchText);
                   }}
                 />
               </div>
@@ -577,8 +725,8 @@ const ReportsPage = () => {
                 options={confidenceBandOptions}
                 optionLabel="name"
                 optionValue="id"
-                placeholder={t('reportsPage.phConfidence')}
-                aria-label={t('reportsPage.ariaConfidence')}
+                placeholder={t("reportsPage.phConfidence")}
+                aria-label={t("reportsPage.ariaConfidence")}
                 className="filter-dropdown-toolbar max-w-[200px]"
               />
               <FilterDropdown
@@ -587,352 +735,203 @@ const ReportsPage = () => {
                 options={confidenceSortOptions}
                 optionLabel="name"
                 optionValue="id"
-                placeholder={t('reportsPage.phSortConf')}
-                aria-label={t('reportsPage.ariaSortConf')}
+                placeholder={t("reportsPage.phSortConf")}
+                aria-label={t("reportsPage.ariaSortConf")}
                 className="filter-dropdown-toolbar max-w-[240px]"
               />
             </div>
           </div>
 
-          {/* Reports List */}
-          {loading ? (
-            <div
-              style={{
-                padding: '24px',
-                background: 'white',
-                borderRadius: '8px',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
-              }}
-            >
-              <Skeleton height={28} width={280} style={{ marginBottom: 20 }} />
-              <Skeleton count={8} height={56} style={{ marginBottom: 12 }} />
-            </div>
-          ) : sortedReports.length === 0 ? (
-            <div style={{
-              textAlign: 'center',
-              padding: '60px',
-              background: 'white',
-              borderRadius: '8px',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-              color: '#6c757d'
-            }}>
-              <p style={{ fontSize: '18px', margin: '0 0 10px 0', fontWeight: '500' }}>{t('reportsPage.emptyTitle')}</p>
-              <button
-                onClick={() => {
-                  if (isGuestBrowseMode()) {
-                    openRequireLogin(t('reportsPage.loginToCreate'));
-                    return;
-                  }
-                  navigate('/report/new');
-                }}
-                style={{
-                  marginTop: '15px',
-                  padding: '12px 24px',
-                  background: '#1E3A8A',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontSize: '15px',
-                  fontWeight: '600',
-                  transition: 'all 0.3s ease'
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.transform = 'translateY(-2px)';
-                  e.target.style.boxShadow = '0 4px 12px rgba(30, 58, 138, 0.3)';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.transform = 'translateY(0)';
-                  e.target.style.boxShadow = 'none';
-                }}
-              >
-                <FaPenToSquare /> {t('reportsPage.createReportBtn')}
-              </button>
-            </div>
-          ) : (
-            <div style={{ 
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-              gap: '15px'
-            }}>
-            {sortedReports.map((report, index) => {
-              const statusInfo = getStatusInfo(report);
-              const rel = getReporterReliability(report.reporter_id) ?? report.reporter_reliability ?? null;
-              const reliabilityInfo = getReliabilityBadge(rel ?? 50);
-              const levelInfo = getFloodLevelInfo(report.flood_level);
-              const cardId = report.id || `report-${index}`;
-              const isHovered = hoveredCardId === cardId;
+          <div className="reports-list-table-wrap">
+            {loading ? (
+              <div className="reports-list-loading">
+                <Skeleton
+                  height={28}
+                  width={280}
+                  style={{ marginBottom: 20 }}
+                />
 
-              return (
-                <div
-                  key={cardId}
-                  className="report-card-gradient"
-                  style={{
-                    borderRadius: '8px',
-                    overflow: 'hidden',
-                    border: '1px solid #e0e0e0',
-                    transition: 'border-color 0.2s ease',
-                    cursor: 'pointer',
-                    background: 'white',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    height: '100%'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = levelInfo.color;
-                    setHoveredCardId(cardId);
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = '#e0e0e0';
-                    setHoveredCardId(null);
-                  }}
-                >
-                  {/* Top Section - White with Icon and Title */}
-                  <div style={{
-                    padding: '24px 20px',
-                    background: 'white',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: '12px'
-                  }}>
-                    {/* Icon */}
-                    <div style={{
-                      width: '60px',
-                      height: '60px',
-                      borderRadius: '50%',
-                      background: levelInfo.color,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '28px',
-                      color: 'white'
-                    }}>
-                      <levelInfo.icon />
-                    </div>
-                    
-                    {/* Title */}
-                    <div style={{
-                      textAlign: 'center',
-                      width: '100%'
-                    }}>
-                      <div style={{
-                        fontSize: '18px',
-                        fontWeight: '700',
-                        color: '#2c3e50',
-                        marginBottom: '4px'
-                      }}>
-                        {report.flood_level}
-                      </div>
-                      <div style={{
-                        fontSize: '12px',
-                        color: '#666',
-                        fontWeight: '500'
-                      }}>
-                        {levelInfo.desc}
-                      </div>
-                      {report.confidence != null && (
-                        <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'center', width: '100%' }}>
-                          <ConfidenceBadge confidence={report.confidence} breakdown={report.confidence_breakdown} />
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                <Skeleton count={8} height={48} style={{ marginBottom: 8 }} />
+              </div>
+            ) : sortedReports.length === 0 ? (
+              <div className="reports-list-empty">
+                <p>{t("reportsPage.emptyTitle")}</p>
 
-                  {/* Wave Separator - Transparent */}
-                  <div style={{
-                    height: '24px',
-                    background: 'white',
-                    position: 'relative',
-                    overflow: 'hidden',
-                    marginTop: '-1px'
-                  }}>
-                    <svg 
-                      viewBox="0 0 1200 24" 
-                      preserveAspectRatio="none"
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        display: 'block'
-                      }}
-                    >
-                      <path
-                        d="M0,24 C200,8 400,16 600,12 C800,8 1000,16 1200,12 L1200,24 L0,24 Z"
-                        fill="transparent"
-                        style={{
-                          transition: 'fill 0.2s ease'
-                        }}
-                      />
-                    </svg>
-                  </div>
+                <PrimaryButton type="button" onClick={handleCreateReport}>
+                  {t("reportsPage.createReportBtn")}
+                </PrimaryButton>
+              </div>
+            ) : (
+              <div className="reports-list-table-scroll">
+                <table className="reports-list-table">
+                  <thead>
+                    <tr>
+                      <th>{t("reportsPage.colLevel")}</th>
 
-                  {/* Bottom Section - With GIF Background */}
-                  <div style={{
-                    flex: 1,
-                    padding: '20px',
-                    color: '#2c3e50',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '12px',
-                    position: 'relative',
-                    overflow: 'hidden'
-                  }}>
-                    {/* GIF Background - Only plays on hover */}
-                    {isHovered ? (
-                      <img 
-                        src="/water_flow.gif" 
-                        alt="Water flow"
-                        style={{
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'cover',
-                          pointerEvents: 'none'
-                        }}
-                      />
-                    ) : (
-                      <div style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        height: '100%',
-                        background: 'transparent',
-                        pointerEvents: 'none'
-                      }}></div>
-                    )}
-                    
-                    {/* Content */}
-                    <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', gap: '12px', flex: 1 }}>
-                    {/* Reporter Name and Status */}
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'start',
-                      flexWrap: 'wrap',
-                      gap: '8px'
-                    }}>
-                      <div>
-                        <div style={{
-                          fontSize: '16px',
-                          fontWeight: '700',
-                          marginBottom: '4px'
-                        }}>
-                          {report.reporter_name || t('reportUi.anonymous')}
-                        </div>
-                        {rel != null && (
-                          <div style={{
-                            fontSize: '11px',
-                            background: 'rgba(0,0,0,0.1)',
-                            color: '#2c3e50',
-                            padding: '3px 10px',
-                            borderRadius: '8px',
-                            fontWeight: 'bold',
-                            display: 'inline-block'
-                          }}>
-                            {t('reportsPage.reliabilityLine', {
-                              tier: reliabilityInfo.text,
-                              value: typeof rel === 'number' ? rel.toFixed(1) : rel
-                            })}
-                          </div>
-                        )}
-                      </div>
-                      <span style={{
-                        fontSize: '11px',
-                        background: report.moderation_status === 'approved' || report.moderation_status === 'rejected'
-                          ? statusInfo.color
-                          : 'rgba(0,0,0,0.1)',
-                        color: report.moderation_status === 'approved' || report.moderation_status === 'rejected'
-                          ? '#fff'
-                          : '#2c3e50',
-                        padding: '6px 12px',
-                        borderRadius: '8px',
-                        fontWeight: 'bold',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        backdropFilter: 'blur(10px)'
-                      }}>
-                        <statusInfo.icon /> {statusInfo.text}
-                      </span>
-                    </div>
+                      <th>{t("reportsPage.colReporter")}</th>
 
-                    {/* Location */}
-                    <div style={{
-                      fontSize: '13px',
-                      display: 'flex',
-                      alignItems: 'start',
-                      gap: '8px',
-                      background: 'rgba(255,255,255,0.7)',
-                      padding: '10px',
-                      borderRadius: '8px',
-                      backdropFilter: 'blur(10px)',
-                      color: '#2c3e50'
-                    }}>
-                      <MdLocationOn style={{ marginTop: '2px', flexShrink: 0, fontSize: '16px' }} />
-                      <span style={{ flex: 1, lineHeight: '1.5' }}>
-                        {report.location_description || 
-                         (report.lat && report.lng ? `${report.lat.toFixed(6)}, ${report.lng.toFixed(6)}` : t('reportUi.noLocationInfo'))}
-                      </span>
-                    </div>
+                      <th>{t("reportsPage.colStatus")}</th>
 
-                    {/* Description */}
-                    {report.description && (
-                      <div style={{
-                        fontSize: '12px',
-                        background: 'rgba(255,255,255,0.7)',
-                        padding: '12px',
-                        borderRadius: '8px',
-                        lineHeight: '1.6',
-                        backdropFilter: 'blur(10px)',
-                        fontStyle: 'italic',
-                        color: '#2c3e50'
-                      }}>
-                        "{report.description}"
-                      </div>
-                    )}
+                      <th>{t("reportsPage.colConfidence")}</th>
 
-                    {/* Footer Info */}
-                    <div style={{
-                      marginTop: 'auto',
-                      paddingTop: '12px',
-                      borderTop: '1px solid rgba(0,0,0,0.1)',
-                      fontSize: '11px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '6px',
-                      color: '#2c3e50'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <FaClockIcon /> {new Date(report.created_at).toLocaleString('vi-VN')}
-                      </div>
-                      {report.verified_by_sensor && (
-                        <div style={{ 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          gap: '6px',
-                          background: 'rgba(255,255,255,0.7)',
-                          padding: '6px 10px',
-                            borderRadius: '8px',
-                          fontWeight: '500',
-                          color: '#2c3e50'
-                        }}>
-                          <FaCheck /> {t('reportsPage.verifiedBySensorCard')}
-                        </div>
-                      )}
-                    </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+                      <th>{t("reportsPage.colLocation")}</th>
+
+                      <th>{t("reportsPage.colCreated")}</th>
+
+                      <th>{t("reportsPage.colSensor")}</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {sortedReports.map((report, index) => {
+                      const statusInfo = getStatusInfo(report);
+
+                      const rel =
+                        getReporterReliability(report.reporter_id) ??
+                        report.reporter_reliability ??
+                        null;
+
+                      const reliabilityInfo = getReliabilityBadge(rel ?? 50);
+
+                      const levelInfo = getFloodLevelInfo(report.flood_level);
+
+                      const statusPill = getStatusPillStyle(statusInfo);
+
+                      const LevelIcon = levelInfo.icon;
+
+                      const StatusIcon = statusInfo.icon;
+
+                      const rowKey = report.id || `report-${index}`;
+
+                      return (
+                        <tr key={rowKey}>
+                          <td>
+                            <div className="reports-level-cell">
+                              <span
+                                className="reports-level-pill"
+                                style={{
+                                  background: levelInfo.pillBg,
+
+                                  color: levelInfo.pillText,
+
+                                  border: `1px solid ${levelInfo.pillBorder}`,
+                                }}
+                              >
+                                <LevelIcon
+                                  style={{ fontSize: "1rem", flexShrink: 0 }}
+                                />
+
+                                {report.flood_level || "—"}
+                              </span>
+
+                              {levelInfo.desc ? (
+                                <span className="reports-level-desc">
+                                  {levelInfo.desc}
+                                </span>
+                              ) : null}
+                            </div>
+                          </td>
+
+                          <td>
+                            <div className="reports-reporter-cell">
+                              <div className="reports-reporter-name">
+                                {report.reporter_name ||
+                                  t("reportUi.anonymous")}
+                              </div>
+
+                              {rel != null ? (
+                                <div className="reports-reporter-meta">
+                                  {t("reportsPage.reliabilityLine", {
+                                    tier: reliabilityInfo.text,
+
+                                    value:
+                                      typeof rel === "number"
+                                        ? rel.toFixed(1)
+                                        : rel,
+                                  })}
+                                </div>
+                              ) : null}
+                            </div>
+                          </td>
+
+                          <td>
+                            <span
+                              className="reports-status-pill"
+                              style={{
+                                background: statusPill.bg,
+
+                                color: statusPill.text,
+
+                                border: `1px solid ${statusPill.border}`,
+                              }}
+                            >
+                              <StatusIcon style={{ fontSize: "0.75rem" }} />
+
+                              {statusInfo.text}
+                            </span>
+                          </td>
+
+                          <td>
+                            {report.confidence != null ? (
+                              <ConfidenceBadge
+                                confidence={report.confidence}
+                                breakdown={report.confidence_breakdown}
+                              />
+                            ) : (
+                              <span className="reports-reporter-meta">—</span>
+                            )}
+                          </td>
+
+                          <td>
+                            <div className="reports-location-cell">
+                              <div className="reports-location-inner">
+                                <MdLocationOn size={18} />
+
+                                <span>{getReportLocationText(report)}</span>
+                              </div>
+                            </div>
+                          </td>
+
+                          <td>
+                            <span className="reports-datetime">
+                              {report.created_at
+                                ? new Date(report.created_at).toLocaleString(
+                                    "vi-VN",
+                                  )
+                                : "—"}
+                            </span>
+                          </td>
+
+                          <td>
+                            {report.verified_by_sensor ? (
+                              <span className="reports-sensor-tag">
+                                <FaCheck style={{ fontSize: "0.7rem" }} />
+
+                                {t("reportsPage.sensorVerified")}
+                              </span>
+                            ) : (
+                              <span className="reports-reporter-meta">
+                                {t("reportsPage.sensorNone")}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
-        )}
         </div>
       </div>
 
+      <CreateReportModal
+        open={createModalOpen}
+        formKey={createFormKey}
+        onClose={() => setCreateModalOpen(false)}
+        onSuccess={() => reloadReportsRef.current?.()}
+      />
     </div>
   );
 };

@@ -1,27 +1,23 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import Map, { Marker, Popup } from 'react-map-gl/mapbox';
+import { Navigate } from 'react-router-dom';
 import FilterDropdown from '../../components/common/FilterDropdown';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { submitFloodReport, uploadReportImage, fetchFloodData } from '../../services/api';
 import { isAuthenticated, getCurrentUser } from '../../utils/auth';
-import { DEFAULT_CENTER, DEFAULT_ZOOM, statusColors } from '../../utils/constants';
+import { DEFAULT_CENTER, DEFAULT_ZOOM } from '../../utils/constants';
 import { getSensorDisplayPosition } from '../../data/sensorOverrides';
-import SensorMarker from '../../components/map/SensorMarker';
+import ReportLocationMapPopup from '../../components/reports/ReportLocationMapPopup';
 import { 
-  FaPenToSquare,
   FaCheck,
   FaXmark,
   FaClock,
-  FaPaperPlane,
   FaMap,
-  FaTrash,
   FaImage,
   FaBullseye
 } from 'react-icons/fa6';
-import { WiFlood } from 'react-icons/wi';
-import { MdAddLocation, MdLocationOn, MdLightbulb } from 'react-icons/md';
+import { MdAddLocation, MdLocationOn } from 'react-icons/md';
 import ErrorToast from '../../components/common/ErrorToast';
+import { CancelButton, ConfirmButton, PrimaryButton } from '../../components/common/Button';
 import SearchAutoComplete from '../../components/common/SearchAutoComplete';
 import { searchAddressSuggestionsInHcm, fetchAddressFromCoords, resolveGeocodePlaceSelection, clearGeocodeAutocompleteSessionToken } from '../../utils/geocode';
 import { useTranslation } from 'react-i18next';
@@ -31,9 +27,8 @@ const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
 const defaultLng = DEFAULT_CENTER[1];
 const defaultLat = DEFAULT_CENTER[0];
 
-const NewReportPage = () => {
+export function NewReportForm({ onCancel, onSuccess }) {
   const { t } = useTranslation();
-  const navigate = useNavigate();
   const authenticated = isAuthenticated();
   const currentUser = getCurrentUser();
   const [formData, setFormData] = useState({
@@ -120,7 +115,7 @@ const NewReportPage = () => {
 
       if (response.success) {
         setResult(response);
-        setTimeout(() => navigate('/reports'), 2000);
+        setTimeout(() => onSuccess?.(), 2000);
       } else {
         setError(response.error || t('newReport.errGeneric'));
       }
@@ -208,6 +203,33 @@ const NewReportPage = () => {
     setMapCenter(null);
   };
 
+  const openMapPopup = () => {
+    mapSnapshotRef.current = {
+      lat: formData.lat,
+      lng: formData.lng,
+      locationDescription
+    };
+    setMapOpen(true);
+  };
+
+  const handleMapCancel = () => {
+    const snap = mapSnapshotRef.current;
+    if (snap) {
+      setFormData((prev) => ({ ...prev, lat: snap.lat, lng: snap.lng }));
+      setLocationDescription(snap.locationDescription ?? null);
+      if (snap.lat != null && snap.lng != null) {
+        setMapCenter([snap.lat, snap.lng]);
+      } else {
+        setMapCenter(null);
+      }
+    }
+    setMapOpen(false);
+  };
+
+  const handleMapConfirm = () => {
+    setMapOpen(false);
+  };
+
   /** Gợi ý địa chỉ: BE → Mapbox → Nominatim (nhạy hơn khi có số nhà nếu có token / BE). */
   const completeAddressSearch = async (e) => {
     const q = e.query.trim();
@@ -278,6 +300,8 @@ const NewReportPage = () => {
   const [sensorViewState, setSensorViewState] = useState(null);
   const [sensors, setSensors] = useState([]);
   const [hoveredSensorId, setHoveredSensorId] = useState(null);
+  const [mapOpen, setMapOpen] = useState(false);
+  const mapSnapshotRef = useRef(null);
 
   // Zoom map đúng vùng gần các sensor: fetch flood data, lưu danh sách sensor + tính bounds để fit
   useEffect(() => {
@@ -328,80 +352,19 @@ const NewReportPage = () => {
   }, [sensorViewState]);
 
   const handleCancel = () => {
-    navigate('/reports');
+    onCancel?.();
   };
 
+  const reporterDisplayName = authenticated
+    ? currentUser?.full_name || currentUser?.username
+    : formData.name;
+
   return (
-    <div style={{
-      minHeight: 'calc(100vh - 60px)', // Subtract header height
-      background: '#f5f5f5',
-      padding: '20px'
-    }}>
+    <>
       {error && (
         <ErrorToast message={error} onClose={() => setError(null)} />
       )}
-      {/* Page Title */}
-      <div style={{
-        backgroundImage: 'url(/add_report.png)',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
-        marginBottom: '24px',
-        boxShadow: '0 4px 12px rgba(25, 118, 210, 0.15)',
-        position: 'relative',
-        overflow: 'hidden',
-        width: '100%',
-        minHeight: '200px',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        padding: '32px 40px'
-      }}>
-        <h1 style={{ 
-          margin: '0 0 12px 0', 
-          fontSize: '2rem', 
-          color: 'white', 
-          fontWeight: '700', 
-          letterSpacing: '0.5px',
-          textShadow: '0 2px 4px rgba(0,0,0,0.5)',
-          position: 'relative',
-          zIndex: 1
-        }}>
-          {t('newReport.pageTitle')}
-        </h1>
-        <p style={{ 
-          margin: '0', 
-          color: 'rgba(255, 255, 255, 0.95)', 
-          fontSize: '15px',
-          fontWeight: '400',
-          lineHeight: '1.6',
-          textShadow: '0 1px 2px rgba(0,0,0,0.5)',
-          position: 'relative',
-          zIndex: 1
-        }}>
-          {t('newReport.pageSubtitle')}
-        </p>
-      </div>
-
-      {/* Form Container */}
-      <div style={{
-        maxWidth: '1200px',
-        margin: '0 auto'
-      }}>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: '20px',
-          alignItems: 'start'
-        }}>
-          {/* Form */}
-          <div style={{
-            background: 'white',
-            padding: '20px',
-            borderRadius: '8px',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-          }}>
-            <form onSubmit={handleSubmit}>
+      <form className="create-report-form-list" onSubmit={handleSubmit}>
               {/* Tên: chỉ khách nhập; user đăng nhập dùng tên tài khoản */}
               {authenticated ? (
                 <div style={{
@@ -500,16 +463,15 @@ const NewReportPage = () => {
               </div>
 
               {/* Hình ảnh hiện trường (optional, tối đa 5 ảnh) */}
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{
-                  display: 'block',
-                  marginBottom: '6px',
-                  fontWeight: '600',
-                  color: '#2c3e50',
-                  fontSize: '13px'
-                }}>
-                  <FaImage style={{ marginRight: '6px' }} /> {t('newReport.photosLabel', { max: MAX_PHOTOS })}
-                </label>
+              <div className="create-report-field" style={{ marginBottom: '16px' }}>
+                <div className="create-report-field__label-row">
+                  <label className="create-report-label">{t('newReport.photosLabel', { max: MAX_PHOTOS })}</label>
+                  {photoList.length > 0 && (
+                    <button type="button" onClick={clearAllPhotos} className="report-photo-clear-all">
+                      {t('newReport.clearAllPhotos')}
+                    </button>
+                  )}
+                </div>
                 <input
                   type="file"
                   accept="image/*"
@@ -519,6 +481,7 @@ const NewReportPage = () => {
                   id="report-photo-input"
                 />
                 <div className="report-photos-section">
+                  <div className="report-photos-row">
                   {photoList.length < MAX_PHOTOS && (
                     <label
                       htmlFor="report-photo-input"
@@ -540,38 +503,29 @@ const NewReportPage = () => {
                             title={t('newReport.removePhoto')}
                             aria-label={t('newReport.removePhoto')}
                           >
-                            <FaXmark style={{ fontSize: '14px' }} />
+                            <FaXmark className="report-photo-remove__icon" aria-hidden />
                           </button>
                         </div>
                       ))}
                     </div>
                   )}
-                  {photoList.length > 0 && (
-                    <button type="button" onClick={clearAllPhotos} className="report-photo-clear-all">
-                      {t('newReport.clearAllPhotos')}
-                    </button>
-                  )}
+                  </div>
                 </div>
               </div>
 
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{
-                  display: 'block',
-                  marginBottom: '6px',
-                  fontWeight: '600',
-                  color: '#2c3e50',
-                  fontSize: '13px'
-                }}>
-                  {t('newReport.addressLabel')}
-                </label>
-                
-                <div style={{ marginBottom: '10px' }}>
+              <div className="create-report-field create-report-field--location">
+                <div className="create-report-field__label-row">
+                  <label className="create-report-label">{t('newReport.locationSectionLabel')}</label>
+                  <PrimaryButton type="button" size="sm" className="gap-1.5 shrink-0" onClick={openMapPopup}>
+                    <FaMap /> {t('newReport.openMapBtn')}
+                  </PrimaryButton>
+                </div>
+                <div className="create-report-control">
                   <SearchAutoComplete
                     value={searchAddress}
                     suggestions={searchResults}
                     completeMethod={completeAddressSearch}
                     field="display_name"
-                    dataKey="id"
                     minLength={2}
                     delay={400}
                     placeholder={t('newReport.addressSearchPh')}
@@ -586,49 +540,45 @@ const NewReportPage = () => {
                     onSelect={(ev) => handleSelectSearchResult(ev.value)}
                   />
                   {searchingAddress && (
-                    <div style={{ marginTop: '6px', fontSize: '12px', color: '#64748b' }}>{t('newReport.searchingSuggest')}</div>
+                    <p className="create-report-field-note">{t('newReport.searchingSuggest')}</p>
                   )}
                 </div>
-
-                {/* Hiển thị vị trí đã chọn */}
-                <div style={{
-                  padding: '12px',
-                  background: '#f8f9fa',
-                  borderRadius: '4px',
-                  fontSize: '13px',
-                  color: '#666',
-                  border: '1px solid #e9ecef'
-                }}>
+                <div className="create-report-location-preview">
                   {formData.lat && formData.lng ? (
                     <>
-                      <div style={{ color: '#28a745', fontWeight: 'bold', marginBottom: '5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <div className="create-report-location-preview__ok">
                         <FaCheck /> {t('newReport.locationSelected')}
                       </div>
                       {fetchingLocation ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#999' }}>
-                          <FaClock style={{ fontSize: '12px' }} /> {t('newReport.resolvingAddr')}
-                        </div>
+                        <p className="create-report-location-preview__pending">
+                          <FaClock /> {t('newReport.resolvingAddr')}
+                        </p>
                       ) : locationDescription ? (
-                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
-                          <MdLocationOn style={{ fontSize: '14px', marginTop: '2px', flexShrink: 0 }} />
+                        <p className="create-report-location-preview__addr">
+                          <MdLocationOn />
                           <span>{locationDescription}</span>
-                        </div>
+                        </p>
                       ) : (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#999' }}>
-                          <MdLocationOn style={{ fontSize: '14px' }} />
-                          {t('newReport.latLngRaw', { lat: formData.lat.toFixed(6), lng: formData.lng.toFixed(6) })}
-                        </div>
+                        <p className="create-report-location-preview__addr">
+                          <MdLocationOn />
+                          <span>
+                            {t('newReport.latLngRaw', {
+                              lat: formData.lat.toFixed(6),
+                              lng: formData.lng.toFixed(6)
+                            })}
+                          </span>
+                        </p>
                       )}
                     </>
                   ) : (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <p className="create-report-location-preview__empty">
                       <MdAddLocation /> {t('newReport.pickLocationHint')}
-                    </div>
+                    </p>
                   )}
                 </div>
               </div>
 
-              {/* Success Message */}
+{/* Success Message */}
               {result && result.success && (
                 <div style={{
                   padding: '15px',
@@ -653,242 +603,59 @@ const NewReportPage = () => {
                 </div>
               )}
 
-              {/* Action Buttons */}
-              <div style={{
-                display: 'flex',
-                gap: '12px',
-                marginTop: '20px'
-              }}>
-                <button
+              <div className="create-report-form-actions">
+                <CancelButton
                   type="button"
                   onClick={handleCancel}
                   disabled={loading || result?.success}
-                  style={{
-                    flex: 1,
-                    padding: '12px',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    color: '#666',
-                    background: '#f5f5f5',
-                    border: '1px solid #ddd',
-                    borderRadius: '6px',
-                    cursor: loading || result?.success ? 'not-allowed' : 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!loading && !result?.success) {
-                      e.target.style.background = '#e9ecef';
-                      e.target.style.borderColor = '#bbb';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!loading && !result?.success) {
-                      e.target.style.background = '#f5f5f5';
-                      e.target.style.borderColor = '#ddd';
-                    }
-                  }}
                 >
                   {t('newReport.cancelBtn')}
-                </button>
-                <button
+                </CancelButton>
+                <ConfirmButton
                   type="submit"
                   disabled={loading || result?.success}
-                  style={{
-                    flex: 1,
-                    padding: '12px',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    color: 'white',
-                    background: loading || result?.success ? '#6c757d' : '#007bff',
-                    border: 'none',
-                    borderRadius: '6px',
-                    cursor: loading || result?.success ? 'not-allowed' : 'pointer',
-                    transition: 'background 0.3s'
-                  }}
+                  loading={loading}
                 >
                   {loading ? t('newReport.sending') : result?.success ? t('newReport.sent') : t('newReport.submit')}
-                </button>
+                </ConfirmButton>
               </div>
-            </form>
-          </div>
+      </form>
 
-          {/* Map */}
-          <div style={{
-            background: 'white',
-            padding: '20px',
-            borderRadius: '8px',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-            position: 'sticky',
-            top: '20px'
-          }}>
-            <h3 style={{
-              margin: '0 0 15px 0',
-              fontSize: '16px',
-              color: '#2c3e50',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}>
-              <FaMap /> {t('newReport.mapPickHeading')}
-            </h3>
-            <div style={{
-              height: '500px',
-              borderRadius: '8px',
-              overflow: 'hidden',
-              border: '2px solid #ddd',
-              position: 'relative'
-            }}>
-              {/* Button xóa marker - góc trên bên phải */}
-              {formData.lat && formData.lng && (
-                <button
-                  type="button"
-                  onClick={handleRemoveMarker}
-                  style={{
-                    position: 'absolute',
-                    top: '10px',
-                    right: '10px',
-                    width: '40px',
-                    height: '40px',
-                    borderRadius: '50%',
-                    background: '#dc3545',
-                    border: '2px solid #dc3545',
-                    color: 'white',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    zIndex: 1000,
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-                    transition: 'all 0.2s ease',
-                    padding: 0,
-                    margin: 0,
-                    outline: 'none'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = '#c82333';
-                    e.currentTarget.style.borderColor = '#c82333';
-                    e.currentTarget.style.transform = 'scale(1.1)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = '#dc3545';
-                    e.currentTarget.style.borderColor = '#dc3545';
-                    e.currentTarget.style.transform = 'scale(1)';
-                  }}
-                  title={t('newReport.clearLocationTitle')}
-                >
-                  <FaTrash style={{ fontSize: '16px', display: 'block' }} />
-                </button>
-              )}
-              {MAPBOX_TOKEN ? (
-                <Map
-                  ref={mapRef}
-                  mapboxAccessToken={MAPBOX_TOKEN}
-                  initialViewState={{
-                    longitude: mapCenter ? mapCenter[1] : defaultLng,
-                    latitude: mapCenter ? mapCenter[0] : defaultLat,
-                    zoom: mapCenter ? 16 : DEFAULT_ZOOM
-                  }}
-                  style={{ height: '100%', width: '100%' }}
-                  mapStyle="mapbox://styles/mapbox/streets-v12"
-                  onClick={(e) => {
-                    setHoveredSensorId(null);
-                    handleLocationSelect(e.lngLat.lng, e.lngLat.lat);
-                  }}
-                >
-                  {/* Marker cảm biến: đồng bộ với map trang chủ, click zoom to / hover hiện thông tin */}
-                  {sensors.map((item, index) => {
-                    const status = item.status || 'normal';
-                    const color = statusColors[status] || statusColors.normal;
-                    const sensorId = item.sensor_id || `sensor-${index}`;
-                    const isOnline = status !== 'offline';
-                    return (
-                      <SensorMarker
-                        key={sensorId}
-                        item={item}
-                        color={color}
-                        isOnline={isOnline}
-                        mode="report"
-                        reportHoverId={sensorId}
-                        hoveredSensorId={hoveredSensorId}
-                        onHoverChange={setHoveredSensorId}
-                        onZoomTo={() => {
-                          const { lat, lng } = getSensorDisplayPosition(item);
-                          const map = mapRef.current?.getMap?.() ?? mapRef.current;
-                          if (map?.flyTo) map.flyTo({ center: [lng, lat], zoom: 16, duration: 800 });
-                        }}
-                      />
-                    );
-                  })}
-                  {formData.lat && formData.lng && (
-                    <>
-                      <Marker longitude={formData.lng} latitude={formData.lat} anchor="center">
-                        <div style={{
-                          width: 32,
-                          height: 32,
-                          borderRadius: '50%',
-                          background: '#14b8a6',
-                          border: '3px solid white',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: 'white'
-                        }}>
-                          <WiFlood style={{ fontSize: '18px' }} />
-                        </div>
-                      </Marker>
-                      <Popup longitude={formData.lng} latitude={formData.lat} anchor="bottom" closeButton closeOnClick={false}>
-                        <div style={{ margin: 0, padding: 0, minWidth: '200px' }}>
-                          <div style={{ padding: '8px 0 12px 0', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid #e5e7eb', marginBottom: '8px' }}>
-                            <div style={{ width: '20px', height: '20px', background: '#14b8a6', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '12px', fontWeight: 'bold', flexShrink: 0 }}>
-                              <WiFlood style={{ fontSize: '14px' }} />
-                            </div>
-                            <span style={{ fontWeight: '600', fontSize: '14px', color: '#333' }}>{t('newReport.popupTitle')}</span>
-                          </div>
-                          <div style={{ padding: 0 }}>
-                            <div style={{ fontSize: '13px', color: '#333', marginBottom: '6px', fontWeight: '500' }}>{formData.name || t('reportUi.noName')}</div>
-                            <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px', display: 'flex', alignItems: 'flex-start', gap: '4px' }}>
-                              <MdLocationOn style={{ fontSize: '14px', marginTop: '2px', flexShrink: 0 }} />
-                              <span>{locationDescription || t('newReport.latLngRaw', { lat: formData.lat.toFixed(6), lng: formData.lng.toFixed(6) })}</span>
-                            </div>
-                            {formData.level && (
-                              <div style={{ fontSize: '12px', color: '#666', display: 'flex', alignItems: 'center', gap: '4px' }}>{t('newReport.popupLevelShort')} {formData.level}</div>
-                            )}
-                          </div>
-                        </div>
-                      </Popup>
-                    </>
-                  )}
-                </Map>
-              ) : (
-                <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f0f0f0', color: '#666' }}>
-                  {t('newReport.mapboxMissingEnv')}
-                </div>
-              )}
-            </div>
-            <div style={{
-              marginTop: '10px',
-              fontSize: '12px',
-              color: '#666',
-              textAlign: 'center',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '4px'
-            }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}>
-                <MdLightbulb /> {t('newReport.mapClickMark')}
-              </span>
-              {sensors.length > 0 && (
-                <span style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}>
-                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: statusColors.normal, border: '1px solid #fff', boxShadow: '0 1px 2px rgba(0,0,0,0.2)' }} /> {t('newReport.sensorNote')}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+      <ReportLocationMapPopup
+        open={mapOpen}
+        onClose={handleMapConfirm}
+        onCancel={handleMapCancel}
+        onConfirm={handleMapConfirm}
+        mapRef={mapRef}
+        defaultLng={defaultLng}
+        defaultLat={defaultLat}
+        defaultZoom={DEFAULT_ZOOM}
+        mapCenter={mapCenter}
+        formData={formData}
+        locationDescription={locationDescription}
+        sensors={sensors}
+        hoveredSensorId={hoveredSensorId}
+        setHoveredSensorId={setHoveredSensorId}
+        onMapClick={handleLocationSelect}
+        onRemoveMarker={handleRemoveMarker}
+        reporterDisplayName={reporterDisplayName}
+        reporterAvatarFileName={authenticated ? currentUser?.avatar : null}
+        searchAddress={searchAddress}
+        searchResults={searchResults}
+        searchingAddress={searchingAddress}
+        onSearchAddressChange={(v) => {
+          setSearchAddress(v);
+          if (!v.trim()) clearGeocodeAutocompleteSessionToken();
+        }}
+        onCompleteAddressSearch={completeAddressSearch}
+        onSelectSearchResult={handleSelectSearchResult}
+      />
+    </>
   );
-};
+}
+
+function NewReportPage() {
+  return <Navigate to="/reports?create=1" replace />;
+}
 
 export default NewReportPage;

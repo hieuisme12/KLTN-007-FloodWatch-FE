@@ -104,4 +104,6 @@ export const hasPermission = (role) => {
   return user.role === role;
 };
 
+/** GET /api/reports/reliability-ranking — chỉ admin / moderator (BE trả 403 nếu không đủ quyền). */
+export const canFetchReliabilityRanking = () => isAdmin() || isModerator();
 

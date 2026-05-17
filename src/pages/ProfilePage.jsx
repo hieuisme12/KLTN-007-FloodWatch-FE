@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getProfile, getProfileIcons, updateProfile } from '../../services/api';
-import { API_CONFIG } from '../../config/apiConfig';
-import ErrorToast from '../../components/common/ErrorToast';
-import { CancelButton, ConfirmButton, PrimaryButton } from '../../components/common/Button';
+import { getProfile, getProfileIcons, updateProfile } from '../services/api';
+import { API_CONFIG } from '../config/apiConfig';
+import ErrorToast from '../components/common/ErrorToast';
+import { CancelButton, ConfirmButton, PrimaryButton } from '../components/common/Button';
 import Skeleton from 'react-loading-skeleton';
 const ProfilePage = () => {
   const navigate = useNavigate();

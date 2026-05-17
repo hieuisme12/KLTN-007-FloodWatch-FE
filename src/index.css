@@ -4,6 +4,7 @@
 
 @layer base {
   :root {
+    --spacing: 0.25rem;
     --fs-font-sans: ui-sans-serif, system-ui, 'Inter', 'Segoe UI', sans-serif;
     --fs-color-primary: 221 83% 53%;
     --fs-color-primary-foreground: 0 0% 100%;

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { fetchReliabilityRanking } from '../services/api';
+import { canFetchReliabilityRanking } from '../utils/auth';
 
 const ReporterRankingContext = createContext(null);
 
@@ -13,7 +14,13 @@ export function ReporterRankingProvider({ children }) {
 
   useEffect(() => {
     let cancelled = false;
-    fetchReliabilityRanking(500).then((res) => {
+
+    const run = async () => {
+      if (!canFetchReliabilityRanking()) {
+        if (!cancelled) setMapByReporterId({});
+        return;
+      }
+      const res = await fetchReliabilityRanking(500);
       if (cancelled || !res.success || !Array.isArray(res.data)) return;
       const next = {};
       res.data.forEach((row) => {
@@ -21,9 +28,18 @@ export function ReporterRankingProvider({ children }) {
         if (id != null) next[id] = row.avg_reliability != null ? Number(row.avg_reliability) : null;
       });
       setMapByReporterId(next);
-    });
+    };
+
+    void run();
+
+    const onUserUpdated = () => {
+      if (!cancelled) void run();
+    };
+    window.addEventListener('user-updated', onUserUpdated);
+
     return () => {
       cancelled = true;
+      window.removeEventListener('user-updated', onUserUpdated);
     };
   }, []);
 

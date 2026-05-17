@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { FaStar } from 'react-icons/fa6';
 import { getReportEvaluationAverage, getReportEvaluations, submitReportEvaluation } from '../../services/api';
 import { isAuthenticated, getCurrentUser } from '../../utils/auth';
+import { PrimaryButton } from '../common/Button';
 
 /**
  * Đánh giá theo từng báo cáo: hiển thị điểm trung bình của báo cáo này; chỉ cho đánh giá nếu chưa đánh giá.
@@ -134,23 +135,16 @@ const ReportEvaluationWidget = ({ reportId, reporterId = null, compact = false }
             </button>
           ))}
           {selectedRating >= 1 && (
-            <button
+            <PrimaryButton
               type="button"
+              size="sm"
+              className="ml-2"
               onClick={handleSubmit}
               disabled={submitting}
-              style={{
-                marginLeft: '8px',
-                padding: '2px 8px',
-                fontSize: '12px',
-                background: '#2563eb',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: submitting ? 'not-allowed' : 'pointer'
-              }}
+              loading={submitting}
             >
               {submitting ? 'Đang gửi...' : 'Gửi'}
-            </button>
+            </PrimaryButton>
           )}
         </div>
       )}

@@ -13,7 +13,6 @@ import { cn } from '@/lib/cn';
 import {
   FaHouse,
   FaClipboardList,
-  FaPlus,
   FaCrown,
   FaUser,
   FaBars,
@@ -34,7 +33,6 @@ const MAIN_NAV_DEF = [
   { path: '/map', labelKey: 'nav.mapDetail', icon: FaMap, badge: null, public: true, mobileOnly: true },
   { path: '/routing', labelKey: 'nav.routing', icon: FaRoute, badge: null, public: true },
   { path: '/reports', labelKey: 'nav.reports', icon: FaClipboardList, badge: null, public: true },
-  { path: '/report/new', labelKey: 'nav.newReport', icon: FaPlus, badge: null, requireAuth: true },
   { path: '/emergency-alerts', labelKey: 'nav.emergency', icon: FaBell, badge: null, requireAuth: true },
 ];
 
