@@ -3,13 +3,18 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "cap:sync": "npm run build && npx cap sync",
-    "cap:open:android": "npx cap open android"
+    "cap:open:android": "npx cap open android",
+    "mobile": "npm run start --prefix mobile",
+    "mobile:tunnel": "npm run start:tunnel --prefix mobile"
   },
   "dependencies": {
     "@capacitor/android": "^8.3.3",

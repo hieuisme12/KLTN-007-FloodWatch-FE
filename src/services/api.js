@@ -43,6 +43,12 @@ const apiClient = axios.create({
   baseURL: API_CONFIG.BASE_URL
 });
 
+/** Endpoint public — không gửi JWT (tránh lỗi khi token hết hạn / BE xử lý auth lạ). */
+const publicApiClient = axios.create({
+  baseURL: API_CONFIG.BASE_URL,
+  timeout: 20000
+});
+
 // Interceptor: Tự động thêm token vào header cho mọi request
 apiClient.interceptors.request.use(
   (config) => {
@@ -123,23 +129,50 @@ apiClient.interceptors.response.use(
   }
 );
 
+function extractNewsItems(body) {
+  const raw = body?.data ?? body?.items ?? body?.articles ?? body;
+  const list = Array.isArray(raw) ? raw : Array.isArray(raw?.items) ? raw.items : [];
+  return list
+    .map((it) => {
+      if (!it || typeof it !== 'object') return null;
+      const title = it.title || it.headline || it.name;
+      const link = it.link || it.url || it.href;
+      if (!title || !link) return null;
+      return {
+        title: String(title),
+        link: String(link),
+        pubDate: it.pubDate || it.publishedAt || it.published_at || it.date || '',
+        source: it.source || it.sourceName || it.feed || ''
+      };
+    })
+    .filter(Boolean);
+}
+
 /**
- * Tin RSS ngập nước / thời tiết TP.HCM (`GET /api/news`) — public, không bắt buộc JWT.
- * @returns {{ success: boolean, data?: Array<{ title: string, link: string, pubDate: string, source: string }>, error?: string }}
+ * Tin RSS TP.HCM (`GET /api/v1/news/hcm`) — public, không bắt buộc JWT.
  */
 export const fetchNewsFeed = async () => {
   try {
-    const response = await apiClient.get(API_ENDPOINTS.NEWS);
+    const response = await publicApiClient.get(API_ENDPOINTS.NEWS);
     const body = response.data;
-    if (body?.success && Array.isArray(body.data)) {
-      return { success: true, data: body.data };
+    const items = extractNewsItems(body);
+    if (items.length > 0) {
+      return { success: true, data: items };
     }
-    return {
-      success: false,
-      error: typeof body?.error === 'string' ? body.error : 'Không thể tải tin tức.',
-      data: Array.isArray(body?.data) ? body.data : []
-    };
+    if (body?.success === false) {
+      return {
+        success: false,
+        error: typeof body?.error === 'string' ? body.error : 'Không thể tải tin tức.',
+        data: []
+      };
+    }
+    return { success: true, data: [] };
   } catch (error) {
+    const body = error?.response?.data;
+    const items = extractNewsItems(body);
+    if (items.length > 0) {
+      return { success: true, data: items, stale: true };
+    }
     return {
       success: false,
       error:
@@ -450,6 +483,33 @@ export const fetchForecastForSensor = async (sensorId, params = {}) => {
   }
 };
 
+function normalizeWeatherHcmError(error, fallback = 'Không tải được thời tiết.') {
+  const status = error?.response?.status;
+  const raw =
+    error?.response?.data?.error ||
+    error?.response?.data?.message ||
+    (typeof error?.message === 'string' ? error.message : '') ||
+    (typeof fallback === 'string' ? fallback : '');
+  const text = typeof raw === 'string' ? raw : '';
+  if (status === 502 || text.includes('502')) {
+    return 'Máy chủ thời tiết tạm thời không phản hồi. Thử lại sau vài phút.';
+  }
+  if (status === 429 || /429|rate limit|too many/i.test(text)) {
+    return 'Nguồn thời tiết đang quá tải. Dữ liệu có thể được cập nhật chậm.';
+  }
+  return text || fallback;
+}
+
+function hasWeatherPayload(payload) {
+  if (!payload || typeof payload !== 'object') return false;
+  return Boolean(
+    payload.current ||
+      payload.hourly ||
+      payload.daily ||
+      payload.temperature_2m != null
+  );
+}
+
 /**
  * Thời tiết TP.HCM (Open-Meteo qua BE). Query: forecast_days, lat, lon
  */
@@ -460,20 +520,43 @@ export const fetchWeatherHcm = async (params = {}) => {
     Object.entries(merged).forEach(([k, v]) => {
       if (v !== undefined && v !== null && v !== '') usp.set(k, String(v));
     });
-    const response = await apiClient.get(`${API_ENDPOINTS.WEATHER_HCM}?${usp}`, { timeout: 20000 });
-    if (response.data && response.data.success) {
-      return { success: true, data: response.data.data || null };
+    const response = await publicApiClient.get(`${API_ENDPOINTS.WEATHER_HCM}?${usp}`);
+    const body = response.data;
+    const payload = body?.data ?? body;
+    const stale = Boolean(body?.stale || body?.from_cache || body?.cached);
+
+    if (body?.success && hasWeatherPayload(payload)) {
+      return { success: true, data: payload, stale };
+    }
+    // BE có thể trả data + stale khi Open-Meteo 429 nhưng cache còn
+    if (hasWeatherPayload(payload)) {
+      return {
+        success: true,
+        data: payload,
+        stale: stale || Boolean(body?.error),
+        warning: body?.error || body?.message || null
+      };
     }
     return {
       success: false,
       data: null,
-      error: response.data?.error || response.data?.message
+      error: normalizeWeatherHcmError(null, body?.error || body?.message)
     };
   } catch (error) {
+    const body = error?.response?.data;
+    const payload = body?.data ?? body;
+    if (hasWeatherPayload(payload)) {
+      return {
+        success: true,
+        data: payload,
+        stale: true,
+        warning: body?.error || body?.message || null
+      };
+    }
     return {
       success: false,
       data: null,
-      error: error.response?.data?.error || error.response?.data?.message || error.message
+      error: normalizeWeatherHcmError(error)
     };
   }
 };

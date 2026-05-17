@@ -852,6 +852,23 @@ button.fs-btn--ghost:hover:not(:disabled) {
   align-items: stretch;
 }
 
+.weather-news-section__weather {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+}
+
+.weather-news-section__weather > * {
+  flex: 1 1 auto;
+  min-height: 100%;
+}
+
+.weather-news-section__news {
+  min-width: 0;
+  width: 100%;
+  align-self: stretch;
+}
+
 .water-level-statistics {
   background: white;
   border-radius: 8px;
@@ -861,17 +878,24 @@ button.fs-btn--ghost:hover:not(:disabled) {
   max-height: 500px;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
-/* Cột tin 24h: cùng chiều cao với thời tiết, danh sách cuộn trong card */
+/* Card tin: chiều cao gọn như cũ, danh sách cuộn trong card */
 .water-level-statistics.water-level-statistics--news-only {
-  max-height: none;
-  height: 100%;
-  flex: 1 1 0;
+  max-height: 500px;
+  height: auto;
   min-height: 0;
+  width: 100%;
+}
+
+.water-level-statistics--news-only .statistics-title {
+  flex-shrink: 0;
+  margin-bottom: 12px;
 }
 
 .water-level-statistics--news-only .news-feed-hint {
+  flex-shrink: 0;
   margin: -12px 0 14px;
   font-size: 12px;
   color: #64748b;
@@ -882,17 +906,35 @@ button.fs-btn--ghost:hover:not(:disabled) {
   margin-top: 0;
   padding-top: 0;
   border-top: none;
-  flex: 1 1 0;
+  flex: 1 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .water-level-statistics--news-only .vov-rss-list {
-  max-height: none;
-  flex: 1 1 0;
-  overflow-y: auto;
+  flex: 0 1 auto;
   min-height: 0;
+  max-height: 220px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.water-level-statistics--news-only .vov-rss-loading,
+.water-level-statistics--news-only .vov-rss-empty {
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.water-level-statistics--news-only .vov-rss-item {
+  padding: 10px 0;
+}
+
+.water-level-statistics--news-only .vov-rss-link {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .statistics-title {
@@ -997,6 +1039,11 @@ button.fs-btn--ghost:hover:not(:disabled) {
 
 .vov-rss-error {
   color: #c62828;
+}
+
+.vov-rss-error--inline {
+  margin: 0 0 10px;
+  font-size: 12px;
 }
 
 .vov-rss-tried {
@@ -1224,6 +1271,10 @@ button.fs-btn--ghost:hover:not(:disabled) {
   .water-level-statistics {
     min-width: 100%;
     max-height: none;
+  }
+
+  .water-level-statistics--news-only .vov-rss-list {
+    max-height: 200px;
   }
   
   .details-grid {

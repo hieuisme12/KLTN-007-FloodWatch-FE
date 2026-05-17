@@ -146,6 +146,7 @@ export default {
   },
   weatherWidget: {
     loadFail: 'Không tải được thời tiết',
+    staleHint: 'Dữ liệu có thể chưa cập nhật mới (nguồn thời tiết đang quá tải).',
     title: 'Thời tiết TP.HCM',
     weatherCode: 'Mã thời tiết: {{code}}',
     rainNextHours: 'Xác suất mưa (giờ tới)',

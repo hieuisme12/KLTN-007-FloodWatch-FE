@@ -146,6 +146,7 @@ export default {
   },
   weatherWidget: {
     loadFail: 'Could not load weather',
+    staleHint: 'Data may be slightly outdated (weather source is rate-limited).',
     title: 'HCMC weather',
     weatherCode: 'Weather code: {{code}}',
     rainNextHours: 'Rain probability (next hours)',

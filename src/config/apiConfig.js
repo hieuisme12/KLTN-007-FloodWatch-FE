@@ -116,8 +116,8 @@ export const API_ENDPOINTS = {
   AUTH_PROFILE_ICONS: '/api/auth/profile-icons',
   AUTH_CHANGE_PASSWORD: '/api/auth/change-password',
 
-  /** Tin RSS tổng hợp (ngập nước / thời tiết TP.HCM) — public, không bắt buộc JWT */
-  NEWS: '/api/news',
+  /** Tin RSS TP.HCM — public, không bắt buộc JWT */
+  NEWS: '/api/v1/news/hcm',
 
   // Stats
   STATS_ONLINE_USERS: '/api/stats/online-users',

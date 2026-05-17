@@ -1,0 +1,11 @@
+{
+  "name": "@hcm-flood/shared",
+  "version": "1.0.0",
+  "private": true,
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./api": "./src/apiEndpoints.js",
+    "./constants": "./src/constants.js"
+  }
+}

@@ -28,6 +28,7 @@ export default function WeatherHcmWidget() {
   const { t, i18n } = useTranslation();
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
+  const [staleHint, setStaleHint] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -35,10 +36,18 @@ export default function WeatherHcmWidget() {
     const load = async () => {
       setLoading(true);
       setError(null);
+      setStaleHint(null);
       const res = await fetchWeatherHcm({ forecast_days: 3 });
       if (cancelled) return;
-      if (res.success && res.data) setData(res.data);
-      else setError(res.error || t('weatherWidget.loadFail'));
+      if (res.success && res.data) {
+        setData(res.data);
+        if (res.stale) {
+          setStaleHint(t('weatherWidget.staleHint'));
+        }
+      } else {
+        setData(null);
+        setError(res.error || t('weatherWidget.loadFail'));
+      }
       setLoading(false);
     };
     load();
@@ -74,20 +83,26 @@ export default function WeatherHcmWidget() {
   return (
     <div
       className={cn(
-        'flex h-full min-h-0 w-full flex-1 flex-col rounded-xl bg-gradient-to-br from-sky-950 via-sky-700 to-sky-600 p-5 text-sky-50 shadow-lg shadow-sky-900/25'
+        'weather-hcm-widget flex h-full min-h-0 w-full flex-1 flex-col rounded-xl bg-gradient-to-br from-sky-950 via-sky-700 to-sky-600 p-5 text-sky-50 shadow-lg shadow-sky-900/25'
       )}
     >
-      <div className="mb-3 flex items-center gap-2.5">
+      <div className="mb-3 flex shrink-0 items-center gap-2.5">
         <FaCloudSun className="shrink-0 text-[28px] opacity-95" aria-hidden />
         <h3 className="m-0 flex-1 text-lg font-bold">{t('weatherWidget.title')}</h3>
       </div>
+      <div className="flex min-h-0 flex-1 flex-col">
       {loading && !data && (
         <div className="space-y-3">
           <Skeleton height={40} width="55%" baseColor="rgba(255,255,255,0.14)" highlightColor="rgba(255,255,255,0.28)" />
           <Skeleton count={3} height={16} baseColor="rgba(255,255,255,0.12)" highlightColor="rgba(255,255,255,0.22)" />
         </div>
       )}
-      {error && <p className="m-0 text-sm text-red-200">{String(error)}</p>}
+      {staleHint && (
+        <p className="m-0 mb-2 text-xs text-amber-100/95">{staleHint}</p>
+      )}
+      {error && !data && (
+        <p className="m-0 flex flex-1 items-start text-sm text-red-200">{String(error)}</p>
+      )}
       {data && (
         <>
           <div className="mb-3.5 flex flex-1 flex-col justify-between gap-4">
@@ -141,6 +156,7 @@ export default function WeatherHcmWidget() {
           </div>
         </>
       )}
+      </div>
     </div>
   );
 }
