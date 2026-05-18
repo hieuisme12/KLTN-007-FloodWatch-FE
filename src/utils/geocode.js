@@ -193,10 +193,32 @@ function parseBackendReverseGeocodePayload(data) {
     return parts.length > 0 ? parts.join(', ') : null;
 }
 
+const REVERSE_BE_UNAVAILABLE_KEY = 'geocode_reverse_be_unavailable';
+
+function isBackendReverseGeocodeDisabled() {
+    if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SKIP_BACKEND_REVERSE_GEOCODE === 'true') {
+        return true;
+    }
+    try {
+        return sessionStorage.getItem(REVERSE_BE_UNAVAILABLE_KEY) === '1';
+    } catch {
+        return false;
+    }
+}
+
+function markBackendReverseGeocodeDisabled() {
+    try {
+        sessionStorage.setItem(REVERSE_BE_UNAVAILABLE_KEY, '1');
+    } catch {
+        /* private mode */
+    }
+}
+
 /**
  * Reverse geocode qua BE (Google Geocoding trên server).
  */
 async function fetchAddressFromBackendReverse(lat, lng) {
+    if (isBackendReverseGeocodeDisabled()) return null;
     const path =
         (typeof import.meta !== 'undefined' && import.meta.env?.VITE_REVERSE_GEOCODE_PATH) ||
         API_ENDPOINTS.REVERSE_GEOCODE;
@@ -208,6 +230,10 @@ async function fetchAddressFromBackendReverse(lat, lng) {
     if (token) headers.Authorization = `Bearer ${token}`;
     try {
         const res = await fetch(url, { headers, credentials: 'omit' });
+        if (res.status === 404) {
+            markBackendReverseGeocodeDisabled();
+            return null;
+        }
         if (!res.ok) return null;
         const json = await res.json();
         if (json && json.success === false) return null;
@@ -308,7 +334,9 @@ async function fetchAddressMapboxReverse(lat, lng, accessToken) {
  * Thứ tự: BE (Google qua server) → Mapbox → Nominatim. Chuỗi trả về đã bỏ mã bưu chính khi hiển thị.
  * @param {number} lat
  * @param {number} lng
- * @param {{ mapboxToken?: string }} options - mapboxToken từ import.meta.env.VITE_MAPBOX_TOKEN (truyền từ nơi gọi nếu cần)
+ * @param {{ mapboxToken?: string, skipBackend?: boolean }} options
+ *   - mapboxToken từ VITE_MAPBOX_TOKEN
+ *   - skipBackend: bỏ qua /geocode/reverse (khi BE chưa có route)
  * @returns {Promise<string|null>}
  */
 export async function fetchAddressFromCoords(lat, lng, options = {}) {
@@ -324,16 +352,20 @@ export async function fetchAddressFromCoords(lat, lng, options = {}) {
         return finalized;
     }
 
-    try {
-        const beAddr = await fetchAddressFromBackendReverse(lat, lng);
-        const beFinal = finalizeAddressString(beAddr);
-        if (beFinal) {
-            cache[cacheKey] = beFinal;
-            setCache(cache);
-            return beFinal;
+    const skipBackend = options.skipBackend === true || isBackendReverseGeocodeDisabled();
+
+    if (!skipBackend) {
+        try {
+            const beAddr = await fetchAddressFromBackendReverse(lat, lng);
+            const beFinal = finalizeAddressString(beAddr);
+            if (beFinal) {
+                cache[cacheKey] = beFinal;
+                setCache(cache);
+                return beFinal;
+            }
+        } catch {
+            /* fallback Mapbox / Nominatim */
         }
-    } catch {
-        /* fallback */
     }
 
     const mapboxToken = (options && options.mapboxToken) || getMapboxToken();

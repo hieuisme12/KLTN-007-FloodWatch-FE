@@ -10,6 +10,8 @@ import { isReportExpired } from "../../utils/reportHelpers";
 import { useSearchParams } from "react-router-dom";
 import { getCurrentUser } from "../../utils/auth";
 import CreateReportModal from "../../components/reports/CreateReportModal";
+import ReportDetailModal from "../../components/reports/ReportDetailModal";
+import { getReportContent } from "../../utils/reportHelpers";
 import { PrimaryButton } from "../../components/common/Button";
 import { isGuestBrowseMode } from "../../utils/guestSession";
 import { useGuestExplore } from "../../hooks/useGuestExplore";
@@ -47,6 +49,7 @@ const ReportsPage = () => {
   const [reportSuggestions, setReportSuggestions] = useState([]);
   const [confidenceBand, setConfidenceBand] = useState("all");
   const [confidenceSort, setConfidenceSort] = useState("none");
+  const [selectedReport, setSelectedReport] = useState(null);
 
   const filterOptions = useMemo(
     () => [
@@ -282,6 +285,13 @@ const ReportsPage = () => {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mergeReportsWithCachedLocations]);
+
+  useEffect(() => {
+    setSelectedReport((prev) => {
+      if (!prev?.id) return prev;
+      return reports.find((r) => r.id === prev.id) ?? prev;
+    });
+  }, [reports]);
 
   // Hàm lấy status info - ưu tiên moderation_status theo logic đúng
   const getStatusInfo = (report) => {
@@ -536,8 +546,9 @@ const ReportsPage = () => {
       }
       for (const r of reports) {
         if (out.length >= 12) break;
-        if (!r.description) continue;
-        addSnippet(r.description);
+        const text = getReportContent(r);
+        if (!text) continue;
+        addSnippet(text);
       }
       setReportSuggestions(out);
     },
@@ -578,8 +589,7 @@ const ReportsPage = () => {
           report.reporter_name.toLowerCase().includes(searchLower)) ||
         (report.flood_level &&
           report.flood_level.toLowerCase().includes(searchLower)) ||
-        (report.description &&
-          report.description.toLowerCase().includes(searchLower)) ||
+        (getReportContent(report).toLowerCase().includes(searchLower)) ||
         (addr && addr.toLowerCase().includes(searchLower));
 
       return matchesFilter && matchesSearch;
@@ -803,8 +813,28 @@ const ReportsPage = () => {
 
                       const rowKey = report.id || `report-${index}`;
 
+                      const isSelected =
+                        selectedReport?.id != null && report.id === selectedReport.id;
+
                       return (
-                        <tr key={rowKey}>
+                        <tr
+                          key={rowKey}
+                          className={
+                            isSelected
+                              ? "reports-list-table-row reports-list-table-row--selected"
+                              : "reports-list-table-row"
+                          }
+                          onClick={() => setSelectedReport(report)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              setSelectedReport(report);
+                            }
+                          }}
+                          tabIndex={0}
+                          role="button"
+                          aria-label={t("reportsPage.rowClickHint")}
+                        >
                           <td>
                             <div className="reports-level-cell">
                               <span
@@ -931,6 +961,22 @@ const ReportsPage = () => {
         formKey={createFormKey}
         onClose={() => setCreateModalOpen(false)}
         onSuccess={() => reloadReportsRef.current?.()}
+      />
+
+      <ReportDetailModal
+        open={Boolean(selectedReport)}
+        report={selectedReport}
+        onClose={() => setSelectedReport(null)}
+        locationText={
+          selectedReport ? getReportLocationText(selectedReport) : ""
+        }
+        reporterReliability={
+          selectedReport
+            ? getReporterReliability(selectedReport.reporter_id) ??
+              selectedReport.reporter_reliability ??
+              null
+            : null
+        }
       />
     </div>
   );

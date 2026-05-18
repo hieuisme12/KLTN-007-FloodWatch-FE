@@ -77,5 +77,13 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src')
     }
+  },
+  server: {
+    proxy: {
+      '/uploads': {
+        target: process.env.VITE_PUBLIC_BASE_URL || 'https://api.floodsight.id.vn',
+        changeOrigin: true
+      }
+    }
   }
 });

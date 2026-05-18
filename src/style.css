@@ -2920,12 +2920,26 @@ button.fs-btn--ghost:hover:not(:disabled) {
   white-space: nowrap;
 }
 
-.reports-list-table tbody tr {
+.reports-list-table tbody tr.reports-list-table-row {
+  cursor: pointer;
   transition: background 0.15s ease;
 }
 
-.reports-list-table tbody tr:hover {
+.reports-list-table tbody tr.reports-list-table-row:hover {
   background: #f8fafc;
+}
+
+.reports-list-table tbody tr.reports-list-table-row--selected {
+  background: #eff6ff;
+}
+
+.reports-list-table tbody tr.reports-list-table-row--selected:hover {
+  background: #dbeafe;
+}
+
+.reports-list-table tbody tr.reports-list-table-row:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
 }
 
 .reports-list-table tbody td {
@@ -3085,6 +3099,216 @@ button.fs-btn--ghost:hover:not(:disabled) {
   font-size: 16px;
   font-weight: 500;
   color: #475569;
+}
+
+/* Popup chi tiết báo cáo (ReportsPage) */
+.report-detail-modal.report-detail-modal--shell {
+  max-height: min(90vh, 880px);
+  overflow: hidden;
+}
+
+.report-detail-modal--shell > div {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: inherit;
+  overflow: hidden;
+}
+
+.report-detail-modal-inner {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: min(90vh, 880px);
+  overflow: hidden;
+}
+
+.report-detail-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 20px 12px;
+  border-bottom: 1px solid #e2e8f0;
+  flex-shrink: 0;
+}
+
+.report-detail-modal-title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.report-detail-modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 20px;
+}
+
+.report-detail-modal-footer {
+  flex-shrink: 0;
+  padding: 12px 20px 20px;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.report-detail-photo--error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f1f5f9;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.report-detail-modal-header .report-detail-id {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.report-detail-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.report-detail-badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.report-detail-type-badge,
+.report-detail-sensor-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 999px;
+}
+
+.report-detail-type-badge {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.report-detail-sensor-badge {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.report-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 20px;
+}
+
+.report-detail-field--full {
+  grid-column: 1 / -1;
+}
+
+.report-detail-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  margin-bottom: 4px;
+}
+
+.report-detail-value {
+  display: block;
+  font-size: 14px;
+  color: #0f172a;
+  line-height: 1.45;
+}
+
+.report-detail-value--strong {
+  font-weight: 700;
+  color: #0369a1;
+}
+
+.report-detail-section {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 16px;
+}
+
+.report-detail-section-title {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.report-detail-content-text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #334155;
+  white-space: pre-wrap;
+}
+
+.report-detail-photos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.report-detail-photo-link {
+  display: block;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+}
+
+.report-detail-photo {
+  display: block;
+  width: 120px;
+  height: 90px;
+  object-fit: cover;
+}
+
+.report-detail-moderation-status {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.report-detail-moderation-status--pending {
+  color: #b45309;
+}
+
+.report-detail-moderation-status--approved {
+  color: #047857;
+}
+
+.report-detail-moderation-status--rejected {
+  color: #b91c1c;
+}
+
+.report-detail-moderation-meta {
+  margin: 0 0 6px;
+  font-size: 14px;
+  color: #334155;
+  line-height: 1.45;
+}
+
+.report-detail-moderation-meta--muted {
+  color: #64748b;
+}
+
+@media (max-width: 640px) {
+  .report-detail-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 768px) {

@@ -9,6 +9,7 @@ import {
   hasStoredRefreshCredentials
 } from '../utils/authSession';
 import { clearGuestExploreMode } from '../utils/guestSession';
+import { resolveReportMediaUrl } from '../utils/mediaUrl';
 
 export { persistAuthTokens, clearAuthStorage, bootstrapAuth } from '../utils/authSession';
 
@@ -296,7 +297,7 @@ export const fetchFloodData = async (endpointRef) => {
 // ==================== CROWDSOURCING APIs ====================
 
 /**
- * Upload ảnh báo cáo. BE trả { success, url, filename }. url dạng /uploads/xxx.jpg → ghép BASE_URL làm photo_url.
+ * Upload ảnh báo cáo. BE: { success, url, absolute_url } — gửi absolute_url trong photo_url / photo_urls.
  * multipart/form-data, field name: image
  */
 export const uploadReportImage = async (file) => {
@@ -304,12 +305,20 @@ export const uploadReportImage = async (file) => {
     const formData = new FormData();
     formData.append('image', file);
     const response = await apiClient.post(API_ENDPOINTS.UPLOAD_REPORT_IMAGE, formData);
-    if (response.data && response.data.success && response.data.url) {
-      const base = API_CONFIG.BASE_URL.replace(/\/$/, '');
-      const photoUrl = response.data.url.startsWith('http') ? response.data.url : base + (response.data.url.startsWith('/') ? response.data.url : '/' + response.data.url);
-      return { success: true, photo_url: photoUrl };
+    const data = response.data;
+    if (data?.success) {
+      const absoluteRaw =
+        typeof data.absolute_url === 'string' ? data.absolute_url.trim() : '';
+      const urlRaw = typeof data.url === 'string' ? data.url.trim() : '';
+      const photoUrl =
+        (absoluteRaw && resolveReportMediaUrl(absoluteRaw)) ||
+        (urlRaw.startsWith('http') ? resolveReportMediaUrl(urlRaw) : null) ||
+        (urlRaw ? resolveReportMediaUrl(urlRaw) : null);
+      if (photoUrl) {
+        return { success: true, photo_url: photoUrl };
+      }
     }
-    return { success: false, error: response.data?.error || 'Upload thất bại' };
+    return { success: false, error: data?.error || 'Upload thất bại' };
   } catch (err) {
     const msg = err.response?.data?.error || err.response?.data?.message || err.message;
     return { success: false, error: msg || 'Tải ảnh lên thất bại' };
