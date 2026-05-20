@@ -119,6 +119,11 @@ export const API_ENDPOINTS = {
   /** Tin RSS TP.HCM — public, không bắt buộc JWT */
   NEWS: '/api/v1/news/hcm',
 
+  /** Chat AI Gemini — public (JWT tuỳ chọn) */
+  CHAT: '/api/chat',
+  /** Snapshot sensor cho widget / chat context */
+  FLOOD_STATUS: '/api/flood-status',
+
   // Stats
   STATS_ONLINE_USERS: '/api/stats/online-users',
   STATS_ONLINE_USERS_COUNT: '/api/stats/online-users/count',

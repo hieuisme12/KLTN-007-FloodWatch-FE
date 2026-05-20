@@ -143,12 +143,31 @@ export default {
     avatarSaving: 'Đang lưu...',
   },
   chatbot: {
+    title: 'AI Cảnh báo ngập',
     welcome:
-      'Xin chào! Tôi là AI Assistant của hệ thống cảnh báo ngập lụt TP.HCM. Tôi có thể giúp bạn:',
-    bullets: '• Xem thông tin các trạm cảm biến\n• Tư vấn về tình hình ngập lụt\n• Hướng dẫn sử dụng hệ thống',
-    wip: 'Tính năng AI Assistant đang được phát triển. Vui lòng thử lại sau!',
-    subtitle: 'Hệ thống cảnh báo ngập lụt',
+      'Xin chào! Tôi là trợ lý AI FloodSight (Gemini), dùng dữ liệu cảm biến thật từ hệ thống. Tôi có thể giúp bạn:',
+    bullets:
+      '• Tình hình ngập theo trạm cảm biến\n• Giải thích mức cảnh báo / nguy hiểm\n• Gợi ý xem bản đồ và báo cáo cộng đồng',
+    subtitle: 'Cập nhật từ cảm biến ngập thời gian thực',
+    statusTitle: 'Trạm mực nước cao nhất',
+    noReading: 'Chưa có số đo',
+    statusDanger: 'Nguy hiểm',
+    statusWarning: 'Cảnh báo',
+    statusNormal: 'An toàn',
+    statusOffline: 'Mất kết nối',
+    statusUnknown: 'Không rõ',
     placeholder: 'Nhập câu hỏi...',
+    typing: 'Đang trả lời…',
+    clear: 'Xóa hội thoại',
+    openAria: 'Mở chat AI',
+    closeAria: 'Đóng chat',
+    sendAria: 'Gửi',
+    errorGeneric: 'Không gửi được tin nhắn. Thử lại sau.',
+    quick: {
+      sensors: 'Trạm nào đang ngập?',
+      situation: 'Tình hình ngập TP.HCM?',
+      mapHelp: 'Hướng dẫn đọc bản đồ'
+    }
   },
   waterNews: {
     title: 'Tin thời sự TP.HCM',

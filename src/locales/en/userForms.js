@@ -143,12 +143,31 @@ export default {
     avatarSaving: 'Saving...',
   },
   chatbot: {
+    title: 'Flood AI Chat',
     welcome:
-      'Hello! I am the AI assistant for the HCMC flood alert system. I can help you with:',
-    bullets: '• Sensor information\n• Flood situation guidance\n• How to use the system',
-    wip: 'The AI assistant feature is under development. Please try again later!',
-    subtitle: 'Flood alert system',
+      'Hello! I am the FloodSight AI assistant (Gemini), using live sensor data. I can help with:',
+    bullets:
+      '• Flood levels by sensor station\n• Alert levels and safety tips\n• Map and crowd reports guidance',
+    subtitle: 'Live data from flood sensors',
+    statusTitle: 'Highest water levels',
+    noReading: 'No reading',
+    statusDanger: 'Danger',
+    statusWarning: 'Warning',
+    statusNormal: 'Safe',
+    statusOffline: 'Offline',
+    statusUnknown: 'Unknown',
     placeholder: 'Type a question...',
+    typing: 'Replying…',
+    clear: 'Clear chat',
+    openAria: 'Open AI chat',
+    closeAria: 'Close chat',
+    sendAria: 'Send',
+    errorGeneric: 'Could not send message. Try again.',
+    quick: {
+      sensors: 'Which stations are flooded?',
+      situation: 'Flood situation in HCMC?',
+      mapHelp: 'How to read the map?'
+    }
   },
   waterNews: {
     title: 'HCMC headline news',
