@@ -6,11 +6,11 @@ import {
   Text,
   View
 } from 'react-native';
-import { Link, useRouter } from 'expo-router';
-import { useAuth } from '../src/context/AuthContext';
-import { fetchActiveAlertsCount } from '../src/lib/api';
-import { API_BASE_URL } from '../src/lib/config';
-import { colors } from '../src/theme';
+import { useRouter } from 'expo-router';
+import { useAuth } from '../../src/context/AuthContext';
+import { fetchActiveAlertsCount } from '../../src/lib/api';
+import { API_BASE_URL } from '../../src/lib/config';
+import { colors } from '../../src/theme';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -47,7 +47,7 @@ export default function HomeScreen() {
     <View style={styles.container}>
       <View style={styles.hero}>
         <Text style={styles.brand}>FloodSight</Text>
-        <Text style={styles.subtitle}>Cảnh báo ngập TP.HCM — bản mobile</Text>
+        <Text style={styles.subtitle}>Cảnh báo ngập TP.HCM</Text>
       </View>
 
       {isLoading ? (
@@ -63,13 +63,7 @@ export default function HomeScreen() {
             >
               <Text style={styles.primaryButtonText}>Đăng nhập</Text>
             </Pressable>
-          ) : (
-            <Link href="/profile" asChild>
-              <Pressable style={styles.secondaryButton}>
-                <Text style={styles.secondaryButtonText}>Tài khoản</Text>
-              </Pressable>
-            </Link>
-          )}
+          ) : null}
         </View>
       )}
 
@@ -93,32 +87,18 @@ export default function HomeScreen() {
       </View>
 
       <Text style={styles.hint}>
-        Đây là app Expo trong monorepo — map và các màn web sẽ được port dần
-        sang React Native.
+        Dùng tab Bản đồ và Báo cáo bên dưới để xem ngập realtime và danh sách
+        báo cáo cộng đồng.
       </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    gap: 16
-  },
-  hero: {
-    paddingVertical: 8
-  },
-  brand: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: colors.primaryDark
-  },
-  subtitle: {
-    marginTop: 4,
-    fontSize: 15,
-    color: colors.textMuted
-  },
+  container: { flex: 1, padding: 20, gap: 16, backgroundColor: colors.background },
+  hero: { paddingVertical: 8 },
+  brand: { fontSize: 28, fontWeight: '700', color: colors.primaryDark },
+  subtitle: { marginTop: 4, fontSize: 15, color: colors.textMuted },
   card: {
     backgroundColor: colors.card,
     borderRadius: 12,
@@ -126,26 +106,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border
   },
-  cardLabel: {
-    fontSize: 13,
-    color: colors.textMuted,
-    marginBottom: 4
-  },
-  cardValue: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.text
-  },
-  apiUrl: {
-    fontSize: 12,
-    color: colors.textMuted
-  },
+  cardLabel: { fontSize: 13, color: colors.textMuted, marginBottom: 4 },
+  cardValue: { fontSize: 18, fontWeight: '600', color: colors.text },
+  apiUrl: { fontSize: 12, color: colors.textMuted },
   mt: { marginTop: 12 },
-  error: {
-    marginTop: 8,
-    color: colors.danger,
-    fontSize: 14
-  },
+  error: { marginTop: 8, color: colors.danger, fontSize: 14 },
   primaryButton: {
     marginTop: 14,
     backgroundColor: colors.primary,
@@ -153,35 +118,8 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center'
   },
-  primaryButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 16
-  },
-  secondaryButton: {
-    marginTop: 14,
-    borderWidth: 1,
-    borderColor: colors.primary,
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center'
-  },
-  secondaryButtonText: {
-    color: colors.primary,
-    fontWeight: '600',
-    fontSize: 16
-  },
-  linkButton: {
-    marginTop: 12,
-    alignSelf: 'flex-start'
-  },
-  linkButtonText: {
-    color: colors.primary,
-    fontWeight: '500'
-  },
-  hint: {
-    fontSize: 13,
-    color: colors.textMuted,
-    lineHeight: 20
-  }
+  primaryButtonText: { color: '#fff', fontWeight: '600', fontSize: 16 },
+  linkButton: { marginTop: 12, alignSelf: 'flex-start' },
+  linkButtonText: { color: colors.primary, fontWeight: '500' },
+  hint: { fontSize: 13, color: colors.textMuted, lineHeight: 20 }
 });

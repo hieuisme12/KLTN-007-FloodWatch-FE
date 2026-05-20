@@ -26,7 +26,16 @@ module.exports = {
       package: 'vn.id.floodsight.mobile',
       edgeToEdgeEnabled: true
     },
-    plugins: ['expo-router'],
+    plugins: [
+      'expo-router',
+      [
+        'expo-location',
+        {
+          locationWhenInUsePermission:
+            'FloodSight cần vị trí để hiển thị bạn trên bản đồ ngập TP.HCM.'
+        }
+      ]
+    ],
     extra: {
       apiBaseUrl:
         process.env.EXPO_PUBLIC_API_BASE_URL || 'https://api.floodsight.id.vn'

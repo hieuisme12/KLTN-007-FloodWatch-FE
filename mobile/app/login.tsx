@@ -30,7 +30,7 @@ export default function LoginScreen() {
     setError(null);
     try {
       await signIn(username, password);
-      router.replace('/');
+      router.replace('/(tabs)');
     } catch (e) {
       const msg =
         (e as { response?: { data?: { message?: string } } })?.response?.data

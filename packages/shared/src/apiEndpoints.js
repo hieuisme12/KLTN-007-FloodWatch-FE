@@ -7,6 +7,7 @@ export const API_ENDPOINTS = {
   FORECAST_SENSOR: '/api/v1/forecast/sensor/:sensorId',
   WEATHER_HCM: '/api/v1/weather/hcm',
   CROWD_REPORTS: '/api/crowd-reports',
+  CROWD_REPORTS_ALL: '/api/crowd-reports/all',
   ALERTS_ACTIVE: '/api/alerts/active',
   AUTH_LOGIN: '/api/auth/login',
   AUTH_PROFILE: '/api/auth/profile',

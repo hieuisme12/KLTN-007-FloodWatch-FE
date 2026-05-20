@@ -15,9 +15,8 @@ export default function RootLayout() {
           contentStyle: { backgroundColor: colors.background }
         }}
       >
-        <Stack.Screen name="index" options={{ title: 'FloodSight' }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="login" options={{ title: 'Đăng nhập' }} />
-        <Stack.Screen name="profile" options={{ title: 'Tài khoản' }} />
       </Stack>
     </AuthProvider>
   );
