@@ -37,6 +37,8 @@ import { getCurrentUser } from '../../utils/auth';
 import Skeleton from 'react-loading-skeleton';
 import { useTranslation } from 'react-i18next';
 import i18n from '../../i18n';
+import { Illustration } from '@/components/shared-assets/illustrations';
+import { PaginationPageDefault } from '@/components/application/pagination/pagination';
 
 const MAPBOX_TOKEN = getMapboxToken();
 const defaultLng = DEFAULT_CENTER[1];
@@ -535,6 +537,9 @@ function EmergencyMapModal({
   );
 }
 
+/** Đăng ký cảnh báo — phân trang bảng “Đăng ký của tôi”. */
+const EMERGENCY_SUBS_PAGE_SIZE = 10;
+
 export default function EmergencyAlertsPage() {
   const { t } = useTranslation();
   const [profile, setProfile] = useState(null);
@@ -563,6 +568,7 @@ export default function EmergencyAlertsPage() {
   const createGeocodeReqRef = useRef(0);
   const mapPickReturnsToCreateRef = useRef(false);
   const [subSearch, setSubSearch] = useState('');
+  const [subsListPage, setSubsListPage] = useState(1);
 
   /** null | subscription — sửa trong popup */
   const [editModalSub, setEditModalSub] = useState(null);
@@ -613,6 +619,20 @@ export default function EmergencyAlertsPage() {
         `${Number(s.lat).toFixed(4)} ${Number(s.lng).toFixed(4)}`.includes(q)
     );
   }, [subs, subSearch]);
+
+  const totalSubsPages = Math.max(1, Math.ceil(filteredSubs.length / EMERGENCY_SUBS_PAGE_SIZE));
+  const paginatedSubs = filteredSubs.slice(
+    (subsListPage - 1) * EMERGENCY_SUBS_PAGE_SIZE,
+    subsListPage * EMERGENCY_SUBS_PAGE_SIZE
+  );
+
+  useEffect(() => {
+    setSubsListPage(1);
+  }, [subSearch]);
+
+  useEffect(() => {
+    setSubsListPage((p) => Math.min(p, totalSubsPages));
+  }, [totalSubsPages]);
 
   const submitCreateSubscription = useCallback(async () => {
     setError('');
@@ -1276,7 +1296,7 @@ export default function EmergencyAlertsPage() {
           </div>
         </div>
 
-        <div className="flex-1">
+        <div className="flex min-h-0 flex-1 flex-col">
           <div className="border-b border-slate-100 px-4 py-4 sm:px-6">
             <h3 className="text-base font-semibold text-slate-900">{t('emergency.mySubsTitle')}</h3>
             <p className="mt-2 text-sm text-slate-600">
@@ -1286,31 +1306,35 @@ export default function EmergencyAlertsPage() {
           <div className="reports-list-table-wrap">
             {filteredSubs.length === 0 ? (
               <div className="reports-list-empty px-4 sm:px-6">
-                <p>{subs.length === 0 ? t('emergency.noSubs') : t('emergency.noSearchMatch')}</p>
+                <Illustration type="box" size="md" className="mx-auto" />
+                <p className="reports-list-empty-title">
+                  {subs.length === 0 ? t('emergency.noSubs') : t('emergency.noSearchMatch')}
+                </p>
               </div>
             ) : (
-              <div className="reports-list-table-scroll">
-                <table className="reports-list-table emergency-subs-table">
-                  <colgroup>
-                    <col className="emergency-subs-col-active" />
-                    <col className="emergency-subs-col-name" />
-                    <col className="emergency-subs-col-radius" />
-                    <col className="emergency-subs-col-channel" />
-                    <col className="emergency-subs-col-location" />
-                    <col className="emergency-subs-col-actions" />
-                  </colgroup>
-                  <thead>
-                    <tr>
-                      <th className="emergency-subs-col-active">{t('emergency.colActive')}</th>
-                      <th className="emergency-subs-col-name">{t('emergency.colName')}</th>
-                      <th className="emergency-subs-col-radius">{t('emergency.colRadius')}</th>
-                      <th className="emergency-subs-col-channel">{t('emergency.colChannel')}</th>
-                      <th className="emergency-subs-col-location">{t('emergency.colLocation')}</th>
-                      <th className="emergency-subs-col-actions">{t('emergency.colActions')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredSubs.map((sub) => {
+              <div className="reports-list-table-area">
+                <div className="reports-list-table-scroll">
+                  <table className="reports-list-table emergency-subs-table">
+                    <colgroup>
+                      <col className="emergency-subs-col-active" />
+                      <col className="emergency-subs-col-name" />
+                      <col className="emergency-subs-col-radius" />
+                      <col className="emergency-subs-col-channel" />
+                      <col className="emergency-subs-col-location" />
+                      <col className="emergency-subs-col-actions" />
+                    </colgroup>
+                    <thead>
+                      <tr>
+                        <th className="emergency-subs-col-active">{t('emergency.colActive')}</th>
+                        <th className="emergency-subs-col-name">{t('emergency.colName')}</th>
+                        <th className="emergency-subs-col-radius">{t('emergency.colRadius')}</th>
+                        <th className="emergency-subs-col-channel">{t('emergency.colChannel')}</th>
+                        <th className="emergency-subs-col-location">{t('emergency.colLocation')}</th>
+                        <th className="emergency-subs-col-actions">{t('emergency.colActions')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paginatedSubs.map((sub) => {
                       const isActive = sub.is_active !== false;
                       return (
                         <tr key={sub.id}>
@@ -1374,6 +1398,16 @@ export default function EmergencyAlertsPage() {
                     })}
                   </tbody>
                 </table>
+                </div>
+                {filteredSubs.length > EMERGENCY_SUBS_PAGE_SIZE && (
+                  <div className="reports-list-pagination">
+                    <PaginationPageDefault
+                      page={subsListPage}
+                      total={totalSubsPages}
+                      onPageChange={setSubsListPage}
+                    />
+                  </div>
+                )}
               </div>
             )}
           </div>

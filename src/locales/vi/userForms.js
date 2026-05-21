@@ -122,6 +122,9 @@ export default {
     rowClickHint: 'Nhấn để xem chi tiết',
     detailClose: 'Đóng',
     detailCloseAria: 'Đóng chi tiết báo cáo',
+    paginationPrev: 'Trước',
+    paginationNext: 'Sau',
+    paginationPageOf: 'Trang {{page}} / {{total}}',
   },
   profilePage: {
     loadFail: 'Không thể tải thông tin người dùng',
@@ -158,6 +161,7 @@ export default {
     statusUnknown: 'Không rõ',
     placeholder: 'Nhập câu hỏi...',
     typing: 'Đang trả lời…',
+    assistantName: 'Trợ lý AI FloodSight',
     clear: 'Xóa hội thoại',
     openAria: 'Mở chat AI',
     closeAria: 'Đóng chat',

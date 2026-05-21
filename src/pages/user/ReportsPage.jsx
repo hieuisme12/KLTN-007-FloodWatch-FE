@@ -33,6 +33,11 @@ import {
   fetchAddressFromCoords,
   formatAddressForUiDisplay,
 } from "../../utils/geocode";
+import { Illustration } from "@/components/shared-assets/illustrations";
+import { PaginationPageDefault } from "@/components/application/pagination/pagination";
+
+const REPORTS_PAGE_SIZE = 10;
+
 const ReportsPage = () => {
   const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -50,6 +55,7 @@ const ReportsPage = () => {
   const [confidenceBand, setConfidenceBand] = useState("all");
   const [confidenceSort, setConfidenceSort] = useState("none");
   const [selectedReport, setSelectedReport] = useState(null);
+  const [listPage, setListPage] = useState(1);
 
   const filterOptions = useMemo(
     () => [
@@ -607,6 +613,20 @@ const ReportsPage = () => {
     return 0;
   });
 
+  const totalListPages = Math.max(1, Math.ceil(sortedReports.length / REPORTS_PAGE_SIZE));
+  const paginatedReports = sortedReports.slice(
+    (listPage - 1) * REPORTS_PAGE_SIZE,
+    listPage * REPORTS_PAGE_SIZE,
+  );
+
+  useEffect(() => {
+    setListPage(1);
+  }, [filter, expiryFilter, searchText, confidenceBand, confidenceSort]);
+
+  useEffect(() => {
+    setListPage((p) => Math.min(p, totalListPages));
+  }, [totalListPages]);
+
   return (
     <div
       style={{
@@ -765,35 +785,33 @@ const ReportsPage = () => {
               </div>
             ) : sortedReports.length === 0 ? (
               <div className="reports-list-empty">
-                <p>{t("reportsPage.emptyTitle")}</p>
-
-                <PrimaryButton type="button" onClick={handleCreateReport}>
-                  {t("reportsPage.createReportBtn")}
-                </PrimaryButton>
+                <Illustration type="cloud" size="md" className="mx-auto" />
+                <p className="reports-list-empty-title">{t("reportsPage.emptyTitle")}</p>
               </div>
             ) : (
-              <div className="reports-list-table-scroll">
-                <table className="reports-list-table">
-                  <thead>
-                    <tr>
-                      <th>{t("reportsPage.colLevel")}</th>
+              <div className="reports-list-table-area">
+                <div className="reports-list-table-scroll">
+                  <table className="reports-list-table">
+                    <thead>
+                      <tr>
+                        <th>{t("reportsPage.colLevel")}</th>
 
-                      <th>{t("reportsPage.colReporter")}</th>
+                        <th>{t("reportsPage.colReporter")}</th>
 
-                      <th>{t("reportsPage.colStatus")}</th>
+                        <th>{t("reportsPage.colStatus")}</th>
 
-                      <th>{t("reportsPage.colConfidence")}</th>
+                        <th>{t("reportsPage.colConfidence")}</th>
 
-                      <th>{t("reportsPage.colLocation")}</th>
+                        <th>{t("reportsPage.colLocation")}</th>
 
-                      <th>{t("reportsPage.colCreated")}</th>
+                        <th>{t("reportsPage.colCreated")}</th>
 
-                      <th>{t("reportsPage.colSensor")}</th>
-                    </tr>
-                  </thead>
+                        <th>{t("reportsPage.colSensor")}</th>
+                      </tr>
+                    </thead>
 
-                  <tbody>
-                    {sortedReports.map((report, index) => {
+                    <tbody>
+                      {paginatedReports.map((report, index) => {
                       const statusInfo = getStatusInfo(report);
 
                       const rel =
@@ -811,7 +829,10 @@ const ReportsPage = () => {
 
                       const StatusIcon = statusInfo.icon;
 
-                      const rowKey = report.id || `report-${index}`;
+                      const rowKey =
+                        report.id != null
+                          ? report.id
+                          : `report-${(listPage - 1) * REPORTS_PAGE_SIZE + index}`;
 
                       const isSelected =
                         selectedReport?.id != null && report.id === selectedReport.id;
@@ -947,9 +968,19 @@ const ReportsPage = () => {
                           </td>
                         </tr>
                       );
-                    })}
-                  </tbody>
-                </table>
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                {sortedReports.length > REPORTS_PAGE_SIZE && (
+                  <div className="reports-list-pagination">
+                    <PaginationPageDefault
+                      page={listPage}
+                      total={totalListPages}
+                      onPageChange={setListPage}
+                    />
+                  </div>
+                )}
               </div>
             )}
           </div>

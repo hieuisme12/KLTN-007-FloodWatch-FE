@@ -122,6 +122,9 @@ export default {
     rowClickHint: 'Click to view details',
     detailClose: 'Close',
     detailCloseAria: 'Close report details',
+    paginationPrev: 'Previous',
+    paginationNext: 'Next',
+    paginationPageOf: 'Page {{page}} of {{total}}',
   },
   profilePage: {
     loadFail: 'Could not load user profile',
@@ -158,6 +161,7 @@ export default {
     statusUnknown: 'Unknown',
     placeholder: 'Type a question...',
     typing: 'Replying…',
+    assistantName: 'FloodSight AI',
     clear: 'Clear chat',
     openAria: 'Open AI chat',
     closeAria: 'Close chat',
