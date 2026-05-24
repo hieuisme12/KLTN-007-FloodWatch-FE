@@ -13,8 +13,7 @@ import { API_CONFIG } from '../../config/apiConfig';
 import {
   fusionCmToColor,
   fusionCmToMarkerRadius,
-  getFusionCoverageLabel,
-  getConfidenceRingColor
+  getFusionCoverageLabel
 } from '../../utils/scoringDisplay';
 import ConfidenceBadge from '../common/ConfidenceBadge';
 import { useReporterRanking } from '../../context/ReporterRankingProvider';
@@ -142,10 +141,6 @@ const CrowdReportMarkerBody = ({
       : isLight
         ? '#fff'
         : '#000';
-  const confRing =
-    report.moderation_status === 'approved' && report.confidence != null
-      ? getConfidenceRingColor(report.confidence)
-      : null;
   const reporterAvatarFileName = getReportReporterAvatar(report);
   const reporterAvatarUrl = reporterAvatarFileName ? getReporterAvatarUrl(reporterAvatarFileName) : null;
   const reliabilityScore = getReporterReliability ? getReporterReliability(report.reporter_id) : (report.reporter_reliability ?? null);
@@ -199,8 +194,7 @@ const CrowdReportMarkerBody = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            flexShrink: 0,
-            boxShadow: confRing ? `0 0 0 3px ${confRing}` : undefined
+            flexShrink: 0
           }}>
             {reporterAvatarUrl ? (
               <img src={reporterAvatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
