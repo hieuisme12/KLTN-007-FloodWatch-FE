@@ -25,6 +25,7 @@ import {
 } from '../../utils/reportDisplayStatus';
 import {
   getCrowdReportMarkerColor,
+  getCrowdReportFloodAccentColor,
   getFloodLevelLabel
 } from '../../utils/floodLevels';
 import FloodLevelLegend from './FloodLevelLegend';
@@ -132,10 +133,15 @@ const CrowdReportMarkerBody = ({
   const { t } = useTranslation();
   const isLight = markerTheme === 'light';
   const textColor = isLight ? '#fff' : '#000';
-  const borderColor = isLight ? '#fff' : '#000';
   const pillBg = isLight ? '#fff' : '#000';
   const pillColor = isLight ? '#000' : '#fff';
-  const color = getCrowdMarkerColor(report);
+  const accentColor = getCrowdMarkerColor(report);
+  const pinAccent =
+    report.moderation_status === 'approved' || report.moderation_status == null
+      ? accentColor
+      : isLight
+        ? '#fff'
+        : '#000';
   const confRing =
     report.moderation_status === 'approved' && report.confidence != null
       ? getConfidenceRingColor(report.confidence)
@@ -187,9 +193,9 @@ const CrowdReportMarkerBody = ({
             width: 48,
             height: 48,
             borderRadius: '50%',
-            border: `3px solid ${borderColor}`,
+            border: `3px solid ${pinAccent}`,
             overflow: 'hidden',
-            background: reporterAvatarUrl ? undefined : color,
+            background: reporterAvatarUrl ? '#fff' : accentColor,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -207,7 +213,7 @@ const CrowdReportMarkerBody = ({
             height: 0,
             borderLeft: '10px solid transparent',
             borderRight: '10px solid transparent',
-            borderTop: `14px solid ${borderColor}`,
+            borderTop: `14px solid ${pinAccent}`,
             marginTop: '-2px'
           }} />
         </div>
@@ -223,6 +229,7 @@ const CrowdReportPopupContent = ({ report, lat, lng, getReporterReliability }) =
   const [fetchedAddress, setFetchedAddress] = useState(null);
   const moderationInfo = getReportModerationDisplay(report, t);
   const validationSubline = getReportValidationSubline(report, t);
+  const floodAccentColor = getCrowdReportFloodAccentColor(report);
   const statusInfo = { color: moderationInfo.color, text: moderationInfo.text };
   const getFloodLevelDesc = (level) => getFloodLevelLabel(level, t);
   useEffect(() => {
@@ -243,7 +250,7 @@ const CrowdReportPopupContent = ({ report, lat, lng, getReporterReliability }) =
         (lat != null && lng != null ? t('reportUi.coordLabel', { lat: lat.toFixed(6), lng: lng.toFixed(6) }) : '—');
   return (
     <div style={{ textAlign: 'left', maxHeight: '70vh', overflow: 'auto', padding: '14px 16px', boxSizing: 'border-box' }}>
-      <h3 style={{ margin: '0 0 8px 0', color: statusInfo.color, fontSize: '16px', fontWeight: 'bold', paddingLeft: 0 }}>
+      <h3 style={{ margin: '0 0 8px 0', color: '#2c3e50', fontSize: '16px', fontWeight: 'bold', paddingLeft: 0 }}>
         <FaMobileScreen style={{ marginRight: '6px', flexShrink: 0 }} /> {report.reporter_name || t('reportUi.anonymous')}
       </h3>
       <div style={{ fontSize: '12px', color: '#333', marginBottom: '8px', display: 'flex', alignItems: 'flex-start', gap: '4px' }}>
@@ -251,11 +258,12 @@ const CrowdReportPopupContent = ({ report, lat, lng, getReporterReliability }) =
         <span>{addrLine}</span>
       </div>
       <div style={{ marginBottom: '8px', padding: '8px', background: '#f5f5f5', borderRadius: '4px' }}>
-        <strong style={{ fontSize: '16px', color: statusInfo.color, display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <strong style={{ fontSize: '16px', color: floodAccentColor, display: 'flex', alignItems: 'center', gap: '8px' }}>
           <WiFlood /> {t('reportUi.popupLevel')}: {getFloodLevelLabel(report.flood_level, t)}
         </strong><br />
-        <small>{getFloodLevelDesc(report.flood_level)}</small><br />
-        <strong>{t('reportUi.status')} </strong>{statusInfo.text}
+        <small style={{ color: floodAccentColor }}>{getFloodLevelDesc(report.flood_level)}</small><br />
+        <strong>{t('reportUi.status')} </strong>
+        <span style={{ color: statusInfo.color }}>{statusInfo.text}</span>
         {validationSubline ? (
           <>
             <br />

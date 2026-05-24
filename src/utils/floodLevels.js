@@ -35,8 +35,8 @@ export function normalizeFloodLevel(raw) {
   if (LEGACY_FLOOD_LEVEL_MAP[s]) return LEGACY_FLOOD_LEVEL_MAP[s];
   if (FLOOD_LEVEL_VALUES.includes(s)) return s;
   if (/^[1-5]$/.test(s)) return `Mức ${s}`;
-  const mucMatch = s.match(/^mức\s*([1-5])$/i) || s.match(/^muc\s*([1-5])$/i);
-  if (mucMatch) return `Mức ${mucMatch[1]}`;
+  const embedded = s.match(/mức\s*([1-5])/i) || s.match(/muc\s*([1-5])/i);
+  if (embedded) return `Mức ${embedded[1]}`;
   return s;
 }
 
@@ -104,14 +104,20 @@ export function getFloodLevelDisplayInfo(level, t) {
   };
 }
 
-/** Màu marker báo cáo crowd trên bản đồ */
+/** Màu marker / viền pin báo cáo trên bản đồ (theo mức ngập khi đã duyệt) */
 export function getCrowdReportMarkerColor(report) {
   const mod = report?.moderation_status;
   if (mod === 'rejected') return '#dc3545';
   if (mod === 'approved') {
-    return getFloodLevelColor(report?.flood_level, '#28a745');
+    return getFloodLevelColor(report?.flood_level, FLOOD_LEVELS[0].color);
   }
   return '#ffc107';
+}
+
+/** Màu chữ popup/icon mức ngập — luôn theo FLOOD_LEVELS, không theo moderation */
+export function getCrowdReportFloodAccentColor(report) {
+  if (report?.moderation_status === 'rejected') return '#dc3545';
+  return getFloodLevelColor(report?.flood_level, '#6c757d');
 }
 
 /** Trích draft báo cáo từ meta POST /api/chat */

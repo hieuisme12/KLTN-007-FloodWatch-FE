@@ -13,7 +13,8 @@ import SensorForecastSection from './SensorForecastSection';
 import ConfidenceBadge from '../common/ConfidenceBadge';
 import {
   getFloodLevelColor,
-  getFloodLevelLabel
+  getFloodLevelLabel,
+  getCrowdReportFloodAccentColor
 } from '../../utils/floodLevels';
 import {
   getReportModerationDisplay,
@@ -85,10 +86,7 @@ const SensorDetailPanel = ({ sensor, crowdReport }) => {
   if (crowdReport) {
     const moderationInfo = getReportModerationDisplay(crowdReport, t);
     const validationSubline = getReportValidationSubline(crowdReport, t);
-    const levelColor =
-      crowdReport.moderation_status === 'approved'
-        ? getFloodLevelColor(crowdReport.flood_level, moderationInfo.color)
-        : moderationInfo.color;
+    const levelColor = getCrowdReportFloodAccentColor(crowdReport);
     const floodLevelDesc = getFloodLevelLabel(crowdReport.flood_level, t);
 
     return (
