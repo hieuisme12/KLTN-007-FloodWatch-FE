@@ -33,6 +33,7 @@ import { useMapboxGlResize } from '../../hooks/useMapboxGlResize';
 import { getMapboxToken } from '../../utils/mapboxToken';
 import { Slab } from 'react-loading-indicators';
 import { useTranslation } from 'react-i18next';
+import { getCrowdReportMarkerColor } from '../../utils/floodLevels';
 
 const MAPBOX_TOKEN = getMapboxToken();
 const defaultLng = DEFAULT_CENTER[1];
@@ -44,20 +45,7 @@ const ROUTE_NORMAL_LAYER_ID = 'route-normal';
 /** Vẽ route dưới nhãn đường để không che tên đường */
 const ROUTE_BEFORE_LAYER_ID = 'road-label';
 
-const getCrowdMarkerColor = (report) => {
-  const moderationStatus = report.moderation_status;
-  if (moderationStatus === 'approved') {
-    const levelColors = { 'Nặng': '#dc3545', 'Trung bình': '#ffc107', 'Nhẹ': '#17a2b8' };
-    return report.flood_level && levelColors[report.flood_level] ? levelColors[report.flood_level] : '#28a745';
-  }
-  if (moderationStatus === 'rejected') return '#dc3545';
-  const validationStatus = report.validation_status;
-  const displayStatus = moderationStatus === 'pending' || !moderationStatus ? validationStatus : moderationStatus;
-  if (displayStatus === 'pending') return '#ffc107';
-  if (report.verified_by_sensor || displayStatus === 'cross_verified') return '#28a745';
-  if (displayStatus === 'verified') return '#17a2b8';
-  return '#6c757d';
-};
+const getCrowdMarkerColor = (report) => getCrowdReportMarkerColor(report);
 
 const toNum = (x) => {
   const n = Number(x);

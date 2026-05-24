@@ -17,23 +17,27 @@ export function getConfidenceRingColor(confidence) {
 }
 
 /**
- * Màu theo mực nước suy ra từ cm (thang 10 / 30 / 50 như flood_level).
+ * Màu theo mực nước (cm) — thang 5 mức 10/20/30/40/55 đồng bộ FLOOD_LEVELS.
  */
 export function fusionCmToColor(cm) {
   const n = Number(cm);
   if (Number.isNaN(n) || cm == null) return '#6c757d';
-  if (n >= 50) return '#dc3545';
-  if (n >= 30) return '#ffc107';
-  if (n >= 10) return '#17a2b8';
+  if (n >= 50) return '#F44336';
+  if (n >= 40) return '#FF9800';
+  if (n >= 30) return '#FFC107';
+  if (n >= 20) return '#8BC34A';
+  if (n >= 10) return '#4CAF50';
   return '#94a3b8';
 }
 
 export function fusionCmToMarkerRadius(cm) {
   const n = Number(cm);
   if (Number.isNaN(n) || cm == null) return 10;
-  if (n >= 50) return 16;
+  if (n >= 50) return 18;
+  if (n >= 40) return 16;
   if (n >= 30) return 14;
-  if (n >= 10) return 12;
+  if (n >= 20) return 12;
+  if (n >= 10) return 11;
   return 9;
 }
 

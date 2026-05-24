@@ -11,6 +11,10 @@ import { isAuthenticated, getCurrentUser } from '../../utils/auth';
 import { DEFAULT_CENTER, DEFAULT_ZOOM } from '../../utils/constants';
 import { fetchAddressFromCoords } from '../../utils/geocode';
 import {
+  getFloodLevelDropdownOptions,
+  isValidFloodLevel
+} from '../../utils/floodLevels';
+import {
   buildReportSubmitSuccessCopy,
   getReportValidationSubline,
   pickDisplayLabel
@@ -47,13 +51,7 @@ const ReportFloodForm = ({ onSuccess, onClose }) => {
   const cooldownSecondsLeft =
     cooldownUntil > Date.now() ? Math.ceil((cooldownUntil - Date.now()) / 1000) : 0;
   
-  // Flood level options for Combobox
-  const floodLevelOptions = [
-    { id: '', name: '-- Chọn mức độ ngập --' },
-    { id: 'Nhẹ', name: 'Nhẹ - Đến mắt cá (~10cm)' },
-    { id: 'Trung bình', name: 'Trung bình - Đến đầu gối (~30cm)' },
-    { id: 'Nặng', name: 'Nặng - Ngập nửa xe (~50cm)' },
-  ];
+  const floodLevelOptions = getFloodLevelDropdownOptions(t);
   
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -66,8 +64,8 @@ const ReportFloodForm = ({ onSuccess, onClose }) => {
       return;
     }
 
-    if (!['Nhẹ', 'Trung bình', 'Nặng'].includes(formData.level)) {
-      setError('Vui lòng chọn mức độ ngập hợp lệ');
+    if (!isValidFloodLevel(formData.level)) {
+      setError(t('newReport.errLevel'));
       return;
     }
 

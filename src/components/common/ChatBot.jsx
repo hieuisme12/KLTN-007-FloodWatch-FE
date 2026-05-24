@@ -11,6 +11,8 @@ import {
 } from '../../utils/chatAccountId';
 import { getCurrentUser } from '../../utils/auth';
 import { API_CONFIG } from '../../config/apiConfig';
+import ChatReportDraftCard from './ChatReportDraftCard';
+import { extractReportDraft } from '../../utils/floodLevels';
 
 const QUICK_KEYS = ['sensors', 'situation', 'mapHelp'];
 
@@ -207,7 +209,12 @@ export default function ChatBot() {
       }
 
       const reply = normalizeChatText(result.reply);
-      const next = [...historyForApi, { role: 'model', content: reply }];
+      const modelMsg = {
+        role: 'model',
+        content: reply,
+        ...(result.meta ? { meta: result.meta } : {})
+      };
+      const next = [...historyForApi, modelMsg];
       setMessages(next);
       saveChatHistory(next);
     },
@@ -312,6 +319,7 @@ export default function ChatBot() {
         <div className="chatbot-panel__messages">
           {messages.map((msg, index) => {
             const isUser = msg.role === 'user';
+            const draft = !isUser ? extractReportDraft(msg.meta) : null;
             const key = `${index}-${msg.role}-${msg.content.slice(0, 24)}`;
             if (isUser) {
               return (
@@ -348,6 +356,7 @@ export default function ChatBot() {
                   <div className="chatbot-msg__sender">{t('chatbot.assistantName')}</div>
                   <div className="chatbot-msg__bubble chatbot-msg__bubble--bot">
                     <ChatMessageContent content={msg.content} plain={false} />
+                    {draft ? <ChatReportDraftCard draft={draft} /> : null}
                   </div>
                 </div>
               </div>

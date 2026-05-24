@@ -1,14 +1,9 @@
 import React from 'react';
 import { FaXmark } from 'react-icons/fa6';
-
-const LEVEL_COLORS = {
-  Nặng: '#dc3545',
-  'Trung bình': '#ffc107',
-  Nhẹ: '#17a2b8'
-};
+import { getFloodLevelColor } from '../../utils/floodLevels';
 
 export function getReportPickMarkerColor(level) {
-  return level && LEVEL_COLORS[level] ? LEVEL_COLORS[level] : '#17a2b8';
+  return getFloodLevelColor(level, '#4CAF50');
 }
 
 function getInitials(displayName) {

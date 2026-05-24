@@ -21,6 +21,11 @@ import { CancelButton, ConfirmButton, PrimaryButton } from '../../components/com
 import SearchAutoComplete from '../../components/common/SearchAutoComplete';
 import { searchAddressSuggestionsInHcm, fetchAddressFromCoords, resolveGeocodePlaceSelection, clearGeocodeAutocompleteSessionToken } from '../../utils/geocode';
 import {
+  getFloodLevelDropdownOptions,
+  isValidFloodLevel,
+  getFloodLevelLabel
+} from '../../utils/floodLevels';
+import {
   buildReportSubmitSuccessCopy,
   getReportValidationSubline,
   pickDisplayLabel
@@ -64,12 +69,7 @@ export function NewReportForm({ onCancel, onSuccess }) {
   });
   
   const floodLevelOptions = useMemo(
-    () => [
-      { id: '', name: t('newReport.levelPick') },
-      { id: 'Nhẹ', name: t('newReport.levelNhe') },
-      { id: 'Trung bình', name: t('newReport.levelTb') },
-      { id: 'Nặng', name: t('newReport.levelNang') }
-    ],
+    () => getFloodLevelDropdownOptions(t),
     [t]
   );
   
@@ -84,7 +84,7 @@ export function NewReportForm({ onCancel, onSuccess }) {
       return;
     }
 
-    if (!['Nhẹ', 'Trung bình', 'Nặng'].includes(formData.level)) {
+    if (!isValidFloodLevel(formData.level)) {
       setError(t('newReport.errLevel'));
       return;
     }

@@ -17,3 +17,5 @@ export const statusLabels = {
 // Tọa độ mặc định (TP.HCM)
 export const DEFAULT_CENTER = [10.776, 106.701];
 export const DEFAULT_ZOOM = 13;
+
+export { FLOOD_LEVELS, FLOOD_LEVEL_VALUES } from './floodLevels';

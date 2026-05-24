@@ -41,6 +41,11 @@ import {
   isReportValidationBySensor,
   getStatusPillStyleFromColor,
 } from "../../utils/reportDisplayStatus";
+import {
+  getFloodLevelDisplayInfo,
+  getFloodLevelLabel,
+  getFloodLevelDef,
+} from "../../utils/floodLevels";
 
 const REPORTS_PAGE_SIZE = 10;
 
@@ -332,44 +337,11 @@ const ReportsPage = () => {
   };
 
   const getFloodLevelInfo = (level) => {
-    const descFor = (lv) =>
-      lv ? t(`reportUi.floodDepth.${lv}`, { defaultValue: lv }) : "";
-    const levels = {
-      Nhẹ: {
-        color: "#17a2b8",
-        pillBg: "rgba(23, 162, 184, 0.12)",
-        pillText: "#0e7490",
-        pillBorder: "rgba(23, 162, 184, 0.35)",
-        icon: WiFlood,
-        desc: descFor("Nhẹ"),
-      },
-      "Trung bình": {
-        color: "#ffc107",
-        pillBg: "rgba(255, 193, 7, 0.15)",
-        pillText: "#b45309",
-        pillBorder: "rgba(255, 193, 7, 0.45)",
-        icon: WiFlood,
-        desc: descFor("Trung bình"),
-      },
-      Nặng: {
-        color: "#dc3545",
-        pillBg: "rgba(220, 53, 69, 0.1)",
-        pillText: "#b91c1c",
-        pillBorder: "rgba(220, 53, 69, 0.35)",
-        icon: WiFlood,
-        desc: descFor("Nặng"),
-      },
+    const info = getFloodLevelDisplayInfo(level, t);
+    return {
+      ...info,
+      icon: getFloodLevelDef(level) ? WiFlood : FaCircleQuestion,
     };
-    return (
-      levels[level] || {
-        color: "#6c757d",
-        pillBg: "#f1f5f9",
-        pillText: "#475569",
-        pillBorder: "#e2e8f0",
-        icon: FaCircleQuestion,
-        desc: descFor(level) || level || "—",
-      }
-    );
   };
 
   const getStatusPillStyle = (statusInfo) => getStatusPillStyleFromColor(statusInfo.color);
@@ -802,7 +774,7 @@ const ReportsPage = () => {
                                   style={{ fontSize: "1rem", flexShrink: 0 }}
                                 />
 
-                                {report.flood_level || "—"}
+                                {getFloodLevelLabel(report.flood_level, t) || "—"}
                               </span>
 
                               {levelInfo.desc ? (

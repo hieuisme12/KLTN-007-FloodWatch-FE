@@ -2,9 +2,13 @@
 export default {
   newReport: {
     levelPick: '-- Select flood level --',
-    levelNhe: 'Light (up to ankle ~10 cm)',
-    levelTb: 'Medium (up to knee ~30 cm)',
-    levelNang: 'Heavy (half-vehicle ~50 cm)',
+    floodLevel: {
+      'Mức 1': 'Level 1 — 10 cm',
+      'Mức 2': 'Level 2 — 20 cm',
+      'Mức 3': 'Level 3 — 30 cm',
+      'Mức 4': 'Level 4 — 40 cm',
+      'Mức 5': 'Level 5 — over 50 cm',
+    },
     errName: 'Please enter your name (at least 2 characters) or sign in to use your account name.',
     errLevel: 'Please select a valid flood level',
     errMap: 'Please pick a location on the map (click the map)',
@@ -39,9 +43,6 @@ export default {
     sensorNote: 'Dots = sensor locations (reports near sensors get verified)',
     verifiedBanner: 'This report was verified by a nearby sensor',
     levelPickLong: '-- Select flood depth --',
-    levelNheLong: 'Light — up to ankle (~10 cm)',
-    levelTbLong: 'Medium — up to knee (~30 cm)',
-    levelNangLong: 'Heavy — half-vehicle (~50 cm)',
     cooldownWait: 'Please wait {{n}} more seconds before submitting again.',
     rateLimitMinutes: 'Too many reports. Try again in about {{n}} minutes.',
     rateLimitGeneric: 'Too many reports. Please try again later.',
@@ -176,7 +177,11 @@ export default {
       sensors: 'Which stations are flooded?',
       situation: 'Flood situation in HCMC?',
       mapHelp: 'How to read the map?'
-    }
+    },
+    draftTitle: 'Flood report draft',
+    draftPickLevel: 'Select flood level:',
+    draftSubmit: 'Submit this report',
+    draftCoords: 'Coordinates: {{lat}}, {{lng}}',
   },
   waterNews: {
     title: 'HCMC headline news',

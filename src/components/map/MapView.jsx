@@ -23,6 +23,11 @@ import {
   getReportValidationSubline,
   isReportValidationBySensor
 } from '../../utils/reportDisplayStatus';
+import {
+  getCrowdReportMarkerColor,
+  getFloodLevelLabel
+} from '../../utils/floodLevels';
+import FloodLevelLegend from './FloodLevelLegend';
 import { getCurrentUser, isAuthenticated } from '../../utils/auth';
 import SensorMarker from './SensorMarker';
 import UserLocationMarker from './UserLocationMarker';
@@ -42,21 +47,8 @@ const MAP_STYLE_URLS = {
   outdoors: 'mapbox://styles/mapbox/outdoors-v12'
 };
 
-// Crowd report marker: màu theo status/level
-const getCrowdMarkerColor = (report) => {
-  const moderationStatus = report.moderation_status;
-  if (moderationStatus === 'approved') {
-    const levelColors = { 'Nặng': '#dc3545', 'Trung bình': '#ffc107', 'Nhẹ': '#17a2b8' };
-    return report.flood_level && levelColors[report.flood_level] ? levelColors[report.flood_level] : '#28a745';
-  }
-  if (moderationStatus === 'rejected') return '#dc3545';
-  const validationStatus = report.validation_status;
-  const displayStatus = moderationStatus === 'pending' || !moderationStatus ? validationStatus : moderationStatus;
-  if (displayStatus === 'pending') return '#ffc107';
-  if (report.verified_by_sensor || displayStatus === 'cross_verified') return '#28a745';
-  if (displayStatus === 'verified') return '#17a2b8';
-  return '#6c757d';
-};
+// Crowd report marker: màu theo mức ngập (5 bậc) / moderation
+const getCrowdMarkerColor = (report) => getCrowdReportMarkerColor(report);
 
 const getReportReporterAvatar = (report) => {
   const fromReport = report.reporter_avatar ?? report.avatar ?? report.reporter?.avatar ?? null;
@@ -232,10 +224,7 @@ const CrowdReportPopupContent = ({ report, lat, lng, getReporterReliability }) =
   const moderationInfo = getReportModerationDisplay(report, t);
   const validationSubline = getReportValidationSubline(report, t);
   const statusInfo = { color: moderationInfo.color, text: moderationInfo.text };
-  const getFloodLevelDesc = (level) => {
-    if (!level) return '';
-    return t(`reportUi.floodDepth.${level}`, { defaultValue: level });
-  };
+  const getFloodLevelDesc = (level) => getFloodLevelLabel(level, t);
   useEffect(() => {
     if (!lat || !lng || desc) {
       return;
@@ -263,7 +252,7 @@ const CrowdReportPopupContent = ({ report, lat, lng, getReporterReliability }) =
       </div>
       <div style={{ marginBottom: '8px', padding: '8px', background: '#f5f5f5', borderRadius: '4px' }}>
         <strong style={{ fontSize: '16px', color: statusInfo.color, display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <WiFlood /> {t('reportUi.popupLevel')}: {report.flood_level}
+          <WiFlood /> {t('reportUi.popupLevel')}: {getFloodLevelLabel(report.flood_level, t)}
         </strong><br />
         <small>{getFloodLevelDesc(report.flood_level)}</small><br />
         <strong>{t('reportUi.status')} </strong>{statusInfo.text}
@@ -1243,6 +1232,19 @@ const MapView = ({
           <div style={{ fontSize: '12px', color: '#666', fontWeight: '500' }}>{t('mapView.onlineLabel')}</div>
         </div>
       </div>
+
+      {/* Chú giải mức ngập báo cáo crowd (5 bậc) */}
+      {!effectiveFusionEnabled && (
+        <FloodLevelLegend
+          style={{
+            position: 'absolute',
+            bottom: '100px',
+            left: '20px',
+            zIndex: 100,
+            pointerEvents: 'none'
+          }}
+        />
+      )}
 
       {/* IUH Logo - Bottom Left */}
       <div style={{

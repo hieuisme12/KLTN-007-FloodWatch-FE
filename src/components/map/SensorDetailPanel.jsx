@@ -12,6 +12,10 @@ import ReportEvaluationWidget from '../reports/ReportEvaluationWidget';
 import SensorForecastSection from './SensorForecastSection';
 import ConfidenceBadge from '../common/ConfidenceBadge';
 import {
+  getFloodLevelColor,
+  getFloodLevelLabel
+} from '../../utils/floodLevels';
+import {
   getReportModerationDisplay,
   getReportValidationSubline,
   isReportValidationBySensor
@@ -81,14 +85,11 @@ const SensorDetailPanel = ({ sensor, crowdReport }) => {
   if (crowdReport) {
     const moderationInfo = getReportModerationDisplay(crowdReport, t);
     const validationSubline = getReportValidationSubline(crowdReport, t);
-    const levelColors = { 'Nặng': '#dc3545', 'Trung bình': '#ffc107', 'Nhẹ': '#17a2b8' };
     const levelColor =
-      crowdReport.moderation_status === 'approved' &&
-      crowdReport.flood_level &&
-      levelColors[crowdReport.flood_level]
-        ? levelColors[crowdReport.flood_level]
+      crowdReport.moderation_status === 'approved'
+        ? getFloodLevelColor(crowdReport.flood_level, moderationInfo.color)
         : moderationInfo.color;
-    const floodLevelDesc = t(`reportUi.floodDepth.${crowdReport.flood_level}`, { defaultValue: crowdReport.flood_level });
+    const floodLevelDesc = getFloodLevelLabel(crowdReport.flood_level, t);
 
     return (
       <div className="sensor-detail-panel">
@@ -120,7 +121,7 @@ const SensorDetailPanel = ({ sensor, crowdReport }) => {
           <div className="sensor-detail-item sensor-detail-water-level">
             <span className="sensor-detail-label"><WiFlood style={{ marginRight: '6px' }} /> {t('reportUi.floodLevel')}</span>
             <span className="sensor-detail-value" style={{ color: levelColor, fontWeight: 'bold' }}>
-              {crowdReport.flood_level || '—'}
+              {getFloodLevelLabel(crowdReport.flood_level, t) || '—'}
             </span>
           </div>
           <div className="sensor-detail-item">

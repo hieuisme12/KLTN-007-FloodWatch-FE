@@ -14,6 +14,11 @@ import { useReporterRanking } from '../../context/ReporterRankingProvider';
 import ConfidenceBadge from '../common/ConfidenceBadge';
 import Skeleton from 'react-loading-skeleton';
 import {
+  getFloodLevelDisplayInfo,
+  getFloodLevelLabel,
+  getFloodLevelDef
+} from '../../utils/floodLevels';
+import {
   getReportModerationDisplay,
   getReportValidationSubline,
   isReportValidationBySensor
@@ -37,12 +42,12 @@ const CrowdReportsList = ({ reports, loading }) => {
   };
 
   const getFloodLevelInfo = (level) => {
-    const levels = {
-      Nhẹ: { color: '#17a2b8', icon: WiFlood, desc: 'Đến mắt cá (~10cm)' },
-      'Trung bình': { color: '#ffc107', icon: WiFlood, desc: 'Đến đầu gối (~30cm)' },
-      Nặng: { color: '#dc3545', icon: WiFlood, desc: 'Ngập nửa xe (~50cm)' }
+    const info = getFloodLevelDisplayInfo(level, t);
+    return {
+      color: info.color,
+      icon: getFloodLevelDef(level) ? WiFlood : FaCircleQuestion,
+      desc: info.desc
     };
-    return levels[level] || { color: '#6c757d', icon: FaCircleQuestion, desc: level };
   };
 
   if (loading) {
@@ -144,7 +149,7 @@ const CrowdReportsList = ({ reports, loading }) => {
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                 <levelInfo.icon style={{ fontSize: '16px' }} />
                 <strong style={{ color: levelInfo.color, fontSize: '14px' }}>
-                  {report.flood_level}
+                  {getFloodLevelLabel(report.flood_level, t)}
                 </strong>
                 <span style={{ fontSize: '12px', color: '#666' }}>
                   {levelInfo.desc}

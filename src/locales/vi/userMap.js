@@ -42,7 +42,8 @@ export default {
     fusionShowOnMap: 'Hiển thị lớp trộn trên bản đồ',
     fusionFusedNearby: 'Kết hợp với cảm biến gần đó',
     fusionColorGuide:
-      'Màu điểm theo mực nước ước tính: dưới 10 cm nhạt, 10–30 cm xanh, 30–50 cm vàng, từ 50 cm đỏ. Khi bật lớp này, các điểm báo cáo thường trên bản đồ tạm ẩn để dễ nhìn.',
+      'Màu điểm theo mực nước ước tính: 10 cm (xanh nhạt), 20 cm, 30 cm (vàng), 40 cm (cam), từ 50 cm (đỏ). Khi bật lớp này, các điểm báo cáo thường trên bản đồ tạm ẩn để dễ nhìn.',
+    crowdLegendTitle: 'Mức ngập (báo cáo)',
     nearestSensor: 'Cảm biến gần nhất:',
     coverageBlended: 'Đang trộn với dữ liệu cảm biến gần nhất',
     coverageCrowdOnlyFar: 'Xa cảm biến — chỉ dựa trên báo cáo người dân',

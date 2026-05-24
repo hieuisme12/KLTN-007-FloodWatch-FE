@@ -2,9 +2,13 @@
 export default {
   newReport: {
     levelPick: '-- Chọn mức độ --',
-    levelNhe: 'Nhẹ (đến mắt cá ~10cm)',
-    levelTb: 'Trung bình (đến đầu gối ~30cm)',
-    levelNang: 'Nặng (ngập nửa xe ~50cm)',
+    floodLevel: {
+      'Mức 1': 'Mức 1 - 10 cm',
+      'Mức 2': 'Mức 2 - 20 cm',
+      'Mức 3': 'Mức 3 - 30 cm',
+      'Mức 4': 'Mức 4 - 40 cm',
+      'Mức 5': 'Mức 5 - trên 50 cm',
+    },
     errName: 'Vui lòng nhập tên của bạn (ít nhất 2 ký tự) hoặc đăng nhập để dùng tên tài khoản.',
     errLevel: 'Vui lòng chọn mức độ ngập hợp lệ',
     errMap: 'Vui lòng chọn vị trí trên bản đồ (click vào bản đồ)',
@@ -39,9 +43,6 @@ export default {
     sensorNote: 'Chấm tròn = vị trí cảm biến (báo cáo gần cảm biến sẽ được xác minh)',
     verifiedBanner: 'Báo cáo đã được xác minh bởi cảm biến gần đó',
     levelPickLong: '-- Chọn mức độ ngập --',
-    levelNheLong: 'Nhẹ - Đến mắt cá (~10cm)',
-    levelTbLong: 'Trung bình - Đến đầu gối (~30cm)',
-    levelNangLong: 'Nặng - Ngập nửa xe (~50cm)',
     cooldownWait: 'Vui lòng đợi thêm {{n}} giây trước khi gửi lại.',
     rateLimitMinutes: 'Bạn gửi quá nhiều báo cáo. Thử lại sau khoảng {{n}} phút.',
     rateLimitGeneric: 'Bạn gửi quá nhiều báo cáo. Vui lòng thử lại sau.',
@@ -176,7 +177,11 @@ export default {
       sensors: 'Trạm nào đang ngập?',
       situation: 'Tình hình ngập TP.HCM?',
       mapHelp: 'Hướng dẫn đọc bản đồ'
-    }
+    },
+    draftTitle: 'Nháp báo cáo ngập',
+    draftPickLevel: 'Chọn mức ngập:',
+    draftSubmit: 'Gửi báo cáo này',
+    draftCoords: 'Tọa độ: {{lat}}, {{lng}}',
   },
   waterNews: {
     title: 'Tin thời sự TP.HCM',

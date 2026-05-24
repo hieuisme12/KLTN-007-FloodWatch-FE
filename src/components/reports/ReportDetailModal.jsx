@@ -8,6 +8,7 @@ import { PrimaryButton } from '../common/Button';
 import ConfidenceBadge from '../common/ConfidenceBadge';
 import ReportEvaluationWidget from './ReportEvaluationWidget';
 import { getReportContent, getReportPhotoUrls } from '../../utils/reportHelpers';
+import { getFloodLevelLabel } from '../../utils/floodLevels';
 import {
   getReportModerationDisplay,
   getReportValidationSubline,
@@ -206,9 +207,7 @@ export default function ReportDetailModal({
 
   const content = getReportContent(report);
   const photos = getReportPhotoUrls(report);
-  const floodLevelDesc = t(`reportUi.floodDepth.${report.flood_level}`, {
-    defaultValue: report.flood_level || '—'
-  });
+  const floodLevelDesc = getFloodLevelLabel(report.flood_level, t);
 
   return (
     <Modal
@@ -279,7 +278,7 @@ export default function ReportDetailModal({
                 <WiFlood aria-hidden /> {t('reportUi.floodLevel')}
               </span>
               <span className="report-detail-value report-detail-value--strong">
-                {report.flood_level || '—'}
+                {getFloodLevelLabel(report.flood_level, t) || '—'}
               </span>
             </div>
 

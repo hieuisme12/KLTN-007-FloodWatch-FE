@@ -42,7 +42,8 @@ export default {
     fusionShowOnMap: 'Show fusion layer on the map',
     fusionFusedNearby: 'Combine with nearby sensors',
     fusionColorGuide:
-      'Point colors reflect estimated depth: under 10 cm pale, 10–30 cm teal, 30–50 cm yellow, from 50 cm red. When this layer is on, regular report markers are hidden for clarity.',
+      'Point colors reflect estimated depth: 10 cm (light green), 20 cm, 30 cm (yellow), 40 cm (orange), from 50 cm (red). When this layer is on, regular report markers are hidden for clarity.',
+    crowdLegendTitle: 'Flood level (reports)',
     nearestSensor: 'Nearest sensor:',
     coverageBlended: 'Blending with nearest sensor data',
     coverageCrowdOnlyFar: 'Far from sensors — crowd reports only',
