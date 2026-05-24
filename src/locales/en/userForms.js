@@ -26,6 +26,10 @@ export default {
     searchingSuggest: 'Searching suggestions…',
     resolvingAddr: 'Resolving address...',
     thanks: 'Thank you for contributing information!',
+    submitPendingModeration:
+      'Your report was submitted and is waiting for moderator approval before it appears on the public map.',
+    submitCrossVerifiedPending:
+      'Cross-verified with a nearby sensor. A moderator must still approve it before it appears on the map.',
     sending: 'Sending...',
     sent: 'Sent',
     submit: 'Submit report',
@@ -73,8 +77,8 @@ export default {
   },
   reportsPage: {
     modAll: 'Status: All',
-    modVerified: 'Status: Verified',
-    modPending: 'Status: Pending review',
+    modVerified: 'Status: Approved',
+    modPending: 'Status: Pending approval',
     expAll: 'Validity: All',
     expActive: 'Validity: Active',
     expExpired: 'Validity: Expired',
@@ -114,6 +118,7 @@ export default {
     detailContent: 'Description',
     detailPhotos: 'Photos',
     detailModeration: 'Moderation',
+    detailValidation: 'Validation (sensor)',
     detailModerator: 'Approved by',
     detailHandler: 'Handled by',
     detailModeratedAt: 'Time',

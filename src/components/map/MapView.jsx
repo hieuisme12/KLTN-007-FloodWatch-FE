@@ -18,6 +18,11 @@ import {
 } from '../../utils/scoringDisplay';
 import ConfidenceBadge from '../common/ConfidenceBadge';
 import { useReporterRanking } from '../../context/ReporterRankingProvider';
+import {
+  getReportModerationDisplay,
+  getReportValidationSubline,
+  isReportValidationBySensor
+} from '../../utils/reportDisplayStatus';
 import { getCurrentUser, isAuthenticated } from '../../utils/auth';
 import SensorMarker from './SensorMarker';
 import UserLocationMarker from './UserLocationMarker';
@@ -224,25 +229,9 @@ const CrowdReportPopupContent = ({ report, lat, lng, getReporterReliability }) =
   const { t, i18n } = useTranslation();
   const desc = report.location_description || null;
   const [fetchedAddress, setFetchedAddress] = useState(null);
-  const moderationStatus = report.moderation_status;
-  let statusInfo = { color: '#6c757d', text: t('reportUi.moderation.unknown') };
-  if (moderationStatus === 'approved') {
-    const levelColors = { 'Nặng': '#dc3545', 'Trung bình': '#ffc107', 'Nhẹ': '#17a2b8' };
-    statusInfo = {
-      color: report.flood_level && levelColors[report.flood_level] ? levelColors[report.flood_level] : '#28a745',
-      text: t('reportUi.moderation.approved')
-    };
-  } else if (moderationStatus === 'rejected') {
-    statusInfo = { color: '#dc3545', text: t('reportUi.moderation.rejected') };
-  } else {
-    const displayStatus = moderationStatus === 'pending' || !moderationStatus ? report.validation_status : moderationStatus;
-    const statusConfig = {
-      pending: { color: '#ffc107', text: t('reportUi.moderation.pending') },
-      verified: { color: '#17a2b8', text: t('reportUi.moderation.verified') },
-      cross_verified: { color: '#28a745', text: t('reportUi.moderation.cross_verified') }
-    };
-    statusInfo = report.verified_by_sensor ? statusConfig.cross_verified : (statusConfig[displayStatus] || statusInfo);
-  }
+  const moderationInfo = getReportModerationDisplay(report, t);
+  const validationSubline = getReportValidationSubline(report, t);
+  const statusInfo = { color: moderationInfo.color, text: moderationInfo.text };
   const getFloodLevelDesc = (level) => {
     if (!level) return '';
     return t(`reportUi.floodDepth.${level}`, { defaultValue: level });
@@ -278,8 +267,14 @@ const CrowdReportPopupContent = ({ report, lat, lng, getReporterReliability }) =
         </strong><br />
         <small>{getFloodLevelDesc(report.flood_level)}</small><br />
         <strong>{t('reportUi.status')} </strong>{statusInfo.text}
+        {validationSubline ? (
+          <>
+            <br />
+            <small>{validationSubline}</small>
+          </>
+        ) : null}
       </div>
-      {report.verified_by_sensor && (
+      {isReportValidationBySensor(report) && (
         <div style={{ marginBottom: '8px', padding: '6px', background: '#f0fff4', borderRadius: '4px', fontSize: '12px', color: '#28a745' }}>
           <FaCheck style={{ marginRight: '4px' }} /> {t('reportUi.sensorVerified')}
         </div>

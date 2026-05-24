@@ -21,10 +21,15 @@ export default {
     moderation: {
       rejected: 'Rejected',
       approved: 'Approved',
-      pending: 'Pending review',
+      pending: 'Pending approval',
       verified: 'Verified',
       cross_verified: 'Cross-verified',
       unknown: 'Unknown',
+    },
+    validation: {
+      cross_verified: 'Cross-verified',
+      verified: 'Verified',
+      not_cross_verified: 'Not cross-verified',
     },
     confidence: {
       veryHigh: 'Very high',

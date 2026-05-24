@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import Map, { Marker } from 'react-map-gl/mapbox';
 import FilterDropdown from '../common/FilterDropdown';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -9,12 +10,18 @@ import { PrimaryButton } from '../common/Button';
 import { isAuthenticated, getCurrentUser } from '../../utils/auth';
 import { DEFAULT_CENTER, DEFAULT_ZOOM } from '../../utils/constants';
 import { fetchAddressFromCoords } from '../../utils/geocode';
+import {
+  buildReportSubmitSuccessCopy,
+  getReportValidationSubline,
+  pickDisplayLabel
+} from '../../utils/reportDisplayStatus';
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
 const defaultLng = DEFAULT_CENTER[1];
 const defaultLat = DEFAULT_CENTER[0];
 
 const ReportFloodForm = ({ onSuccess, onClose }) => {
+  const { t } = useTranslation();
   const authenticated = isAuthenticated();
   const currentUser = getCurrentUser();
   const [formData, setFormData] = useState({
@@ -300,20 +307,21 @@ const ReportFloodForm = ({ onSuccess, onClose }) => {
         {result && result.success && result.data && (
           <div style={{
             padding: '10px',
-            background: result.data.verified_by_sensor ? '#f0fff4' : '#fffbf0',
-            border: `1px solid ${result.data.verified_by_sensor ? '#28a745' : '#ffc107'}`,
+            background: '#fffbf0',
+            border: '1px solid #fde68a',
             borderRadius: '6px',
-            color: result.data.verified_by_sensor ? '#28a745' : '#856404',
+            color: '#78350f',
             marginBottom: '15px'
           }}>
-            {result.data.verified_by_sensor ? (
-              <>
-                <FaCheck style={{ marginRight: '6px' }} /> <strong>Đã xác minh!</strong> {result.message || 'Báo cáo của bạn đã được xác minh bởi hệ thống cảm biến. Cảm ơn!'}
-              </>
-            ) : (
-              <>
-                <FaClock style={{ marginRight: '6px' }} /> <strong>Đang xem xét</strong> {result.message || 'Báo cáo của bạn đang được xem xét. Cảm ơn!'}
-              </>
+            <FaClock style={{ marginRight: '6px' }} />{' '}
+            <strong>{t('newReport.successTitle')}</strong>{' '}
+            {buildReportSubmitSuccessCopy(result, t)}
+            {(pickDisplayLabel(result.data?.display_validation) ||
+              getReportValidationSubline(result.data, t)) && (
+              <div style={{ marginTop: '6px', fontSize: '12px' }}>
+                {pickDisplayLabel(result.data?.display_validation) ||
+                  getReportValidationSubline(result.data, t)}
+              </div>
             )}
           </div>
         )}

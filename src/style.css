@@ -3076,6 +3076,20 @@ button.fs-btn--ghost:hover:not(:disabled) {
   color: #64748b;
 }
 
+.reports-status-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.reports-validation-subline {
+  font-size: 11px;
+  font-weight: 500;
+  color: #64748b;
+  line-height: 1.35;
+}
+
 .reports-status-pill {
   display: inline-flex;
   align-items: center;
@@ -3352,6 +3366,14 @@ button.fs-btn--ghost:hover:not(:disabled) {
 
 .report-detail-moderation-meta--muted {
   color: #64748b;
+}
+
+.report-detail-validation-subline {
+  margin: 6px 0 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: #64748b;
+  line-height: 1.4;
 }
 
 @media (max-width: 640px) {

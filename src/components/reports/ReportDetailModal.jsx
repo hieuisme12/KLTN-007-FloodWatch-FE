@@ -9,6 +9,11 @@ import ConfidenceBadge from '../common/ConfidenceBadge';
 import ReportEvaluationWidget from './ReportEvaluationWidget';
 import { getReportContent, getReportPhotoUrls } from '../../utils/reportHelpers';
 import {
+  getReportModerationDisplay,
+  getReportValidationSubline,
+  isReportValidationBySensor
+} from '../../utils/reportDisplayStatus';
+import {
   fetchAddressFromCoords,
   formatAddressForUiDisplay
 } from '../../utils/geocode';
@@ -26,23 +31,33 @@ function looksLikeCoordsOnly(text) {
 }
 
 function ModerationBlock({ report, t, locale }) {
-  const { moderation_status, moderated_by_name, moderated_at, rejection_reason } =
-    report ?? {};
+  const { moderated_by_name, moderated_at, rejection_reason } = report ?? {};
+  const moderationInfo = getReportModerationDisplay(report, t);
+  const validationSubline = getReportValidationSubline(report, t);
+  const status = moderationInfo.status;
 
-  if (moderation_status === 'pending') {
+  if (status === 'pending') {
     return (
-      <p className="report-detail-moderation-status report-detail-moderation-status--pending">
-        {t('reportUi.moderation.pending')}
-      </p>
+      <div className="report-detail-moderation-body">
+        <p className="report-detail-moderation-status report-detail-moderation-status--pending">
+          {moderationInfo.text}
+        </p>
+        {validationSubline ? (
+          <p className="report-detail-validation-subline">{validationSubline}</p>
+        ) : null}
+      </div>
     );
   }
 
-  if (moderation_status === 'approved') {
+  if (status === 'approved') {
     return (
       <div className="report-detail-moderation-body">
         <p className="report-detail-moderation-status report-detail-moderation-status--approved">
-          {t('reportUi.moderation.approved')}
+          {moderationInfo.text}
         </p>
+        {validationSubline ? (
+          <p className="report-detail-validation-subline">{validationSubline}</p>
+        ) : null}
         {moderated_by_name ? (
           <p className="report-detail-moderation-meta">
             {t('reportsPage.detailModerator')}: <strong>{moderated_by_name}</strong>
@@ -61,12 +76,15 @@ function ModerationBlock({ report, t, locale }) {
     );
   }
 
-  if (moderation_status === 'rejected') {
+  if (status === 'rejected') {
     return (
       <div className="report-detail-moderation-body">
         <p className="report-detail-moderation-status report-detail-moderation-status--rejected">
-          {t('reportUi.moderation.rejected')}
+          {moderationInfo.text}
         </p>
+        {validationSubline ? (
+          <p className="report-detail-validation-subline">{validationSubline}</p>
+        ) : null}
         {moderated_by_name ? (
           <p className="report-detail-moderation-meta">
             {t('reportsPage.detailHandler')}: <strong>{moderated_by_name}</strong>
@@ -88,7 +106,7 @@ function ModerationBlock({ report, t, locale }) {
 
   return (
     <p className="report-detail-moderation-meta report-detail-moderation-meta--muted">
-      {t('reportUi.moderation.unknown')}
+      {moderationInfo.text}
     </p>
   );
 }
@@ -225,7 +243,7 @@ export default function ReportDetailModal({
             <span className="report-detail-type-badge">
               <FaMobileScreen aria-hidden /> {t('reportUi.crowdReport')}
             </span>
-            {report.verified_by_sensor ? (
+            {isReportValidationBySensor(report) ? (
               <span className="report-detail-sensor-badge">
                 <FaCheck aria-hidden /> {t('reportUi.sensorVerified')}
               </span>

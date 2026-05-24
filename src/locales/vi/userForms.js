@@ -26,6 +26,10 @@ export default {
     searchingSuggest: 'Đang tìm gợi ý…',
     resolvingAddr: 'Đang lấy địa chỉ...',
     thanks: 'Cảm ơn bạn đã đóng góp thông tin!',
+    submitPendingModeration:
+      'Báo cáo đã được gửi và đang chờ moderator duyệt trước khi hiển thị trên bản đồ công khai.',
+    submitCrossVerifiedPending:
+      'Đã xác minh chéo với cảm biến gần đó. Vẫn cần moderator duyệt trước khi hiển thị trên bản đồ.',
     sending: 'Đang gửi...',
     sent: 'Đã gửi',
     submit: 'Gửi báo cáo',
@@ -73,8 +77,8 @@ export default {
   },
   reportsPage: {
     modAll: 'Trạng thái: Tất cả',
-    modVerified: 'Trạng thái: Đã xác minh',
-    modPending: 'Trạng thái: Chờ xem xét',
+    modVerified: 'Trạng thái: Đã duyệt',
+    modPending: 'Trạng thái: Chờ duyệt',
     expAll: 'Thời hạn: Tất cả',
     expActive: 'Thời hạn: Còn hiệu lực',
     expExpired: 'Thời hạn: Đã hết hạn',
@@ -114,6 +118,7 @@ export default {
     detailContent: 'Mô tả',
     detailPhotos: 'Hình ảnh',
     detailModeration: 'Kiểm duyệt',
+    detailValidation: 'Xác minh (cảm biến)',
     detailModerator: 'Người duyệt',
     detailHandler: 'Người xử lý',
     detailModeratedAt: 'Thời gian',

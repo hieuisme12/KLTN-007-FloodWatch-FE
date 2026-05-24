@@ -20,6 +20,11 @@ import ErrorToast from '../../components/common/ErrorToast';
 import { CancelButton, ConfirmButton, PrimaryButton } from '../../components/common/Button';
 import SearchAutoComplete from '../../components/common/SearchAutoComplete';
 import { searchAddressSuggestionsInHcm, fetchAddressFromCoords, resolveGeocodePlaceSelection, clearGeocodeAutocompleteSessionToken } from '../../utils/geocode';
+import {
+  buildReportSubmitSuccessCopy,
+  getReportValidationSubline,
+  pickDisplayLabel
+} from '../../utils/reportDisplayStatus';
 import { useTranslation } from 'react-i18next';
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
@@ -583,21 +588,23 @@ export function NewReportForm({ onCancel, onSuccess }) {
                 <div style={{
                   padding: '15px',
                   marginBottom: '20px',
-                  background: '#d4edda',
-                  color: '#155724',
-                  border: '1px solid #c3e6cb',
+                  background: '#fffbf0',
+                  color: '#78350f',
+                  border: '1px solid #fde68a',
                   borderRadius: '4px',
                   fontSize: '14px'
                 }}>
                   <strong style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <FaCheck /> {t('newReport.successTitle')}
+                    <FaClock /> {t('newReport.successTitle')}
                   </strong>
                   <div style={{ marginTop: '8px' }}>
-                    {result.message || t('newReport.thanks')}
+                    {buildReportSubmitSuccessCopy(result, t)}
                   </div>
-                  {(result.data?.verified_by_sensor || result.data?.sensor_verified) && (
-                    <div style={{ marginTop: '5px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <FaBullseye /> {t('newReport.verifiedBanner')}
+                  {(pickDisplayLabel(result.data?.display_validation) ||
+                    getReportValidationSubline(result.data, t)) && (
+                    <div style={{ marginTop: '8px', fontSize: '13px', color: '#92400e' }}>
+                      {pickDisplayLabel(result.data?.display_validation) ||
+                        getReportValidationSubline(result.data, t)}
                     </div>
                   )}
                 </div>

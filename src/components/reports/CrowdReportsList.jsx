@@ -1,62 +1,34 @@
 import React from 'react';
-import { 
-  FaCheck, 
-  FaXmark, 
-  FaClock, 
-  FaCircleQuestion, 
-  FaStar, 
-  FaCircle, 
-  FaTriangleExclamation, 
-  FaMobileScreen
+import { useTranslation } from 'react-i18next';
+import {
+  FaCheck,
+  FaXmark,
+  FaClock,
+  FaCircleQuestion,
+  FaStar,
+  FaCircle,
 } from 'react-icons/fa6';
 import { WiFlood } from 'react-icons/wi';
 import { MdLocationOn } from 'react-icons/md';
 import { useReporterRanking } from '../../context/ReporterRankingProvider';
 import ConfidenceBadge from '../common/ConfidenceBadge';
 import Skeleton from 'react-loading-skeleton';
+import {
+  getReportModerationDisplay,
+  getReportValidationSubline,
+  isReportValidationBySensor
+} from '../../utils/reportDisplayStatus';
+
+const MODERATION_ICONS = {
+  pending: FaClock,
+  approved: FaCheck,
+  rejected: FaXmark
+};
 
 const CrowdReportsList = ({ reports, loading }) => {
+  const { t } = useTranslation();
   const { getReporterReliability } = useReporterRanking();
-  // Hàm lấy status info - ưu tiên moderation_status theo logic đúng
-  const getStatusInfo = (report) => {
-    // Logic: Nếu moderation_status đã được xử lý (approved/rejected), hiển thị nó
-    // Nếu moderation_status = 'pending' hoặc null, hiển thị validation_status
-    const moderationStatus = report.moderation_status;
-    const validationStatus = report.validation_status;
-    
-    // Nếu đã được moderator xử lý (approved hoặc rejected), ưu tiên hiển thị
-    if (moderationStatus === 'approved' || moderationStatus === 'rejected') {
-      if (moderationStatus === 'rejected') {
-        return { text: 'Đã từ chối', color: '#dc3545', icon: FaXmark };
-      }
-      // Đã duyệt: màu theo mức độ ngập (Nặng / Trung bình / Nhẹ)
-      const levelColors = { 'Nặng': '#dc3545', 'Trung bình': '#ffc107', 'Nhẹ': '#17a2b8' };
-      const level = report.flood_level && levelColors[report.flood_level] ? report.flood_level : null;
-      const color = level ? levelColors[level] : '#28a745';
-      return { text: 'Đã duyệt', color, icon: FaCheck };
-    }
-    
-    // Nếu moderation_status = 'pending' hoặc null, hiển thị validation_status
-    const displayStatus = moderationStatus === 'pending' || !moderationStatus 
-      ? validationStatus 
-      : moderationStatus;
-    
-    // Badge mapping cho validation_status
-    const statusConfig = {
-      pending: { text: 'Chờ xét duyệt', color: '#ffc107', icon: FaClock },
-      verified: { text: 'Đã xác minh', color: '#17a2b8', icon: FaCheck },
-      cross_verified: { text: 'Đã xác minh chéo', color: '#28a745', icon: FaCheck }
-    };
-    
-    // Nếu có verified_by_sensor, ưu tiên hiển thị cross_verified
-    if (report.verified_by_sensor) {
-      return statusConfig.cross_verified;
-    }
-    
-    return statusConfig[displayStatus] || { text: 'Không xác định', color: '#6c757d', icon: FaCircleQuestion };
-  };
 
-  // Hàm format reliability score
   const getReliabilityBadge = (score) => {
     if (score >= 81) return { color: '#28a745', text: 'Rất cao', icon: FaStar };
     if (score >= 61) return { color: '#17a2b8', text: 'Cao', icon: FaCircle };
@@ -64,12 +36,11 @@ const CrowdReportsList = ({ reports, loading }) => {
     return { color: '#dc3545', text: 'Thấp', icon: FaCircle };
   };
 
-  // Hàm format flood level - dùng WiFlood cho tất cả mức độ ngập
   const getFloodLevelInfo = (level) => {
     const levels = {
-      'Nhẹ': { color: '#17a2b8', icon: WiFlood, desc: 'Đến mắt cá (~10cm)' },
+      Nhẹ: { color: '#17a2b8', icon: WiFlood, desc: 'Đến mắt cá (~10cm)' },
       'Trung bình': { color: '#ffc107', icon: WiFlood, desc: 'Đến đầu gối (~30cm)' },
-      'Nặng': { color: '#dc3545', icon: WiFlood, desc: 'Ngập nửa xe (~50cm)' }
+      Nặng: { color: '#dc3545', icon: WiFlood, desc: 'Ngập nửa xe (~50cm)' }
     };
     return levels[level] || { color: '#6c757d', icon: FaCircleQuestion, desc: level };
   };
@@ -103,7 +74,9 @@ const CrowdReportsList = ({ reports, loading }) => {
         Báo cáo từ người dân ({reports.length})
       </h3>
       {reports.map((report, index) => {
-        const statusInfo = getStatusInfo(report);
+        const moderationInfo = getReportModerationDisplay(report, t);
+        const validationSubline = getReportValidationSubline(report, t);
+        const StatusIcon = MODERATION_ICONS[moderationInfo.status] || FaCircleQuestion;
         const rel = getReporterReliability(report.reporter_id) ?? report.reporter_reliability ?? null;
         const reliabilityInfo = getReliabilityBadge(rel ?? 50);
         const levelInfo = getFloodLevelInfo(report.flood_level);
@@ -115,12 +88,11 @@ const CrowdReportsList = ({ reports, loading }) => {
               padding: '12px',
               background: 'white',
               borderRadius: '8px',
-              border: `1px solid ${statusInfo.color}40`,
-              borderLeft: `4px solid ${statusInfo.color}`,
+              border: `1px solid ${moderationInfo.color}40`,
+              borderLeft: `4px solid ${moderationInfo.color}`,
               boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
             }}
           >
-            {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '8px' }}>
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
@@ -147,14 +119,17 @@ const CrowdReportsList = ({ reports, loading }) => {
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
                 <span style={{
                   fontSize: '11px',
-                  background: statusInfo.color + '20',
-                  color: statusInfo.color,
+                  background: moderationInfo.color + '20',
+                  color: moderationInfo.color,
                   padding: '4px 8px',
                   borderRadius: '12px',
                   fontWeight: 'bold'
                 }}>
-                  <statusInfo.icon style={{ fontSize: '11px' }} /> {statusInfo.text}
+                  <StatusIcon style={{ fontSize: '11px' }} /> {moderationInfo.text}
                 </span>
+                {validationSubline ? (
+                  <span style={{ fontSize: '10px', color: '#64748b' }}>{validationSubline}</span>
+                ) : null}
                 {report.moderation_status === 'approved' && report.confidence != null && (
                   <ConfidenceBadge
                     confidence={report.confidence}
@@ -165,7 +140,6 @@ const CrowdReportsList = ({ reports, loading }) => {
               </div>
             </div>
 
-            {/* Body */}
             <div style={{ marginTop: '8px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                 <levelInfo.icon style={{ fontSize: '16px' }} />
@@ -177,7 +151,7 @@ const CrowdReportsList = ({ reports, loading }) => {
                 </span>
               </div>
 
-              {report.verified_by_sensor && (
+              {isReportValidationBySensor(report) && (
                 <div style={{
                   fontSize: '12px',
                   color: '#28a745',
@@ -186,7 +160,7 @@ const CrowdReportsList = ({ reports, loading }) => {
                   background: '#f0fff4',
                   borderRadius: '4px'
                 }}>
-                  <FaCheck style={{ marginRight: '4px' }} /> Đã xác minh bởi hệ thống cảm biến
+                  <FaCheck style={{ marginRight: '4px' }} /> {t('reportUi.sensorVerified')}
                 </div>
               )}
 

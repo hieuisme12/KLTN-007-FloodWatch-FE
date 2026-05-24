@@ -35,6 +35,12 @@ import {
 } from "../../utils/geocode";
 import { Illustration } from "@/components/shared-assets/illustrations";
 import { PaginationPageDefault } from "@/components/application/pagination/pagination";
+import {
+  getReportModerationDisplay,
+  getReportValidationSubline,
+  isReportValidationBySensor,
+  getStatusPillStyleFromColor,
+} from "../../utils/reportDisplayStatus";
 
 const REPORTS_PAGE_SIZE = 10;
 
@@ -299,75 +305,6 @@ const ReportsPage = () => {
     });
   }, [reports]);
 
-  // Hàm lấy status info - ưu tiên moderation_status theo logic đúng
-  const getStatusInfo = (report) => {
-    // Logic: Nếu moderation_status đã được xử lý (approved/rejected), hiển thị nó
-    // Nếu moderation_status = 'pending' hoặc null, hiển thị validation_status
-    const moderationStatus = report.moderation_status;
-    const validationStatus = report.validation_status;
-
-    // Nếu đã được moderator xử lý (approved hoặc rejected), ưu tiên hiển thị
-    if (moderationStatus === "approved" || moderationStatus === "rejected") {
-      if (moderationStatus === "rejected") {
-        return {
-          text: t("reportUi.moderation.rejected"),
-          color: "#dc3545",
-          icon: FaXmark,
-        };
-      }
-      // Đã duyệt: màu theo mức độ ngập (Nặng / Trung bình / Nhẹ)
-      const levelColors = {
-        Nặng: "#dc3545",
-        "Trung bình": "#ffc107",
-        Nhẹ: "#17a2b8",
-      };
-      const level =
-        report.flood_level && levelColors[report.flood_level]
-          ? report.flood_level
-          : null;
-      const color = level ? levelColors[level] : "#28a745";
-      return { text: t("reportUi.moderation.approved"), color, icon: FaCheck };
-    }
-
-    // Nếu moderation_status = 'pending' hoặc null, hiển thị validation_status
-    const displayStatus =
-      moderationStatus === "pending" || !moderationStatus
-        ? validationStatus
-        : moderationStatus;
-
-    // Badge mapping cho validation_status
-    const statusConfig = {
-      pending: {
-        text: t("reportUi.moderation.pending"),
-        color: "#ffc107",
-        icon: FaClock,
-      },
-      verified: {
-        text: t("reportUi.moderation.verified"),
-        color: "#17a2b8",
-        icon: FaCheck,
-      },
-      cross_verified: {
-        text: t("reportUi.moderation.cross_verified"),
-        color: "#28a745",
-        icon: FaCheck,
-      },
-    };
-
-    // Nếu có verified_by_sensor, ưu tiên hiển thị cross_verified
-    if (report.verified_by_sensor) {
-      return statusConfig.cross_verified;
-    }
-
-    return (
-      statusConfig[displayStatus] || {
-        text: t("reportUi.moderation.unknown"),
-        color: "#6c757d",
-        icon: FaCircleQuestion,
-      }
-    );
-  };
-
   const getReliabilityBadge = (score) => {
     if (score >= 81)
       return {
@@ -435,21 +372,13 @@ const ReportsPage = () => {
     );
   };
 
-  const getStatusPillStyle = (statusInfo) => {
-    const byColor = {
-      "#dc3545": { bg: "#fee2e2", text: "#b91c1c", border: "#fecaca" },
-      "#ffc107": { bg: "#fef3c7", text: "#b45309", border: "#fde68a" },
-      "#17a2b8": { bg: "#e0f7fa", text: "#0e7490", border: "#b2ebf2" },
-      "#28a745": { bg: "#dcfce7", text: "#15803d", border: "#bbf7d0" },
-      "#6c757d": { bg: "#f1f5f9", text: "#475569", border: "#e2e8f0" },
-    };
-    return (
-      byColor[statusInfo.color] || {
-        bg: "#f1f5f9",
-        text: statusInfo.color,
-        border: "#e2e8f0",
-      }
-    );
+  const getStatusPillStyle = (statusInfo) => getStatusPillStyleFromColor(statusInfo.color);
+
+  const getModerationStatusIcon = (status) => {
+    if (status === 'approved') return FaCheck;
+    if (status === 'rejected') return FaXmark;
+    if (status === 'pending') return FaClock;
+    return FaCircleQuestion;
   };
 
   const openCreateModal = useCallback(() => {
@@ -812,7 +741,8 @@ const ReportsPage = () => {
 
                     <tbody>
                       {paginatedReports.map((report, index) => {
-                      const statusInfo = getStatusInfo(report);
+                      const moderationInfo = getReportModerationDisplay(report, t);
+                      const validationSubline = getReportValidationSubline(report, t);
 
                       const rel =
                         getReporterReliability(report.reporter_id) ??
@@ -823,11 +753,11 @@ const ReportsPage = () => {
 
                       const levelInfo = getFloodLevelInfo(report.flood_level);
 
-                      const statusPill = getStatusPillStyle(statusInfo);
+                      const statusPill = getStatusPillStyle(moderationInfo);
 
                       const LevelIcon = levelInfo.icon;
 
-                      const StatusIcon = statusInfo.icon;
+                      const StatusIcon = getModerationStatusIcon(moderationInfo.status);
 
                       const rowKey =
                         report.id != null
@@ -906,20 +836,27 @@ const ReportsPage = () => {
                           </td>
 
                           <td>
-                            <span
-                              className="reports-status-pill"
-                              style={{
-                                background: statusPill.bg,
+                            <div className="reports-status-cell">
+                              <span
+                                className="reports-status-pill"
+                                style={{
+                                  background: statusPill.bg,
 
-                                color: statusPill.text,
+                                  color: statusPill.text,
 
-                                border: `1px solid ${statusPill.border}`,
-                              }}
-                            >
-                              <StatusIcon style={{ fontSize: "0.75rem" }} />
+                                  border: `1px solid ${statusPill.border}`,
+                                }}
+                              >
+                                <StatusIcon style={{ fontSize: "0.75rem" }} />
 
-                              {statusInfo.text}
-                            </span>
+                                {moderationInfo.text}
+                              </span>
+                              {validationSubline ? (
+                                <span className="reports-validation-subline">
+                                  {validationSubline}
+                                </span>
+                              ) : null}
+                            </div>
                           </td>
 
                           <td>
@@ -954,7 +891,7 @@ const ReportsPage = () => {
                           </td>
 
                           <td>
-                            {report.verified_by_sensor ? (
+                            {isReportValidationBySensor(report) ? (
                               <span className="reports-sensor-tag">
                                 <FaCheck style={{ fontSize: "0.7rem" }} />
 

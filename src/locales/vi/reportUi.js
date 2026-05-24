@@ -21,10 +21,15 @@ export default {
     moderation: {
       rejected: 'Đã từ chối',
       approved: 'Đã duyệt',
-      pending: 'Chờ xét duyệt',
+      pending: 'Chờ duyệt',
       verified: 'Đã xác minh',
       cross_verified: 'Đã xác minh chéo',
       unknown: 'Không xác định',
+    },
+    validation: {
+      cross_verified: 'Xác minh chéo',
+      verified: 'Đã xác minh',
+      not_cross_verified: 'Chưa xác minh chéo',
     },
     confidence: {
       veryHigh: 'Rất cao',

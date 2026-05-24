@@ -11,6 +11,11 @@ import { useReporterRanking } from '../../context/ReporterRankingProvider';
 import ReportEvaluationWidget from '../reports/ReportEvaluationWidget';
 import SensorForecastSection from './SensorForecastSection';
 import ConfidenceBadge from '../common/ConfidenceBadge';
+import {
+  getReportModerationDisplay,
+  getReportValidationSubline,
+  isReportValidationBySensor
+} from '../../utils/reportDisplayStatus';
 
 const SensorDetailPanel = ({ sensor, crowdReport }) => {
   const { t, i18n } = useTranslation();
@@ -74,25 +79,15 @@ const SensorDetailPanel = ({ sensor, crowdReport }) => {
 
   // Đang chọn báo cáo người dân
   if (crowdReport) {
-    const moderationStatus = crowdReport.moderation_status;
-    let statusInfo = { color: '#6c757d', text: t('reportUi.moderation.unknown') };
-    if (moderationStatus === 'approved') {
-      const levelColors = { 'Nặng': '#dc3545', 'Trung bình': '#ffc107', 'Nhẹ': '#17a2b8' };
-      statusInfo = {
-        color: crowdReport.flood_level && levelColors[crowdReport.flood_level] ? levelColors[crowdReport.flood_level] : '#28a745',
-        text: t('reportUi.moderation.approved')
-      };
-    } else if (moderationStatus === 'rejected') {
-      statusInfo = { color: '#dc3545', text: t('reportUi.moderation.rejected') };
-    } else {
-      const displayStatus = moderationStatus === 'pending' || !moderationStatus ? crowdReport.validation_status : moderationStatus;
-      const statusConfig = {
-        pending: { color: '#ffc107', text: t('reportUi.moderation.pending') },
-        verified: { color: '#17a2b8', text: t('reportUi.moderation.verified') },
-        cross_verified: { color: '#28a745', text: t('reportUi.moderation.cross_verified') }
-      };
-      statusInfo = crowdReport.verified_by_sensor ? statusConfig.cross_verified : (statusConfig[displayStatus] || statusInfo);
-    }
+    const moderationInfo = getReportModerationDisplay(crowdReport, t);
+    const validationSubline = getReportValidationSubline(crowdReport, t);
+    const levelColors = { 'Nặng': '#dc3545', 'Trung bình': '#ffc107', 'Nhẹ': '#17a2b8' };
+    const levelColor =
+      crowdReport.moderation_status === 'approved' &&
+      crowdReport.flood_level &&
+      levelColors[crowdReport.flood_level]
+        ? levelColors[crowdReport.flood_level]
+        : moderationInfo.color;
     const floodLevelDesc = t(`reportUi.floodDepth.${crowdReport.flood_level}`, { defaultValue: crowdReport.flood_level });
 
     return (
@@ -124,7 +119,7 @@ const SensorDetailPanel = ({ sensor, crowdReport }) => {
           </div>
           <div className="sensor-detail-item sensor-detail-water-level">
             <span className="sensor-detail-label"><WiFlood style={{ marginRight: '6px' }} /> {t('reportUi.floodLevel')}</span>
-            <span className="sensor-detail-value" style={{ color: statusInfo.color, fontWeight: 'bold' }}>
+            <span className="sensor-detail-value" style={{ color: levelColor, fontWeight: 'bold' }}>
               {crowdReport.flood_level || '—'}
             </span>
           </div>
@@ -134,9 +129,16 @@ const SensorDetailPanel = ({ sensor, crowdReport }) => {
           </div>
           <div className="sensor-detail-item">
             <span className="sensor-detail-label">{t('reportUi.status')}</span>
-            <span className="sensor-detail-value" style={{ color: statusInfo.color }}>{statusInfo.text}</span>
+            <span className="sensor-detail-value" style={{ color: moderationInfo.color }}>
+              {moderationInfo.text}
+              {validationSubline ? (
+                <span style={{ display: 'block', fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+                  {validationSubline}
+                </span>
+              ) : null}
+            </span>
           </div>
-          {crowdReport.verified_by_sensor && (
+          {isReportValidationBySensor(crowdReport) && (
             <div className="sensor-detail-item" style={{ color: '#28a745', fontSize: '13px' }}>
               <FaCheck style={{ marginRight: '6px' }} /> {t('reportUi.sensorVerified')}
             </div>
