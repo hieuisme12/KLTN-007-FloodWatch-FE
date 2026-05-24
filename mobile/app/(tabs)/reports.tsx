@@ -16,11 +16,12 @@ import {
   type CrowdReport,
   fetchAllReports,
   formatReportDate,
-  FLOOD_LEVEL_COLORS,
+  getFloodLevelLabel,
   getReportContent,
   MODERATION_COLORS,
   MODERATION_LABELS
 } from '../../src/lib/reportsApi';
+import { getFloodLevelColor } from '../../src/lib/floodLevels';
 import { colors } from '../../src/theme';
 
 type FilterKey = 'all' | 'pending' | 'approved' | 'rejected';
@@ -150,7 +151,7 @@ function ReportRow({
   const mod = report.moderation_status ?? '';
   const modColor = MODERATION_COLORS[mod] ?? colors.textMuted;
   const modLabel = MODERATION_LABELS[mod] ?? mod;
-  const levelColor = FLOOD_LEVEL_COLORS[report.flood_level ?? ''] ?? colors.primary;
+  const levelColor = getFloodLevelColor(report.flood_level, colors.primary);
   const snippet = getReportContent(report);
 
   return (
@@ -159,7 +160,7 @@ function ReportRow({
         <Text style={styles.rowId}>#{report.id}</Text>
         <View style={[styles.levelPill, { backgroundColor: `${levelColor}22` }]}>
           <Text style={[styles.levelText, { color: levelColor }]}>
-            {report.flood_level || '—'}
+            {getFloodLevelLabel(report.flood_level)}
           </Text>
         </View>
       </View>

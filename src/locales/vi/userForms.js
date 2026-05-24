@@ -3,11 +3,11 @@ export default {
   newReport: {
     levelPick: '-- Chọn mức độ --',
     floodLevel: {
-      'Mức 1': 'Mức 1 - 10 cm',
-      'Mức 2': 'Mức 2 - 20 cm',
-      'Mức 3': 'Mức 3 - 30 cm',
-      'Mức 4': 'Mức 4 - 40 cm',
-      'Mức 5': 'Mức 5 - trên 50 cm',
+      level1: 'Mức 1 - 10 cm',
+      level2: 'Mức 2 - 20 cm',
+      level3: 'Mức 3 - 30 cm',
+      level4: 'Mức 4 - 40 cm',
+      level5: 'Mức 5 - trên 50 cm',
     },
     errName: 'Vui lòng nhập tên của bạn (ít nhất 2 ký tự) hoặc đăng nhập để dùng tên tài khoản.',
     errLevel: 'Vui lòng chọn mức độ ngập hợp lệ',

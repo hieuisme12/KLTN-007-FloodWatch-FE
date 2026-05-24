@@ -5,7 +5,8 @@ import { isAuthenticated } from '../../utils/auth';
 import {
   FLOOD_LEVELS,
   isValidFloodLevel,
-  normalizeFloodLevel
+  normalizeFloodLevel,
+  getFloodLevelLabel
 } from '../../utils/floodLevels';
 import {
   buildReportSubmitSuccessCopy,
@@ -105,7 +106,7 @@ export default function ChatReportDraftCard({ draft, onSubmitted }) {
               disabled={submitting}
               onClick={() => setSelectedLevel(level.value)}
             >
-              {t(`reportUi.floodDepth.${level.value}`, { defaultValue: level.label })}
+              {getFloodLevelLabel(level.value, t)}
             </button>
           );
         })}

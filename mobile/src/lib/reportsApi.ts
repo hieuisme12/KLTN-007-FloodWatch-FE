@@ -2,6 +2,9 @@ import axios from 'axios';
 import { API_ENDPOINTS } from '@hcm-flood/shared';
 import { apiClient } from './api';
 import { getReportContent, getReportPhotoUrls } from './mediaUrl';
+import { FLOOD_LEVEL_COLORS } from './floodLevels';
+
+export { FLOOD_LEVEL_COLORS, getFloodLevelLabel } from './floodLevels';
 
 export type ModerationStatus = 'pending' | 'approved' | 'rejected' | string;
 
@@ -91,10 +94,4 @@ export const MODERATION_COLORS: Record<string, string> = {
   pending: '#b45309',
   approved: '#047857',
   rejected: '#b91c1c'
-};
-
-export const FLOOD_LEVEL_COLORS: Record<string, string> = {
-  Nặng: '#dc2626',
-  'Trung bình': '#ca8a04',
-  Nhẹ: '#0891b2'
 };

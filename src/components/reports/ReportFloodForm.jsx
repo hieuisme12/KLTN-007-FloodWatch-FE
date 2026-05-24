@@ -238,7 +238,7 @@ const ReportFloodForm = ({ onSuccess, onClose }) => {
             options={floodLevelOptions}
             optionLabel="name"
             optionValue="id"
-            placeholder="Chọn mức độ ngập"
+            placeholder={t('newReport.levelPh')}
             className="filter-dropdown-toolbar w-full"
           />
         </div>

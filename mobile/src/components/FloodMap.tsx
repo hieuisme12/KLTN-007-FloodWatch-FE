@@ -5,6 +5,7 @@ import * as Location from 'expo-location';
 import { HCM_MAP_CENTER } from '@hcm-flood/shared';
 import type { MapCrowdReport, MapSensor } from '../lib/mapApi';
 import { crowdReportColor, SENSOR_MARKER_COLORS } from '../lib/mapColors';
+import { getFloodLevelLabel } from '../lib/floodLevels';
 import { colors } from '../theme';
 
 const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN?.trim() ?? '';
@@ -102,13 +103,13 @@ export default function FloodMap({ sensors, reports }: Props) {
             coordinate={{ latitude: r.lat, longitude: r.lng }}
             pinColor={crowdReportColor(r.flood_level)}
             title="Báo cáo người dân"
-            description={r.flood_level ?? 'Ngập'}
+            description={getFloodLevelLabel(r.flood_level) || 'Ngập'}
           >
             <Callout>
               <View style={styles.callout}>
                 <Text style={styles.calloutTitle}>Báo cáo người dân</Text>
                 {r.flood_level ? (
-                  <Text style={styles.calloutMeta}>Mức ngập: {r.flood_level}</Text>
+                  <Text style={styles.calloutMeta}>Mức ngập: {getFloodLevelLabel(r.flood_level)}</Text>
                 ) : null}
                 {r.reporter_name ? (
                   <Text style={styles.calloutMeta}>Người báo: {r.reporter_name}</Text>

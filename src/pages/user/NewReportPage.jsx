@@ -22,8 +22,7 @@ import SearchAutoComplete from '../../components/common/SearchAutoComplete';
 import { searchAddressSuggestionsInHcm, fetchAddressFromCoords, resolveGeocodePlaceSelection, clearGeocodeAutocompleteSessionToken } from '../../utils/geocode';
 import {
   getFloodLevelDropdownOptions,
-  isValidFloodLevel,
-  getFloodLevelLabel
+  isValidFloodLevel
 } from '../../utils/floodLevels';
 import {
   buildReportSubmitSuccessCopy,

@@ -15,6 +15,7 @@ import {
   MODERATION_COLORS,
   MODERATION_LABELS
 } from '../lib/reportsApi';
+import { getFloodLevelLabel } from '../lib/floodLevels';
 import { colors } from '../theme';
 
 type Props = {
@@ -54,7 +55,7 @@ export default function ReportDetailSheet({ visible, report, onClose }: Props) {
             <Field label="Địa chỉ" value={address} />
             <Field label="Người báo cáo" value={report.reporter_name || 'Ẩn danh'} />
             <Field label="Thời gian" value={formatReportDate(report.created_at)} />
-            <Field label="Mức ngập" value={report.flood_level || '—'} accent />
+            <Field label="Mức ngập" value={getFloodLevelLabel(report.flood_level)} accent />
             {report.confidence != null ? (
               <Field label="Độ tin" value={`${report.confidence}/100`} />
             ) : null}

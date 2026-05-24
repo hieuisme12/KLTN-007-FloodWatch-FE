@@ -18,12 +18,12 @@ import SensorMarker from '../../components/map/SensorMarker';
 import ErrorToast from '../../components/common/ErrorToast';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import { CancelButton, ConfirmButton, PrimaryButton } from '../../components/common/Button';
-import { Edit03, Trash01 } from '@untitledui/icons';
 import { ButtonGroup, ButtonGroupItem } from '@/components/base/button-group/button-group';
 import { cn } from '@/lib/cn';
 import {
   FaLink,
   FaTrash,
+  FaPenToSquare,
   FaLocationCrosshairs,
   FaMagnifyingGlass,
   FaXmark,
@@ -1379,14 +1379,14 @@ export default function EmergencyAlertsPage() {
                             <ButtonGroup selectedKeys={new Set()} className="shrink-0">
                               <ButtonGroupItem
                                 id={`edit-${sub.id}`}
-                                iconLeading={Edit03}
+                                iconLeading={FaPenToSquare}
                                 onPress={() => openEditModal(sub)}
                               >
                                 {t('emergency.editDetails')}
                               </ButtonGroupItem>
                               <ButtonGroupItem
                                 id={`delete-${sub.id}`}
-                                iconLeading={Trash01}
+                                iconLeading={FaTrash}
                                 onPress={() => removeSub(sub.id)}
                               >
                                 {t('emergency.delete')}

@@ -3,11 +3,11 @@ export default {
   newReport: {
     levelPick: '-- Select flood level --',
     floodLevel: {
-      'Mức 1': 'Level 1 — 10 cm',
-      'Mức 2': 'Level 2 — 20 cm',
-      'Mức 3': 'Level 3 — 30 cm',
-      'Mức 4': 'Level 4 — 40 cm',
-      'Mức 5': 'Level 5 — over 50 cm',
+      level1: 'Level 1 — 10 cm',
+      level2: 'Level 2 — 20 cm',
+      level3: 'Level 3 — 30 cm',
+      level4: 'Level 4 — 40 cm',
+      level5: 'Level 5 — over 50 cm',
     },
     errName: 'Please enter your name (at least 2 characters) or sign in to use your account name.',
     errLevel: 'Please select a valid flood level',

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { FLOOD_LEVELS } from '../../utils/floodLevels';
+import { FLOOD_LEVELS, getFloodLevelLabel } from '../../utils/floodLevels';
 
 export default function FloodLevelLegend({ style }) {
   const { t } = useTranslation();
@@ -20,7 +20,7 @@ export default function FloodLevelLegend({ style }) {
               aria-hidden
             />
             <span className="flood-level-legend__label">
-              {t(`reportUi.floodDepth.${level.value}`, { defaultValue: level.label })}
+              {getFloodLevelLabel(level.value, t)}
             </span>
           </li>
         ))}
