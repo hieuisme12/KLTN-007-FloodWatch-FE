@@ -25,7 +25,7 @@ export function pickDisplayLabel(field, t) {
     const key = field.key;
     if (key && typeof t === 'function' && DISPLAY_KEY_I18N[key]) {
       const translated = t(DISPLAY_KEY_I18N[key], { defaultValue: '' });
-      if (translated) return field.hint ? `${translated} (${field.hint})` : translated;
+      if (translated) return translated;
     }
     if (typeof field.label === 'string') {
       const s = field.label.trim();
