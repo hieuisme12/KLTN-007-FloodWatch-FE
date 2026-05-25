@@ -116,6 +116,7 @@ function buildRouteGeoJSON(result) {
   const nearLimitIds = new Set(
     Array.isArray(avoided.near_limit_edge_ids) ? avoided.near_limit_edge_ids : []
   );
+  const maxDepth = result?.vehicle?.maxWadingDepthCm || 10;
   const features = segments
     .map((seg, idx) => {
       const lineCoords = segmentLineCoordinates(seg);
@@ -132,10 +133,12 @@ function buildRouteGeoJSON(result) {
         if (blockedIds.has(edgeId)) status = 'blocked';
         else if (nearLimitIds.has(edgeId)) status = 'near_limit';
       }
+      // depthRatio: 0 = dry, 0-0.5 = light flood, 0.5-1 = near limit
+      const depthRatio = depthCm != null && depthCm > 0 ? Math.min(depthCm / maxDepth, 1) : 0;
       return {
         type: 'Feature',
         id: `seg-${idx}`,
-        properties: { idx, edgeId, depthCm, status },
+        properties: { idx, edgeId, depthCm, depthRatio, status },
         geometry: { type: 'LineString', coordinates: lineCoords }
       };
     })
@@ -193,9 +196,9 @@ export default function RoutingPage() {
   const { t, i18n } = useTranslation();
   const transportTabs = useMemo(
     () => [
-      { id: 'motorbike', label: t('routing.vehicleMotorbike'), icon: FaMotorcycle, note: t('routing.tabMotorbikeNote') },
-      { id: 'car', label: t('routing.vehicleCar'), icon: FaCarSide, note: t('routing.tabCarNote') },
-      { id: 'suv', label: t('routing.vehicleSuv'), icon: FaTruck, note: t('routing.tabSuvNote') }
+      { id: 'motorbike', label: t('routing.vehicleMotorbike'), icon: FaMotorcycle, note: 'max 10cm' },
+      { id: 'car', label: t('routing.vehicleCar'), icon: FaCarSide, note: 'max 20cm' },
+      { id: 'suv', label: t('routing.vehicleSuv'), icon: FaTruck, note: 'max 40cm' }
     ],
     [t]
   );
@@ -1368,12 +1371,42 @@ export default function RoutingPage() {
           */}
 
           <div className="border-t border-[#e8eaed] px-4 py-3">
-            {result && !found && (
-              <div className="mt-2 rounded-md border border-[#f9ab00] bg-[#fef7e0] px-2 py-1.5 text-xs text-[#5f370e]">
-                {t('routing.noSafeRoute')}
+            {result && found && (
+              <div className="space-y-2">
+                <div className="rounded-lg border border-[#d2e3fc] bg-[#e8f0fe] px-3 py-2.5">
+                  <div className="mb-1 text-xs font-medium text-[#1a73e8]">
+                    {vehicleName && vehicleMaxDepthCm != null
+                      ? t('routing.routeForVehicle', { name: vehicleName, depth: vehicleMaxDepthCm })
+                      : t('routing.routeFound')}
+                  </div>
+                  <div className="flex items-center gap-4 text-sm font-semibold text-[#202124]">
+                    <span>{distanceKm != null ? `${numberFormatter.format(distanceKm)} km` : '—'}</span>
+                    <span className="text-[#5f6368]">·</span>
+                    <span>{etaMin != null ? t('routing.minutesShort', { n: etaMin }) : '—'}</span>
+                  </div>
+                  {result.avoided && (
+                    <div className="mt-1.5 text-xs text-[#5f6368]">
+                      {t('routing.avoidedSegments', {
+                        blocked: Array.isArray(result.avoided.blocked_edge_ids) ? result.avoided.blocked_edge_ids.length : 0,
+                        nearLimit: Array.isArray(result.avoided.near_limit_edge_ids) ? result.avoided.near_limit_edge_ids.length : 0
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
-            <button type="button" onClick={() => setShowAdvancedInfo((v) => !v)} className="mt-2 hidden text-[11px] text-[#5f6368] underline">
+            {result && !found && (
+              <div className="space-y-2">
+                <div className="rounded-md border border-[#f9ab00] bg-[#fef7e0] px-3 py-2 text-xs text-[#5f370e]">
+                  <div className="font-medium">{t('routing.noSafeRouteTitle', { name: vehicleName || t('routing.vehicleMotorbike') })}</div>
+                  <div className="mt-1">{result.reason || t('routing.noSafeRouteDesc')}</div>
+                </div>
+                <div className="rounded-md border border-[#e8eaed] bg-[#f8f9fa] px-3 py-2 text-xs text-[#5f6368]">
+                  💡 {t('routing.noSafeRouteSuggestion')}
+                </div>
+              </div>
+            )}
+            <button type="button" onClick={() => setShowAdvancedInfo((v) => !v)} className="mt-2 text-[11px] text-[#5f6368] underline">
               {showAdvancedInfo ? t('routing.hideTech') : t('routing.showTech')}
             </button>
             {showAdvancedInfo && (
@@ -1470,13 +1503,18 @@ export default function RoutingPage() {
                     }}
                   />
                   <Layer
-                    id="route-normal"
+                    id={ROUTE_NORMAL_LAYER_ID}
                     type="line"
                     beforeId={ROUTE_BEFORE_LAYER_ID}
                     filter={['==', ['get', 'status'], 'normal']}
                     layout={{ 'line-join': 'round', 'line-cap': 'round' }}
                     paint={{
-                      'line-color': '#3b82f6',
+                      'line-color': [
+                        'interpolate', ['linear'], ['get', 'depthRatio'],
+                        0, '#4CAF50',
+                        0.5, '#FFEB3B',
+                        1, '#FF9800'
+                      ],
                       'line-width': 10,
                       'line-opacity': 0.98
                     }}
@@ -1488,9 +1526,10 @@ export default function RoutingPage() {
                     filter={['==', ['get', 'status'], 'near_limit']}
                     layout={{ 'line-join': 'round', 'line-cap': 'round' }}
                     paint={{
-                      'line-color': '#6b7280',
+                      'line-color': '#FF9800',
                       'line-width': 10,
-                      'line-opacity': 0.95
+                      'line-opacity': 0.95,
+                      'line-dasharray': [2, 1]
                     }}
                   />
                   <Layer
@@ -1500,9 +1539,10 @@ export default function RoutingPage() {
                     filter={['==', ['get', 'status'], 'blocked']}
                     layout={{ 'line-join': 'round', 'line-cap': 'round' }}
                     paint={{
-                      'line-color': '#6b7280',
+                      'line-color': '#F44336',
                       'line-width': 10,
-                      'line-opacity': 0.95
+                      'line-opacity': 0.9,
+                      'line-dasharray': [1, 1]
                     }}
                   />
                 </Source>
