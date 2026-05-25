@@ -7,7 +7,7 @@ export default {
     reportList: 'Danh sách báo cáo',
     mapDetail: 'Bản đồ chi tiết',
     routing: 'Tìm đường',
-    reports: 'Báo cáo',
+    reports: 'Phản ánh',
     newReport: 'Báo cáo mới',
     emergency: 'Cảnh báo khẩn',
     guestMode: 'Chế độ khách',
