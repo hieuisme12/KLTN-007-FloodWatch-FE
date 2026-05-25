@@ -3,15 +3,32 @@
  * Ưu tiên label từ BE (`display_moderation` / `display_validation`), fallback i18n.
  */
 
-export function pickDisplayLabel(field) {
+const DISPLAY_KEY_I18N = {
+  auto_approved: 'reportUi.displayKey.auto_approved',
+  pending_manual_only: 'reportUi.displayKey.pending_manual_only',
+  pending_near_auto: 'reportUi.displayKey.pending_near_auto',
+  cross_verified: 'reportUi.displayKey.cross_verified',
+  no_sensor: 'reportUi.displayKey.no_sensor',
+  pending: 'reportUi.displayKey.pending',
+  not_cross_verified: 'reportUi.displayKey.not_cross_verified',
+};
+
+export function pickDisplayLabel(field, t) {
   if (field == null) return null;
   if (typeof field === 'string') {
     const s = field.trim();
     return s || null;
   }
-  if (typeof field === 'object' && typeof field.label === 'string') {
-    const s = field.label.trim();
-    return s || null;
+  if (typeof field === 'object') {
+    const key = field.key;
+    if (key && typeof t === 'function' && DISPLAY_KEY_I18N[key]) {
+      const translated = t(DISPLAY_KEY_I18N[key], { defaultValue: '' });
+      if (translated) return field.hint ? `${translated} (${field.hint})` : translated;
+    }
+    if (typeof field.label === 'string') {
+      const s = field.label.trim();
+      return s || null;
+    }
   }
   return null;
 }
@@ -31,7 +48,7 @@ const MODERATION_COLORS = {
 /** Tầng chính: Chờ duyệt / Đã duyệt / Đã từ chối */
 export function getReportModerationDisplay(report, t) {
   const status = report?.moderation_status || 'pending';
-  const label = pickDisplayLabel(report?.display_moderation);
+  const label = pickDisplayLabel(report?.display_moderation, t);
   const fallbackKey = MODERATION_FALLBACK_KEYS[status] || 'reportUi.moderation.unknown';
   return {
     status,
@@ -44,7 +61,7 @@ export function getReportModerationDisplay(report, t) {
 export function getReportValidationSubline(report, t) {
   const mod = report?.moderation_status || 'pending';
   const val = report?.validation_status;
-  const label = pickDisplayLabel(report?.display_validation);
+  const label = pickDisplayLabel(report?.display_validation, t);
 
   if (label) return label;
 

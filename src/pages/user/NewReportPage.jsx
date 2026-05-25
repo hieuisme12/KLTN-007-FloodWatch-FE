@@ -599,10 +599,10 @@ export function NewReportForm({ onCancel, onSuccess }) {
                   <div style={{ marginTop: '8px' }}>
                     {buildReportSubmitSuccessCopy(result, t)}
                   </div>
-                  {(pickDisplayLabel(result.data?.display_validation) ||
+                  {(pickDisplayLabel(result.data?.display_validation, t) ||
                     getReportValidationSubline(result.data, t)) && (
                     <div style={{ marginTop: '8px', fontSize: '13px', color: '#92400e' }}>
-                      {pickDisplayLabel(result.data?.display_validation) ||
+                      {pickDisplayLabel(result.data?.display_validation, t) ||
                         getReportValidationSubline(result.data, t)}
                     </div>
                   )}

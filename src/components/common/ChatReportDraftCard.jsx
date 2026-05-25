@@ -66,10 +66,10 @@ export default function ChatReportDraftCard({ draft, onSubmitted }) {
           {t('newReport.successTitle')}
         </p>
         <p>{buildReportSubmitSuccessCopy(result, t)}</p>
-        {(pickDisplayLabel(result.data?.display_validation) ||
+        {(pickDisplayLabel(result.data?.display_validation, t) ||
           getReportValidationSubline(result.data, t)) && (
           <p className="chatbot-draft__validation-sub">
-            {pickDisplayLabel(result.data?.display_validation) ||
+            {pickDisplayLabel(result.data?.display_validation, t) ||
               getReportValidationSubline(result.data, t)}
           </p>
         )}

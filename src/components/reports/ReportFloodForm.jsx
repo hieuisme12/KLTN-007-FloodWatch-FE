@@ -314,10 +314,10 @@ const ReportFloodForm = ({ onSuccess, onClose }) => {
             <FaClock style={{ marginRight: '6px' }} />{' '}
             <strong>{t('newReport.successTitle')}</strong>{' '}
             {buildReportSubmitSuccessCopy(result, t)}
-            {(pickDisplayLabel(result.data?.display_validation) ||
+            {(pickDisplayLabel(result.data?.display_validation, t) ||
               getReportValidationSubline(result.data, t)) && (
               <div style={{ marginTop: '6px', fontSize: '12px' }}>
-                {pickDisplayLabel(result.data?.display_validation) ||
+                {pickDisplayLabel(result.data?.display_validation, t) ||
                   getReportValidationSubline(result.data, t)}
               </div>
             )}

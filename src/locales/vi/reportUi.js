@@ -32,6 +32,15 @@ export default {
       verified: 'Đã xác minh',
       not_cross_verified: 'Chưa xác minh chéo',
     },
+    displayKey: {
+      auto_approved: 'Tự động duyệt',
+      pending_manual_only: 'Chờ duyệt thủ công',
+      pending_near_auto: 'Gần tự động duyệt',
+      cross_verified: 'Xác minh chéo',
+      no_sensor: 'Không có cảm biến gần',
+      pending: 'Chờ duyệt',
+      not_cross_verified: 'Chưa xác minh chéo',
+    },
     confidence: {
       veryHigh: 'Rất cao',
       high: 'Cao',

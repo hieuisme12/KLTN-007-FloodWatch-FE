@@ -32,6 +32,15 @@ export default {
       verified: 'Verified',
       not_cross_verified: 'Not cross-verified',
     },
+    displayKey: {
+      auto_approved: 'Auto-approved',
+      pending_manual_only: 'Pending manual review',
+      pending_near_auto: 'Near auto-approval',
+      cross_verified: 'Cross-verified',
+      no_sensor: 'No nearby sensor',
+      pending: 'Pending',
+      not_cross_verified: 'Not cross-verified',
+    },
     confidence: {
       veryHigh: 'Very high',
       high: 'High',
