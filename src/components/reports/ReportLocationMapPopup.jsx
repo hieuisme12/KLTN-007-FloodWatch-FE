@@ -180,9 +180,10 @@ export default function ReportLocationMapPopup({
                     hoveredSensorId={hoveredSensorId}
                     onHoverChange={setHoveredSensorId}
                     onZoomTo={() => {
-                      const { lat, lng } = getSensorDisplayPosition(item);
+                      const pos = getSensorDisplayPosition(item);
+                      if (!pos) return;
                       const map = mapRef.current?.getMap?.() ?? mapRef.current;
-                      if (map?.flyTo) map.flyTo({ center: [lng, lat], zoom: 16, duration: 800 });
+                      if (map?.flyTo) map.flyTo({ center: [pos.lng, pos.lat], zoom: 16, duration: 800 });
                     }}
                   />
                 );

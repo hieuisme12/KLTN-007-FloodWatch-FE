@@ -2,7 +2,9 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaPaperPlane, FaXmark } from 'react-icons/fa6';
 import ChatMessageContent from './ChatMessageContent';
-import { fetchTopFloodStations, postChatMessage } from '../../services/chatApi';
+import ChatReportDraftCard from './ChatReportDraftCard';
+import { confirmChatReport, fetchTopFloodStations, postChatMessage } from '../../services/chatApi';
+import { isAuthenticated } from '../../utils/auth';
 import { normalizeChatText } from '../../utils/chatMessageFormat';
 import {
   getChatAccountId,
@@ -11,7 +13,6 @@ import {
 } from '../../utils/chatAccountId';
 import { getCurrentUser } from '../../utils/auth';
 import { API_CONFIG } from '../../config/apiConfig';
-import ChatReportDraftCard from './ChatReportDraftCard';
 import { extractReportDraft } from '../../utils/floodLevels';
 
 const QUICK_KEYS = ['sensors', 'situation', 'mapHelp'];
@@ -123,6 +124,9 @@ export default function ChatBot() {
   });
   const [inputMessage, setInputMessage] = useState('');
   const [sending, setSending] = useState(false);
+  const [confirmingReport, setConfirmingReport] = useState(false);
+  const [reportDraft, setReportDraft] = useState(null);
+  const [confirmError, setConfirmError] = useState('');
   const [topStations, setTopStations] = useState([]);
   const messagesScrollRef = useRef(null);
   const accountIdRef = useRef(getChatAccountId());
@@ -161,7 +165,7 @@ export default function ChatBot() {
   useEffect(() => {
     if (!isOpen) return;
     scrollToBottom(messages.length <= 2 ? 'auto' : 'smooth');
-  }, [messages, isOpen, sending, scrollToBottom]);
+  }, [messages, isOpen, sending, confirmingReport, reportDraft, scrollToBottom]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -187,6 +191,8 @@ export default function ChatBot() {
 
       setMessages((prev) => [...prev, userMsg]);
       setInputMessage('');
+      setReportDraft(null);
+      setConfirmError('');
       setSending(true);
 
       const result = await postChatMessage({
@@ -217,8 +223,73 @@ export default function ChatBot() {
       const next = [...historyForApi, modelMsg];
       setMessages(next);
       saveChatHistory(next);
+
+      const meta = result.meta;
+      const draft = meta?.report_draft;
+      const isCreateReport =
+        meta?.intent === 'create_report' ||
+        draft?.intent === 'create_report';
+      if (isCreateReport && draft?.ready === true) {
+        setReportDraft(draft);
+      } else {
+        setReportDraft(null);
+      }
     },
     [messages, sending, t]
+  );
+
+  const handleConfirmReport = useCallback(
+    async ({ guestName } = {}) => {
+      if (!reportDraft?.ready || confirmingReport || sending) return;
+
+      if (!isAuthenticated()) {
+        const name = (guestName || '').trim();
+        if (name.length < 2) {
+          setConfirmError(t('chatbot.reportDraft.guestNameRequired'));
+          return;
+        }
+      }
+
+      setConfirmError('');
+      setConfirmingReport(true);
+
+      const body = {
+        level: reportDraft.level,
+        lat: reportDraft.lat,
+        lng: reportDraft.lng,
+        location_description:
+          reportDraft.formatted_address || reportDraft.location_description || undefined,
+        ...(reportDraft.content ? { content: reportDraft.content } : {})
+      };
+      if (!isAuthenticated() && guestName) {
+        body.name = guestName.trim();
+      }
+
+      const result = await confirmChatReport(body);
+      setConfirmingReport(false);
+
+      if (!result.success) {
+        setConfirmError(result.error || t('chatbot.reportDraft.confirmFail'));
+        return;
+      }
+
+      setReportDraft(null);
+      const confirmReply = normalizeChatText(
+        result.reply || t('chatbot.reportDraft.confirmOk', { id: result.data?.id ?? '—' })
+      );
+      setMessages((prev) => {
+        const next = [...prev, { role: 'model', content: confirmReply }];
+        saveChatHistory(next);
+        return next;
+      });
+
+      if (result.data) {
+        window.dispatchEvent(
+          new CustomEvent('floodsight:crowd-report-created', { detail: result.data })
+        );
+      }
+    },
+    [reportDraft, confirmingReport, sending, t]
   );
 
   const handleSend = () => sendText(inputMessage);
@@ -238,7 +309,16 @@ export default function ChatBot() {
     const welcome = buildWelcomeMessages(t);
     setMessages(welcome);
     saveChatHistory([]);
+    setReportDraft(null);
+    setConfirmError('');
   };
+
+  const handleDismissDraft = () => {
+    setReportDraft(null);
+    setConfirmError('');
+  };
+
+  const showDraftCard = reportDraft?.ready === true;
 
   if (!isOpen) {
     return (
@@ -308,7 +388,7 @@ export default function ChatBot() {
               key={key}
               type="button"
               className="chatbot-quick-chip"
-              disabled={sending}
+              disabled={sending || confirmingReport}
               onClick={() => handleQuick(key)}
             >
               {t(`chatbot.quick.${key}`)}
@@ -382,6 +462,21 @@ export default function ChatBot() {
               </div>
             </div>
           ) : null}
+          {showDraftCard ? (
+            <div className="chatbot-draft-card-wrap">
+              <ChatReportDraftCard
+                draft={reportDraft}
+                confirming={confirmingReport}
+                onConfirm={handleConfirmReport}
+                onDismiss={handleDismissDraft}
+              />
+              {confirmError ? (
+                <p className="chatbot-draft-card__error" role="alert">
+                  {confirmError}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -390,7 +485,7 @@ export default function ChatBot() {
           type="button"
           className="chatbot-clear"
           onClick={handleClear}
-          disabled={sending}
+          disabled={sending || confirmingReport}
         >
           {t('chatbot.clear')}
         </button>
@@ -402,14 +497,14 @@ export default function ChatBot() {
             onChange={(e) => setInputMessage(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={t('chatbot.placeholder')}
-            disabled={sending}
+            disabled={sending || confirmingReport}
             maxLength={2000}
           />
           <button
             type="button"
             className="chatbot-send"
             onClick={handleSend}
-            disabled={sending || !inputMessage.trim()}
+            disabled={sending || confirmingReport || !inputMessage.trim()}
             aria-label={t('chatbot.sendAria')}
           >
             <FaPaperPlane className="chatbot-send__icon" aria-hidden />

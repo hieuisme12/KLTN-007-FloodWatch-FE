@@ -121,6 +121,8 @@ export const API_ENDPOINTS = {
 
   /** Chat AI Gemini — public (JWT tuỳ chọn) */
   CHAT: '/api/chat',
+  /** Xác nhận nháp báo cáo từ chat (logic giống POST /api/report-flood) */
+  CHAT_CONFIRM_REPORT: '/api/chat/confirm-report',
   /** Snapshot sensor cho widget / chat context */
   FLOOD_STATUS: '/api/flood-status',
 
@@ -143,10 +145,12 @@ export const POLLING_INTERVALS = {
 // Báo cáo cộng đồng: số giờ hiển thị trên bản đồ, sau đó coi là hết hạn (ẩn khỏi map)
 export const CROWD_REPORT_MAP_DISPLAY_HOURS = 24;
 
-// Default values
+// Default values (ngưỡng 5 mức từ BE)
 export const DEFAULTS = {
   WARNING_THRESHOLD: 10,
+  ELEVATED_THRESHOLD: 20,
   DANGER_THRESHOLD: 30,
+  CRITICAL_THRESHOLD: 50,
   DEFAULT_LAT: 10.776,
   DEFAULT_LNG: 106.701
 };

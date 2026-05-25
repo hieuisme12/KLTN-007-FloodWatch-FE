@@ -63,7 +63,14 @@ const DashboardPage = () => {
 
     loadCrowdReports();
     const interval = setInterval(loadCrowdReports, POLLING_INTERVALS.CROWD_REPORTS);
-    return () => clearInterval(interval);
+    const onReportCreated = () => {
+      void loadCrowdReports();
+    };
+    window.addEventListener('floodsight:crowd-report-created', onReportCreated);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('floodsight:crowd-report-created', onReportCreated);
+    };
   }, []);
 
   const nonExpiredCrowdReports = filterNonExpiredReports(crowdReports, CROWD_REPORT_MAP_DISPLAY_HOURS);

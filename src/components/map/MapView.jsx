@@ -789,9 +789,7 @@ const MapView = ({
   // Tự động zoom đến vùng có sensor khi load trang (lần đầu có floodData)
   useEffect(() => {
     if (hasFittedSensorBounds.current || !floodData?.length) return;
-    const points = floodData
-      .map((s) => getSensorDisplayPosition(s))
-      .filter((p) => p.lat != null && p.lng != null);
+    const points = floodData.map((s) => getSensorDisplayPosition(s)).filter(Boolean);
     if (points.length === 0) return;
     const lats = points.map((p) => p.lat);
     const lngs = points.map((p) => p.lng);
@@ -974,6 +972,7 @@ const MapView = ({
           </Source>
         )}
         {floodData.map((item, index) => {
+          if (!getSensorDisplayPosition(item)) return null;
           const status = item.status || 'normal';
           const color = statusColors[status] || statusColors.normal;
           const sensorId = item.sensor_id || `sensor-${index}`;

@@ -173,6 +173,20 @@ export default {
     closeAria: 'Close chat',
     sendAria: 'Send',
     errorGeneric: 'Could not send message. Try again.',
+    reportDraft: {
+      title: 'Flood report draft',
+      address: 'Address',
+      level: 'Flood level',
+      description: 'Description',
+      coords: 'Coordinates',
+      guestName: 'Your name',
+      guestNamePh: 'Enter name (guest)',
+      confirm: 'Confirm and submit',
+      dismiss: 'Cancel / Edit',
+      confirmOk: 'Report #{{id}} submitted and pending review.',
+      confirmFail: 'Could not submit report. Try again.',
+      guestNameRequired: 'Enter your name (at least 2 characters) or sign in.'
+    },
     quick: {
       sensors: 'Which stations are flooded?',
       situation: 'Flood situation in HCMC?',

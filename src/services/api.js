@@ -193,8 +193,7 @@ const normalizeFloodData = (data) => {
     const warningThreshold = item.warning_threshold || DEFAULTS.WARNING_THRESHOLD;
     const dangerThreshold = item.danger_threshold || DEFAULTS.DANGER_THRESHOLD;
 
-    // Realtime thường gửi `sensor_status` (online/offline) mà không gửi `status`.
-    // Trước đây chỉ dùng `item.status` → thiếu thì fallback 'normal' → mọi cảm biến bị coi là online (sóng pulse).
+    // 5 mức status từ BE: normal, warning, elevated, danger, critical + offline
     let status = item.status;
     if (status == null || status === '') {
       status = item.sensor_status;
@@ -205,15 +204,21 @@ const normalizeFloodData = (data) => {
         status = 'offline';
       } else if (t === 'online' || t === 'connected' || t === 'active' || t === 'live') {
         status = null;
-      } else if (t === 'normal' || t === 'warning' || t === 'danger') {
+      } else if (['normal', 'warning', 'elevated', 'danger', 'critical'].includes(t)) {
         status = t;
       }
     }
 
-    // Tính từ mực nước khi chưa có mức ngập (fallback cũ hoặc realtime chỉ gửi online/offline chung)
+    // Fallback: tính từ mực nước khi BE không gửi status rõ ràng
     if (!status) {
-      if (waterLevel >= dangerThreshold) {
+      const criticalThreshold = item.critical_threshold || 50;
+      const elevatedThreshold = item.elevated_threshold || 20;
+      if (waterLevel >= criticalThreshold) {
+        status = 'critical';
+      } else if (waterLevel >= dangerThreshold) {
         status = 'danger';
+      } else if (waterLevel >= elevatedThreshold) {
+        status = 'elevated';
       } else if (waterLevel >= warningThreshold) {
         status = 'warning';
       } else {
@@ -233,10 +238,12 @@ const normalizeFloodData = (data) => {
       water_level: waterLevel,
       velocity: velocity,
       status,
-      lng: item.lng || DEFAULTS.DEFAULT_LNG,
-      lat: item.lat || DEFAULTS.DEFAULT_LAT,
+      lng: item.lng ?? item.longitude ?? null,
+      lat: item.lat ?? item.latitude ?? null,
       warning_threshold: warningThreshold,
+      elevated_threshold: item.elevated_threshold || 20,
       danger_threshold: dangerThreshold,
+      critical_threshold: item.critical_threshold || 50,
       last_data_time: item.last_data_time || item.created_at,
       created_at: item.created_at || new Date().toISOString(),
       temperature: item.temperature ?? null,
@@ -255,13 +262,13 @@ export const fetchFloodData = async (endpointRef) => {
 
     if (endpointRef.current === null) {
       try {
-        response = await tryRealtime(API_ENDPOINTS.FLOOD_DATA_REALTIME);
+        response = await tryRealtime(API_ENDPOINTS.FLOOD_DATA_REALTIME_V1);
         if (response.status === 200) {
-          endpointRef.current = 'realtime';
+          endpointRef.current = 'realtime_v1';
         } else if (response.status === 404) {
-          response = await tryRealtime(API_ENDPOINTS.FLOOD_DATA_REALTIME_V1);
+          response = await tryRealtime(API_ENDPOINTS.FLOOD_DATA_REALTIME);
           if (response.status === 200) {
-            endpointRef.current = 'realtime_v1';
+            endpointRef.current = 'realtime';
           } else {
             endpointRef.current = 'fallback';
             response = await apiClient.get(`${API_ENDPOINTS.FLOOD_DATA}?t=${Date.now()}`);
@@ -276,10 +283,10 @@ export const fetchFloodData = async (endpointRef) => {
       }
     } else {
       const path =
-        endpointRef.current === 'realtime'
-          ? API_ENDPOINTS.FLOOD_DATA_REALTIME
-          : endpointRef.current === 'realtime_v1'
-            ? API_ENDPOINTS.FLOOD_DATA_REALTIME_V1
+        endpointRef.current === 'realtime_v1'
+          ? API_ENDPOINTS.FLOOD_DATA_REALTIME_V1
+          : endpointRef.current === 'realtime'
+            ? API_ENDPOINTS.FLOOD_DATA_REALTIME
             : API_ENDPOINTS.FLOOD_DATA;
       response = await apiClient.get(`${path}?t=${Date.now()}`);
     }

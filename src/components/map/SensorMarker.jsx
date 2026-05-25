@@ -28,7 +28,9 @@ const SensorMarker = ({
   reportHoverId
 }) => {
   const { t } = useTranslation();
-  const { lat, lng } = getSensorDisplayPosition(item);
+  const position = getSensorDisplayPosition(item);
+  const lat = position?.lat;
+  const lng = position?.lng;
   const overrideAddress = getSensorDisplayAddress(item);
   const displayName = getSensorDisplayName(item);
   const [geocodeAddress, setGeocodeAddress] = useState(null);
@@ -114,6 +116,8 @@ const SensorMarker = ({
       setHoveredPopup(false);
     }
   }, [isControlledReport, hoveredSensorId]);
+
+  if (!position) return null;
 
   return (
     <>

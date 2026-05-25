@@ -173,6 +173,20 @@ export default {
     closeAria: 'Đóng chat',
     sendAria: 'Gửi',
     errorGeneric: 'Không gửi được tin nhắn. Thử lại sau.',
+    reportDraft: {
+      title: 'Nháp báo cáo ngập',
+      address: 'Địa chỉ',
+      level: 'Mức ngập',
+      description: 'Mô tả',
+      coords: 'Tọa độ',
+      guestName: 'Tên của bạn',
+      guestNamePh: 'Nhập tên (khách)',
+      confirm: 'Xác nhận gửi báo cáo',
+      dismiss: 'Hủy / Sửa',
+      confirmOk: 'Đã gửi báo cáo #{{id}}, trạng thái chờ duyệt.',
+      confirmFail: 'Không gửi được báo cáo. Thử lại.',
+      guestNameRequired: 'Vui lòng nhập tên (ít nhất 2 ký tự) hoặc đăng nhập.'
+    },
     quick: {
       sensors: 'Trạm nào đang ngập?',
       situation: 'Tình hình ngập TP.HCM?',

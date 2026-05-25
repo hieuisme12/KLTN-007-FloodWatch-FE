@@ -96,6 +96,68 @@ export async function fetchFloodStatusSnapshot(params = {}) {
   }
 }
 
+/**
+ * Xác nhận gửi báo cáo từ nháp chat (meta.report_draft khi ready: true).
+ * @param {{ level: string, lat: number, lng: number, location_description?: string, content?: string, name?: string, photo_url?: string, photo_urls?: string[] }} body
+ */
+export async function confirmChatReport(body) {
+  const level = typeof body.level === 'string' ? body.level.trim() : '';
+  const lat = Number(body.lat);
+  const lng = Number(body.lng);
+
+  if (!['Nhẹ', 'Trung bình', 'Nặng'].includes(level)) {
+    return { success: false, error: 'Mức ngập không hợp lệ', status: 400 };
+  }
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return { success: false, error: 'Thiếu tọa độ vị trí', status: 400 };
+  }
+
+  const payload = {
+    level,
+    lat,
+    lng,
+    ...(body.location_description
+      ? { location_description: String(body.location_description).trim() }
+      : {}),
+    ...(body.content ? { content: String(body.content).trim().slice(0, 500) } : {}),
+    ...(body.name ? { name: String(body.name).trim() } : {}),
+    ...(body.photo_url ? { photo_url: body.photo_url } : {}),
+    ...(Array.isArray(body.photo_urls) && body.photo_urls.length > 0
+      ? { photo_urls: body.photo_urls }
+      : {})
+  };
+
+  try {
+    const { data, status } = await chatClient.post(API_ENDPOINTS.CHAT_CONFIRM_REPORT, payload);
+
+    if (data?.success) {
+      return {
+        success: true,
+        reply: normalizeChatText(data.reply || data.message || ''),
+        data: data.data ?? null
+      };
+    }
+
+    return {
+      success: false,
+      error: data?.error || data?.message || 'Không gửi được báo cáo',
+      status
+    };
+  } catch (err) {
+    const status = err.response?.status;
+    const bodyErr = err.response?.data;
+    const error =
+      bodyErr?.error ||
+      bodyErr?.message ||
+      (status === 429
+        ? 'Bạn gửi quá nhiều báo cáo. Vui lòng thử lại sau.'
+        : status === 400
+          ? bodyErr?.error || 'Dữ liệu báo cáo không hợp lệ.'
+          : err.message || 'Không kết nối được server.');
+    return { success: false, error, status };
+  }
+}
+
 /** Top trạm theo mực nước (cm) — hiển thị khi mở chat. */
 export async function fetchTopFloodStations(limit = 3) {
   const res = await fetchFloodStatusSnapshot({ limit: 50 });

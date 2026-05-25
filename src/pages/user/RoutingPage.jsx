@@ -54,10 +54,57 @@ const toNum = (x) => {
 
 const pickLngLat = (obj, prefix = '') => {
   if (!obj || typeof obj !== 'object') return null;
-  const lng = toNum(obj[`${prefix}lng`] ?? obj[`${prefix}longitude`] ?? obj.lng ?? obj.longitude);
-  const lat = toNum(obj[`${prefix}lat`] ?? obj[`${prefix}latitude`] ?? obj.lat ?? obj.latitude);
+  const lng = toNum(
+    obj[`${prefix}lng`] ??
+      obj[`${prefix}lon`] ??
+      obj[`${prefix}longitude`] ??
+      (prefix ? undefined : obj.lng ?? obj.lon ?? obj.longitude)
+  );
+  const lat = toNum(
+    obj[`${prefix}lat`] ??
+      obj[`${prefix}latitude`] ??
+      (prefix ? undefined : obj.lat ?? obj.latitude)
+  );
   if (lng == null || lat == null) return null;
   return [lng, lat];
+};
+
+const pickSegmentEndpoint = (seg, role) => {
+  if (!seg || typeof seg !== 'object') return null;
+  if (role === 'from') {
+    return (
+      pickLngLat(seg.from || seg.start) ||
+      (() => {
+        const lng = toNum(seg.from_lng ?? seg.start_lng);
+        const lat = toNum(seg.from_lat ?? seg.start_lat);
+        return lng != null && lat != null ? [lng, lat] : null;
+      })()
+    );
+  }
+  return (
+    pickLngLat(seg.to || seg.end) ||
+    (() => {
+      const lng = toNum(seg.to_lng ?? seg.end_lng);
+      const lat = toNum(seg.to_lat ?? seg.end_lat);
+      return lng != null && lat != null ? [lng, lat] : null;
+    })()
+  );
+};
+
+const segmentLineCoordinates = (seg) => {
+  const raw =
+    (Array.isArray(seg?.coordinates) && seg.coordinates) ||
+    (Array.isArray(seg?.geometry?.coordinates) && seg.geometry.coordinates);
+  if (raw?.length >= 2) {
+    const coords = raw
+      .map((c) => (Array.isArray(c) && c.length >= 2 ? [toNum(c[0]), toNum(c[1])] : pickLngLat(c)))
+      .filter((c) => c && c[0] != null && c[1] != null);
+    if (coords.length >= 2) return coords;
+  }
+  const from = pickSegmentEndpoint(seg, 'from');
+  const to = pickSegmentEndpoint(seg, 'to');
+  if (!from || !to) return null;
+  return [from, to];
 };
 
 function buildRouteGeoJSON(result) {
@@ -71,9 +118,8 @@ function buildRouteGeoJSON(result) {
   );
   const features = segments
     .map((seg, idx) => {
-      const from = pickLngLat(seg.from || seg.start || seg, '');
-      const to = pickLngLat(seg.to || seg.end || seg, '');
-      if (!from || !to) return null;
+      const lineCoords = segmentLineCoordinates(seg);
+      if (!lineCoords || lineCoords.length < 2) return null;
       const edgeId =
         seg.edge_id ?? seg.id ?? seg.edge ?? seg.edgeId ?? seg.segment_id ?? null;
       const rawDepth =
@@ -90,7 +136,7 @@ function buildRouteGeoJSON(result) {
         type: 'Feature',
         id: `seg-${idx}`,
         properties: { idx, edgeId, depthCm, status },
-        geometry: { type: 'LineString', coordinates: [from, to] }
+        geometry: { type: 'LineString', coordinates: lineCoords }
       };
     })
     .filter(Boolean);
@@ -764,11 +810,12 @@ export default function RoutingPage() {
     }
     if (!option) return;
 
+    const optionLng = option.lng ?? option.lon;
     const coordsReady =
       option.lat != null &&
-      option.lng != null &&
+      optionLng != null &&
       Number.isFinite(Number(option.lat)) &&
-      Number.isFinite(Number(option.lng));
+      Number.isFinite(Number(optionLng));
     const needsPlace = option.place_id && !coordsReady;
 
     let resolved = option;

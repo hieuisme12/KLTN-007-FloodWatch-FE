@@ -315,7 +315,7 @@ export function NewReportForm({ onCancel, onSuccess }) {
       const list = res.data.filter((s) => s.lat != null && s.lng != null);
       if (list.length === 0) return;
       setSensors(list);
-      const points = list.map((s) => getSensorDisplayPosition(s));
+      const points = list.map((s) => getSensorDisplayPosition(s)).filter(Boolean);
       const lats = points.map((p) => p.lat);
       const lngs = points.map((p) => p.lng);
       const minLat = Math.min(...lats);

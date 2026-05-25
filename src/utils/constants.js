@@ -1,16 +1,20 @@
-// Màu sắc theo trạng thái
+// Màu sắc theo trạng thái (5 mức BE + offline)
 export const statusColors = {
-  normal: '#28a745',    // Xanh lá
-  warning: '#ffc107',   // Vàng
-  danger: '#dc3545',    // Đỏ
-  offline: '#6c757d',   // Xám
+  normal: '#4CAF50',
+  warning: '#FFEB3B',
+  elevated: '#FF9800',
+  danger: '#F44336',
+  critical: '#B71C1C',
+  offline: '#6c757d',
 };
 
-// Nhãn trạng thái (không có icon, icon sẽ được xử lý ở component)
+// Nhãn trạng thái
 export const statusLabels = {
   normal: 'Bình thường',
   warning: 'Cảnh báo',
+  elevated: 'Nâng cao',
   danger: 'Nguy hiểm',
+  critical: 'Nghiêm trọng',
   offline: 'Mất kết nối'
 };
 
