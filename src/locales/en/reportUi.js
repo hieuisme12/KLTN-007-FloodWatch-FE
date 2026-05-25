@@ -79,7 +79,7 @@ export default {
       criticalThreshold: 'Critical threshold',
       station: 'Station',
       liveBadge: 'LIVE',
-      offlineBadge: 'Off live',
+      offlineBadge: 'OFFLINE',
       na: 'N/A',
     },
     confidenceBadge: {

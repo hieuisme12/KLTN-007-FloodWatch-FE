@@ -201,11 +201,11 @@ const SensorDetailPanel = ({ sensor, crowdReport }) => {
         <div className="sensor-detail-status-badge">
           {isOnline ? (
             <span className="sensor-live-badge">
-              <FaCircle style={{ color: '#dc3545', fontSize: '12px' }} /> {t('reportUi.sensorPanel.liveBadge')}
+              <FaCircle style={{ color: '#dc3545', fontSize: '10px' }} />{t('reportUi.sensorPanel.liveBadge')}
             </span>
           ) : (
             <span className="sensor-offline-badge">
-              <FaCircle style={{ color: '#6c757d', fontSize: '12px' }} /> {t('reportUi.sensorPanel.offlineBadge')}
+              <FaCircle style={{ color: '#6c757d', fontSize: '10px' }} />{t('reportUi.sensorPanel.offlineBadge')}
             </span>
           )}
         </div>

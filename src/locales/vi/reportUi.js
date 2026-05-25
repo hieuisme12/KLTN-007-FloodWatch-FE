@@ -79,7 +79,7 @@ export default {
       criticalThreshold: 'Ngưỡng nghiêm trọng',
       station: 'Trạm',
       liveBadge: 'LIVE',
-      offlineBadge: 'Off live',
+      offlineBadge: 'OFFLINE',
       na: 'N/A',
     },
     confidenceBadge: {
