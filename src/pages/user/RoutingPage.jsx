@@ -381,8 +381,13 @@ export default function RoutingPage() {
         case 'sensor_flood_radius_m':
           formatted = Number.isFinite(num) ? t('routing.unitMeters', { n: num }) : String(v);
           break;
+        case 'sensor_flood_decay': {
+          const decayMap = { linear: 'Tuyến tính', plateau: 'Bậc thang' };
+          formatted = decayMap[String(v)] || String(v);
+          break;
+        }
         default:
-          formatted = String(v);
+          formatted = Number.isFinite(num) ? String(num) : String(v);
       }
       return {
         label: floodSourceLabels[k] || k,
@@ -1409,14 +1414,21 @@ export default function RoutingPage() {
             <button type="button" onClick={() => setShowAdvancedInfo((v) => !v)} className="mt-2 text-[11px] text-[#5f6368] underline">
               {showAdvancedInfo ? t('routing.hideTech') : t('routing.showTech')}
             </button>
-            {showAdvancedInfo && (
+            {showAdvancedInfo && result && (
               <div className="mt-2 space-y-1 text-[11px] text-[#5f6368]">
-                <div>Segments: {Array.isArray(result?.route?.segments) ? result.route.segments.length : 0}</div>
-                <div>Nodes: {nodePathCount}</div>
-                <div>Start node: {startNodeInfo.id} | End node: {endNodeInfo.id}</div>
-                {vehicleName && <div>Vehicle: {vehicleName}</div>}
-                {vehicleMaxDepthCm != null && <div>Max depth: {numberFormatter.format(Number(vehicleMaxDepthCm))} cm</div>}
-                {floodSourcesSummary.length > 0 && <div>Flood sources: {floodSourcesSummary.length}</div>}
+                <div>{t('routing.techSegments')}: {Array.isArray(result?.route?.segments) ? result.route.segments.length : 0}</div>
+                <div>{t('routing.techNodes')}: {nodePathCount}</div>
+                <div>{t('routing.techStartNode')}: {startNodeInfo.id} | {t('routing.techEndNode')}: {endNodeInfo.id}</div>
+                {vehicleName && <div>{t('routing.techVehicle')}: {vehicleName}</div>}
+                {vehicleMaxDepthCm != null && <div>{t('routing.techMaxDepth')}: {numberFormatter.format(Number(vehicleMaxDepthCm))} cm</div>}
+                {floodSourcesSummary.length > 0 && (
+                  <div className="mt-1 space-y-0.5">
+                    <div className="font-medium">{t('routing.techFloodSources')}:</div>
+                    {floodSourcesSummary.map((item, i) => (
+                      <div key={i} className="ml-2">• {item.label}: {item.value}</div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
