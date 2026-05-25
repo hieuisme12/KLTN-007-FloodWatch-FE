@@ -28,12 +28,18 @@ const DashboardPage = () => {
     navigate(location.pathname, { replace: true, state: {} });
   }, [guestWelcome, location.pathname, navigate, openWelcome]);
 
-  // Tự động chọn sensor đầu tiên khi có dữ liệu (tránh setState đồng bộ trong effect)
+  // Khi floodData cập nhật từ polling: đồng bộ selectedSensor với dữ liệu mới nhất
   useEffect(() => {
-    if (floodData.length === 0 || selectedSensor) return;
-    const id = window.setTimeout(() => setSelectedSensor(floodData[0]), 0);
-    return () => window.clearTimeout(id);
-  }, [floodData, selectedSensor]);
+    if (floodData.length === 0) return;
+    if (!selectedSensor) {
+      const id = window.setTimeout(() => setSelectedSensor(floodData[0]), 0);
+      return () => window.clearTimeout(id);
+    }
+    const fresh = floodData.find((s) => s.sensor_id === selectedSensor.sensor_id);
+    if (fresh && fresh !== selectedSensor) {
+      setSelectedSensor(fresh);
+    }
+  }, [floodData]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const loadData = async () => {

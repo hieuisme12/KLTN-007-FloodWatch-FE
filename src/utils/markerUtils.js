@@ -38,13 +38,15 @@ export const createCustomIcon = (color, isBlinking = false) => {
 
 // Định dạng trạng thái (không có icon, icon sẽ được xử lý ở component)
 export const getStatusLabel = (status, t) => {
-  const keyMap = { normal: 'normal', warning: 'warning', danger: 'danger', offline: 'offline' };
+  const keyMap = { normal: 'normal', warning: 'warning', elevated: 'elevated', danger: 'danger', critical: 'critical', offline: 'offline' };
   const sub = keyMap[status];
   if (typeof t === 'function' && sub) return t(`reportUi.sensorStatus.${sub}`);
   const labels = {
     normal: 'Bình thường',
     warning: 'Cảnh báo',
+    elevated: 'Nâng cao',
     danger: 'Nguy hiểm',
+    critical: 'Nghiêm trọng',
     offline: 'Mất kết nối'
   };
   return labels[status] || (typeof t === 'function' ? t('reportUi.moderation.unknown') : 'Không xác định');

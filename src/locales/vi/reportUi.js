@@ -62,7 +62,9 @@ export default {
       temperature: 'Nhiệt độ',
       humidity: 'Độ ẩm',
       warningThreshold: 'Ngưỡng cảnh báo',
+      elevatedThreshold: 'Ngưỡng nâng cao',
       dangerThreshold: 'Ngưỡng nguy hiểm',
+      criticalThreshold: 'Ngưỡng nghiêm trọng',
       station: 'Trạm',
       liveBadge: 'LIVE',
       offlineBadge: 'Off live',
@@ -82,7 +84,9 @@ export default {
     sensorStatus: {
       normal: 'Bình thường',
       warning: 'Cảnh báo',
+      elevated: 'Nâng cao',
       danger: 'Nguy hiểm',
+      critical: 'Nghiêm trọng',
       offline: 'Mất kết nối',
     },
     velocity: {

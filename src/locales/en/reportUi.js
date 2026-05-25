@@ -62,7 +62,9 @@ export default {
       temperature: 'Temperature',
       humidity: 'Humidity',
       warningThreshold: 'Warning threshold',
+      elevatedThreshold: 'Elevated threshold',
       dangerThreshold: 'Danger threshold',
+      criticalThreshold: 'Critical threshold',
       station: 'Station',
       liveBadge: 'LIVE',
       offlineBadge: 'Off live',
@@ -82,7 +84,9 @@ export default {
     sensorStatus: {
       normal: 'Normal',
       warning: 'Warning',
+      elevated: 'Elevated',
       danger: 'Danger',
+      critical: 'Critical',
       offline: 'Offline',
     },
     velocity: {

@@ -259,8 +259,16 @@ const SensorDetailPanel = ({ sensor, crowdReport }) => {
           <span className="sensor-detail-value">{sensor.warning_threshold} cm</span>
         </div>
         <div className="sensor-detail-item">
+          <span className="sensor-detail-label">{t('reportUi.sensorPanel.elevatedThreshold')}:</span>
+          <span className="sensor-detail-value">{sensor.elevated_threshold} cm</span>
+        </div>
+        <div className="sensor-detail-item">
           <span className="sensor-detail-label">{t('reportUi.sensorPanel.dangerThreshold')}:</span>
           <span className="sensor-detail-value">{sensor.danger_threshold} cm</span>
+        </div>
+        <div className="sensor-detail-item">
+          <span className="sensor-detail-label">{t('reportUi.sensorPanel.criticalThreshold')}:</span>
+          <span className="sensor-detail-value">{sensor.critical_threshold} cm</span>
         </div>
         <div className="sensor-detail-item sensor-detail-location">
           <span className="sensor-detail-label">{t('reportUi.sensorPanel.station')}:</span>
