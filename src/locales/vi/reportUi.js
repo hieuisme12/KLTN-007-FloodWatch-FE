@@ -8,6 +8,7 @@ export default {
     coordLabel: 'Tọa độ: {{lat}}, {{lng}}',
     noLocationInfo: 'Không có thông tin vị trí',
     sensorVerified: 'Đã xác minh bởi hệ thống cảm biến',
+    sensorNotVerified: 'Chưa được xác minh bởi cảm biến',
     sensorLegend: 'Chấm tròn = vị trí cảm biến (báo cáo gần cảm biến sẽ được xác minh)',
     crowdReport: 'Báo cáo người dân',
     address: 'Địa chỉ:',

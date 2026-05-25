@@ -265,9 +265,13 @@ const CrowdReportPopupContent = ({ report, lat, lng, getReporterReliability }) =
           </>
         ) : null}
       </div>
-      {isReportValidationBySensor(report) && (
+      {isReportValidationBySensor(report) ? (
         <div style={{ marginBottom: '8px', padding: '6px', background: '#f0fff4', borderRadius: '4px', fontSize: '12px', color: '#28a745' }}>
           <FaCheck style={{ marginRight: '4px' }} /> {t('reportUi.sensorVerified')}
+        </div>
+      ) : (
+        <div style={{ marginBottom: '8px', padding: '6px', background: '#fef3c7', borderRadius: '4px', fontSize: '12px', color: '#92400e' }}>
+          <FaClock style={{ marginRight: '4px' }} /> {t('reportUi.sensorNotVerified')}
         </div>
       )}
       {getReporterReliability && (() => {

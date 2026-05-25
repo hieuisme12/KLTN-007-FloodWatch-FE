@@ -8,6 +8,7 @@ export default {
     coordLabel: 'Coordinates: {{lat}}, {{lng}}',
     noLocationInfo: 'No location information',
     sensorVerified: 'Verified by sensor system',
+    sensorNotVerified: 'Not verified by sensor',
     sensorLegend: 'Dots = sensor locations (reports near sensors get verified)',
     crowdReport: 'Crowd report',
     address: 'Address:',
