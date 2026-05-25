@@ -4,11 +4,12 @@ import { Dropdown } from 'primereact/dropdown';
 /**
  * Dropdown bộ lọc (PrimeReact). Mặc định **không** bật ô search trong panel (`filter={false}`).
  * Truyền `filter` nếu cần tìm trong danh sách dài.
+ * `appendTo="self"` — panel đi theo nút.
  */
 export default function FilterDropdown({
   filter = false,
   filterDelay = 400,
-  appendTo = document.body,
+  appendTo = 'self',
   className = '',
   panelClassName = '',
   ...rest
