@@ -33,6 +33,8 @@ export default {
       not_cross_verified: 'Chưa xác minh chéo',
     },
     displayKey: {
+      approved: 'Đã duyệt',
+      rejected: 'Đã từ chối',
       auto_approved: 'Tự động duyệt',
       pending_manual_only: 'Chờ duyệt thủ công',
       pending_near_auto: 'Gần tự động duyệt',

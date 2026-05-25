@@ -4,6 +4,8 @@
  */
 
 const DISPLAY_KEY_I18N = {
+  approved: 'reportUi.displayKey.approved',
+  rejected: 'reportUi.displayKey.rejected',
   auto_approved: 'reportUi.displayKey.auto_approved',
   pending_manual_only: 'reportUi.displayKey.pending_manual_only',
   pending_near_auto: 'reportUi.displayKey.pending_near_auto',

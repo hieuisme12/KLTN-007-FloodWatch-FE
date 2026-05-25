@@ -33,6 +33,8 @@ export default {
       not_cross_verified: 'Not cross-verified',
     },
     displayKey: {
+      approved: 'Approved',
+      rejected: 'Rejected',
       auto_approved: 'Auto-approved',
       pending_manual_only: 'Pending manual review',
       pending_near_auto: 'Near auto-approval',
