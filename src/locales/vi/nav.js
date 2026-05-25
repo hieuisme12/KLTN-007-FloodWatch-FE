@@ -8,7 +8,7 @@ export default {
     mapDetail: 'Bản đồ chi tiết',
     routing: 'Tìm đường',
     reports: 'Phản ánh',
-    newReport: 'Báo cáo mới',
+    newReport: 'Phản ánh mới',
     emergency: 'Cảnh báo khẩn',
     guestMode: 'Chế độ khách',
     admin: 'Quản trị viên',
