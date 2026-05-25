@@ -3,6 +3,22 @@ import { useTranslation } from 'react-i18next';
 import { getConfidenceTier } from '../../utils/scoringDisplay';
 import { cn } from '../../lib/cn';
 
+const BREAKDOWN_LABELS = {
+  base_reliability: 'Độ tin cậy cơ sở',
+  moderation_approved: 'Đã duyệt',
+  moderation_rejected: 'Bị từ chối',
+  sensor_cross_verified: 'Cảm biến xác minh',
+  sensor_not_verified: 'Chưa xác minh cảm biến',
+  time_recency: 'Độ mới theo thời gian',
+  photo_bonus: 'Có hình ảnh',
+  duplicate_penalty: 'Trùng lặp',
+  crowd_agreement: 'Đồng thuận cộng đồng',
+  reporter_reliability: 'Độ tin cậy người báo',
+  location_accuracy: 'Độ chính xác vị trí',
+  flood_level_match: 'Phù hợp mức ngập',
+  no_sensor_coverage: 'Không có cảm biến gần'
+};
+
 /**
  * Badge độ tin báo cáo (0–100). breakdown: object từ API (optional).
  */
@@ -45,7 +61,7 @@ export default function ConfidenceBadge({ confidence, breakdown, className = '',
             <ul className="m-0 max-w-full list-none rounded-lg border border-slate-200 bg-slate-50 p-2 text-[11px]">
               {entries.map(([k, v]) => (
                 <li key={k} className="flex justify-between gap-3 py-0.5">
-                  <span className="break-words text-slate-500">{k}</span>
+                  <span className="break-words text-slate-500">{BREAKDOWN_LABELS[k] || k.replace(/_/g, ' ')}</span>
                   <span className="shrink-0 font-semibold text-slate-900">
                     {Number(v) > 0 ? '+' : ''}
                     {Number(v).toFixed(1)}
