@@ -4,6 +4,15 @@ import { fetchForecastForSensor } from '../../services/api';
 import { formatForecastConfidence } from '../../utils/scoringDisplay';
 import { FaTriangleExclamation } from 'react-icons/fa6';
 
+const FORECAST_METHOD_LABELS = {
+  linear_trend: 'Xu hướng tuyến tính',
+  linear_regression: 'Hồi quy tuyến tính',
+  moving_average: 'Trung bình trượt',
+  exponential_smoothing: 'San mũ',
+  last_value: 'Giá trị cuối',
+  none: 'Không xác định'
+};
+
 export default function SensorForecastSection({ sensorId }) {
   const { t } = useTranslation();
   const [data, setData] = useState(null);
@@ -96,7 +105,7 @@ export default function SensorForecastSection({ sensorId }) {
           )}
           {data.method && (
             <p className="sensor-forecast-meta">
-              {t('reportUi.sensorForecast.method', { method: data.method })}
+              {t('reportUi.sensorForecast.method', { method: FORECAST_METHOD_LABELS[data.method] || data.method.replace(/_/g, ' ') })}
               {data.sample_count != null && t('reportUi.sensorForecast.samplesSuffix', { n: data.sample_count })}
               {data.span_minutes != null && t('reportUi.sensorForecast.spanSuffix', { n: data.span_minutes })}
             </p>
