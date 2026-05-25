@@ -6,7 +6,6 @@ import { fetchFloodData, fetchCrowdReports } from '../../services/api';
 import { POLLING_INTERVALS, CROWD_REPORT_MAP_DISPLAY_HOURS } from '../../config/apiConfig';
 import { filterNonExpiredReports } from '../../utils/reportHelpers';
 import MapView from '../../components/map/MapView';
-import ChatBot from '../../components/common/ChatBot';
 import SensorDetailPanel from '../../components/map/SensorDetailPanel';
 import WeatherNewsSection from '../../components/news/WeatherNewsSection';
 import { PrimaryButton } from '../../components/common/Button';
@@ -130,7 +129,6 @@ const DashboardPage = () => {
         <WeatherNewsSection />
       </div>
 
-      <ChatBot />
     </div>
   );
 };

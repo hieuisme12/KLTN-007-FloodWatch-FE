@@ -7,6 +7,7 @@ import { useSyncAuthLocation } from '@/hooks/useSyncAuthLocation';
 import Header from './Header';
 import Sidebar from './Sidebar';
 import Footer from './Footer';
+import ChatBot from '../common/ChatBot';
 
 function MainContent({ children }) {
   const { collapsed } = useSidebar();
@@ -54,6 +55,7 @@ function LayoutShell({ children }) {
       <Sidebar />
       <MainContent>{children}</MainContent>
       {!isRoutingPage && !isMapPage && <Footer />}
+      <ChatBot />
     </div>
   );
 }
