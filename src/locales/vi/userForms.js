@@ -111,6 +111,7 @@ export default {
     colCreated: 'Thời gian',
     colSensor: 'Cảm biến',
     sensorVerified: 'Đã xác nhận',
+    sensorNotVerified: 'Chưa xác nhận',
     sensorNone: '—',
     reliabilityLine: 'Độ tin cậy: {{tier}} ({{value}})',
     verifiedBySensorCard: 'Đã được xác nhận bởi cảm biến',

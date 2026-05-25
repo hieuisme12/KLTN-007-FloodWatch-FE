@@ -3137,6 +3137,11 @@ button.fs-btn--ghost:hover:not(:disabled) {
   border-radius: 999px;
 }
 
+.reports-sensor-tag--pending {
+  color: #92400e;
+  background: #fef3c7;
+}
+
 .reports-list-empty,
 .reports-list-loading {
   padding: 48px 24px;

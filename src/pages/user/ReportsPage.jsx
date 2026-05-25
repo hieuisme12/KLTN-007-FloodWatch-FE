@@ -866,12 +866,12 @@ const ReportsPage = () => {
                             {isReportValidationBySensor(report) ? (
                               <span className="reports-sensor-tag">
                                 <FaCheck style={{ fontSize: "0.7rem" }} />
-
                                 {t("reportsPage.sensorVerified")}
                               </span>
                             ) : (
-                              <span className="reports-reporter-meta">
-                                {t("reportsPage.sensorNone")}
+                              <span className="reports-sensor-tag reports-sensor-tag--pending">
+                                <FaClock style={{ fontSize: "0.7rem" }} />
+                                {t("reportsPage.sensorNotVerified")}
                               </span>
                             )}
                           </td>

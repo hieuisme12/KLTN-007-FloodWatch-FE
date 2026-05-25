@@ -111,6 +111,7 @@ export default {
     colCreated: 'Created',
     colSensor: 'Sensor',
     sensorVerified: 'Verified',
+    sensorNotVerified: 'Not verified',
     sensorNone: '—',
     reliabilityLine: 'Reliability: {{tier}} ({{value}})',
     verifiedBySensorCard: 'Confirmed by nearby sensor',

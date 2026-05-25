@@ -64,10 +64,9 @@ export function getReportValidationSubline(report, t) {
   return null;
 }
 
-/** Cột cảm biến = validation (xác minh chéo / cảm biến), không phải đã lên bản đồ */
+/** Cột cảm biến: chỉ "Đã xác nhận" khi sensor thực sự xác minh ngập phù hợp */
 export function isReportValidationBySensor(report) {
   if (!report) return false;
-  if (report.verified_by_sensor || report.sensor_verified) return true;
   return report.validation_status === 'cross_verified';
 }
 
