@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Animated, PanResponder, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import MapView, { Callout, Marker, Polyline, PROVIDER_DEFAULT } from 'react-native-maps';
+import MapView, { Callout, Marker, Polyline, PROVIDER_DEFAULT, UrlTile } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTabBarInset } from '../../src/constants/tabBarLayout';
@@ -13,6 +13,8 @@ import {
   type SafePathResponse
 } from '../../src/lib/routingApi';
 import { fetchMapCrowdReports, fetchMapSensors, type MapCrowdReport, type MapSensor } from '../../src/lib/mapApi';
+import { getMapboxTileUrl } from '../../src/lib/mapboxTiles';
+import { colors } from '../../src/theme';
 import { crowdReportColor, SENSOR_MARKER_COLORS } from '../../src/lib/mapColors';
 import { getFloodLevelLabel } from '../../src/lib/floodLevels';
 import RadarIcon from '../../src/components/RadarIcon';
@@ -295,6 +297,7 @@ export default function RoutingScreen() {
   const etaMinutes = Math.max(1, Math.round((result?.route?.total_cost_sec || 0) / 60));
   const distanceKm = ((result?.route?.total_distance_m || 0) / 1000).toFixed(1);
   const avoidedCount = result?.route?.avoided?.blocked_edge_ids?.length || 0;
+  const mapboxTileUrl = getMapboxTileUrl();
 
   return (
     <View style={styles.container}>
@@ -313,6 +316,10 @@ export default function RoutingScreen() {
           onMapPick(latitude, longitude);
         }}
       >
+        {mapboxTileUrl ? (
+          <UrlTile urlTemplate={mapboxTileUrl} maximumZ={20} flipY={false} />
+        ) : null}
+
         {userCoords ? (
           <Marker
             key="user-gps"
@@ -433,6 +440,14 @@ export default function RoutingScreen() {
             ))
           : null}
       </MapView>
+
+      {!mapboxTileUrl ? (
+        <View style={[styles.mapHint, { bottom: tabBarInset + 8 }]} pointerEvents="none">
+          <Text style={styles.mapHintText}>
+            Thêm EXPO_PUBLIC_MAPBOX_TOKEN trong mobile/.env để dùng nền Mapbox
+          </Text>
+        </View>
+      ) : null}
 
       <MapSheetNavBridge />
 
@@ -766,5 +781,15 @@ const styles = StyleSheet.create({
   },
   reportCallout: { minWidth: 160, maxWidth: 240 },
   reportTitle: { fontWeight: '700', fontSize: 14, marginBottom: 4, color: '#0f172a' },
-  reportMeta: { fontSize: 13, color: '#475569' }
+  reportMeta: { fontSize: 13, color: '#475569' },
+  mapHint: {
+    position: 'absolute',
+    left: 8,
+    right: 8,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    padding: 8,
+    borderRadius: 8,
+    zIndex: 1
+  },
+  mapHintText: { fontSize: 11, color: colors.textMuted, textAlign: 'center' }
 });

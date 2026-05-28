@@ -1,0 +1,32 @@
+{
+  "name": "FloodSight — Cảnh báo ngập TP.HCM",
+  "short_name": "FloodSight",
+  "description": "Theo dõi ngập lụt, báo cáo hiện trường và tìm đường an toàn tại TP.HCM.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0c4a6e",
+  "theme_color": "#0c4a6e",
+  "lang": "vi",
+  "icons": [
+    {
+      "src": "/logo_mini.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/logo_mini.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/logo_mini.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

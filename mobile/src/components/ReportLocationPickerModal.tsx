@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   Modal,
   Platform,
   Pressable,
@@ -7,16 +8,26 @@ import {
   Text,
   View
 } from 'react-native';
-import MapView, { Marker, PROVIDER_DEFAULT, type MapPressEvent } from 'react-native-maps';
+import MapView, { Marker, PROVIDER_DEFAULT, UrlTile, type MapPressEvent } from 'react-native-maps';
+import * as Location from 'expo-location';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HCM_MAP_CENTER } from '@hcm-flood/shared';
+import { fetchMapSensors, type MapSensor } from '../lib/mapApi';
+import { getMapboxTileUrl } from '../lib/mapboxTiles';
+import { curvedHeaderText } from './curvedTabScreen';
 import GradientPressable from './GradientPressable';
+import { MapSensorMarkers, MapUserGpsMarker } from './FloodMapMarkers';
+import TabHeaderGradient from './TabHeaderGradient';
 import { colors } from '../theme';
 
 type Props = {
   visible: boolean;
   initialLat?: number | null;
   initialLng?: number | null;
+  title?: string;
+  emptyHint?: string;
+  pinTitle?: string;
+  showGpsInFooter?: boolean;
   onClose: () => void;
   onConfirm: (lat: number, lng: number) => void;
 };
@@ -25,12 +36,22 @@ export default function ReportLocationPickerModal({
   visible,
   initialLat,
   initialLng,
+  title = 'Chọn vị trí trên bản đồ',
+  emptyHint = 'Chạm vào bản đồ để đánh dấu vị trí',
+  pinTitle = 'Vị trí đã chọn',
+  showGpsInFooter = false,
   onClose,
   onConfirm
 }: Props) {
   const insets = useSafeAreaInsets();
   const mapRef = useRef<MapView>(null);
   const [pin, setPin] = useState<{ lat: number; lng: number } | null>(null);
+  const [sensors, setSensors] = useState<MapSensor[]>([]);
+  const [userCoords, setUserCoords] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
+  const mapboxTileUrl = getMapboxTileUrl();
 
   useEffect(() => {
     if (!visible) return;
@@ -40,6 +61,36 @@ export default function ReportLocationPickerModal({
       setPin(null);
     }
   }, [visible, initialLat, initialLng]);
+
+  useEffect(() => {
+    if (!visible) return;
+    fetchMapSensors().then(setSensors).catch(() => {});
+  }, [visible]);
+
+  useEffect(() => {
+    if (!visible) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted' || cancelled) return;
+        const pos = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced
+        });
+        if (!cancelled) {
+          setUserCoords({
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude
+          });
+        }
+      } catch {
+        // GPS unavailable
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [visible]);
 
   function onMapPress(e: MapPressEvent) {
     const { latitude, longitude } = e.nativeEvent.coordinate;
@@ -52,9 +103,26 @@ export default function ReportLocationPickerModal({
     onClose();
   }
 
+  function handleUseGps() {
+    if (!userCoords) {
+      Alert.alert('Chưa có GPS', 'Không lấy được vị trí hiện tại. Hãy cấp quyền vị trí hoặc chọn trên bản đồ.');
+      return;
+    }
+    setPin({ lat: userCoords.latitude, lng: userCoords.longitude });
+    mapRef.current?.animateToRegion(
+      {
+        latitude: userCoords.latitude,
+        longitude: userCoords.longitude,
+        latitudeDelta: 0.02,
+        longitudeDelta: 0.02
+      },
+      400
+    );
+  }
+
   const region = {
-    latitude: pin?.lat ?? initialLat ?? HCM_MAP_CENTER.lat,
-    longitude: pin?.lng ?? initialLng ?? HCM_MAP_CENTER.lng,
+    latitude: pin?.lat ?? initialLat ?? userCoords?.latitude ?? HCM_MAP_CENTER.lat,
+    longitude: pin?.lng ?? initialLng ?? userCoords?.longitude ?? HCM_MAP_CENTER.lng,
     latitudeDelta: 0.06,
     longitudeDelta: 0.06
   };
@@ -69,12 +137,13 @@ export default function ReportLocationPickerModal({
             styles.header,
             {
               paddingTop: insets.top + 12,
-              paddingBottom: 14
+              paddingBottom: 16
             }
           ]}
         >
-          <Text style={styles.title} numberOfLines={2}>
-            Chọn vị trí trên bản đồ
+          <TabHeaderGradient />
+          <Text style={[curvedHeaderText.topTitle, styles.title]} numberOfLines={2}>
+            {title}
           </Text>
           <Pressable
             onPress={onClose}
@@ -92,28 +161,55 @@ export default function ReportLocationPickerModal({
             </Text>
           </View>
         ) : (
-          <MapView
-            ref={mapRef}
-            style={styles.map}
-            provider={PROVIDER_DEFAULT}
-            initialRegion={region}
-            onPress={onMapPress}
-          >
-            {pin ? (
-              <Marker
-                coordinate={{ latitude: pin.lat, longitude: pin.lng }}
-                title="Vị trí báo cáo"
-              />
+          <View style={styles.mapWrap}>
+            <MapView
+              ref={mapRef}
+              style={styles.map}
+              provider={PROVIDER_DEFAULT}
+              initialRegion={region}
+              showsUserLocation={false}
+              showsMyLocationButton={Platform.OS === 'android'}
+              toolbarEnabled={false}
+              onPress={onMapPress}
+            >
+              {mapboxTileUrl ? (
+                <UrlTile urlTemplate={mapboxTileUrl} maximumZ={20} flipY={false} />
+              ) : null}
+
+              <MapSensorMarkers sensors={sensors} keyPrefix="report-picker-sensor" />
+              <MapUserGpsMarker coords={userCoords} />
+
+              {pin ? (
+                <Marker
+                  coordinate={{ latitude: pin.lat, longitude: pin.lng }}
+                  pinColor="#dc2626"
+                  title={pinTitle}
+                  zIndex={10}
+                />
+              ) : null}
+            </MapView>
+
+            {!mapboxTileUrl ? (
+              <View style={styles.mapHint} pointerEvents="none">
+                <Text style={styles.mapHintText}>
+                  Thêm EXPO_PUBLIC_MAPBOX_TOKEN trong mobile/.env để dùng nền Mapbox
+                </Text>
+              </View>
             ) : null}
-          </MapView>
+          </View>
         )}
 
         <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
           <Text style={styles.hint}>
             {pin
               ? `Đã chọn: ${pin.lat.toFixed(5)}, ${pin.lng.toFixed(5)}`
-              : 'Chạm vào bản đồ để đánh dấu vị trí ngập'}
+              : emptyHint}
           </Text>
+          {showGpsInFooter ? (
+            <Pressable style={styles.gpsBtn} onPress={handleUseGps}>
+              <Text style={styles.gpsBtnText}>Lấy GPS hiện tại</Text>
+            </Pressable>
+          ) : null}
           <GradientPressable
             style={styles.confirmBtn}
             borderRadius={999}
@@ -134,21 +230,35 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     gap: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    backgroundColor: colors.primaryDark
+    overflow: 'hidden'
   },
-  title: { flex: 1, color: '#fff', fontSize: 16, fontWeight: '700' },
+  title: { flex: 1, fontSize: 20, zIndex: 1 },
   closeBtn: {
     paddingVertical: 8,
     paddingHorizontal: 4,
     minHeight: 40,
-    justifyContent: 'center'
+    justifyContent: 'center',
+    zIndex: 1
   },
-  close: { color: '#bae6fd', fontSize: 15, fontWeight: '600' },
+  close: {
+    color: 'rgba(255,255,255,0.92)',
+    fontSize: 15,
+    fontWeight: '600'
+  },
+  mapWrap: { flex: 1 },
   map: { flex: 1 },
+  mapHint: {
+    position: 'absolute',
+    left: 8,
+    right: 8,
+    bottom: 8,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    padding: 8,
+    borderRadius: 8
+  },
+  mapHintText: { fontSize: 11, color: colors.textMuted, textAlign: 'center' },
   webStub: {
     flex: 1,
     alignItems: 'center',
@@ -165,6 +275,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff'
   },
   hint: { fontSize: 13, color: colors.textMuted },
+  gpsBtn: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 999,
+    paddingVertical: 12,
+    alignItems: 'center',
+    backgroundColor: '#f8fafc'
+  },
+  gpsBtnText: { fontSize: 15, fontWeight: '600', color: colors.primary },
   confirmBtn: {
     paddingVertical: 14,
     width: '100%'

@@ -1,45 +1,53 @@
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
-import UserRoundCogIcon from './UserRoundCogIcon';
+import { Animated, StyleSheet, Text, View } from 'react-native';
 import { PROFILE_AVATAR_OUTER } from './ProfileAvatarBadge';
 import { PROFILE_HERO_TOP_GAP } from '../constants/profileScrollHeader';
 import { curvedTabScreen } from './curvedTabScreen';
 
 type Props = {
   name: string;
+  username: string;
   email: string;
   phone: string;
-  onPressEdit: () => void;
+  roleLabel: string;
   heroOpacity?: Animated.AnimatedInterpolation<number>;
 };
 
-/** Khoảng từ đầu scroll tới tên — avatar nằm trên mép body overlap */
-const HERO_OFFSET =
+const AVATAR_SPACER_HEIGHT =
   Math.abs(curvedTabScreen.bodyOverlap) + PROFILE_AVATAR_OUTER / 2 + PROFILE_HERO_TOP_GAP;
 
 export default function ProfilePersonalCard({
   name,
+  username,
   email,
   phone,
-  onPressEdit,
+  roleLabel,
   heroOpacity
 }: Props) {
   const heroFade = heroOpacity ?? 1;
+  const showUsername =
+    username.trim().length > 0 && username.trim().toLowerCase() !== name.trim().toLowerCase();
+
+  const rows: Array<{ label: string; value: string }> = [
+    { label: 'Họ và tên', value: name },
+    ...(showUsername ? [{ label: 'Tên đăng nhập', value: username }] : []),
+    { label: 'Email', value: email },
+    { label: 'Số điện thoại', value: phone },
+    { label: 'Vai trò', value: roleLabel }
+  ];
 
   return (
     <View style={styles.wrap}>
       <Animated.View style={[styles.heroText, { opacity: heroFade }]}>
         <Text style={styles.name}>{name}</Text>
-        <Text style={styles.subtitle}>{email}</Text>
       </Animated.View>
 
       <View style={styles.infoCard}>
-        <Pressable style={styles.editFab} onPress={onPressEdit} hitSlop={8}>
-          <UserRoundCogIcon size={18} color="#0f172a" strokeWidth={2} />
-        </Pressable>
-
-        <InfoRow label="Email" value={email} />
-        <View style={styles.divider} />
-        <InfoRow label="Số điện thoại" value={phone} />
+        {rows.map((row, index) => (
+          <View key={row.label}>
+            {index > 0 ? <View style={styles.divider} /> : null}
+            <InfoRow label={row.label} value={row.value} />
+          </View>
+        ))}
       </View>
     </View>
   );
@@ -60,7 +68,7 @@ const styles = StyleSheet.create({
   },
   heroText: {
     alignItems: 'center',
-    marginTop: HERO_OFFSET,
+    marginTop: AVATAR_SPACER_HEIGHT,
     marginBottom: 14,
     zIndex: 1
   },
@@ -68,12 +76,6 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '800',
     color: '#0f172a',
-    textAlign: 'center',
-    marginBottom: 4
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#64748b',
     textAlign: 'center'
   },
   infoCard: {
@@ -89,19 +91,7 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 3
   },
-  editFab: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(148,163,184,0.15)',
-    zIndex: 2
-  },
-  row: { gap: 4, paddingRight: 40 },
+  row: { gap: 4 },
   rowLabel: {
     fontSize: 12,
     fontWeight: '600',
@@ -116,6 +106,7 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: '#f1f5f9'
+    backgroundColor: '#f1f5f9',
+    marginBottom: 12
   }
 });

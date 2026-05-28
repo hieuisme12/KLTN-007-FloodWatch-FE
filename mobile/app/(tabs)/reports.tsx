@@ -6,6 +6,7 @@ import {
   Platform,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -139,14 +140,19 @@ export default function ReportsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterKey>('all');
   const [selected, setSelected] = useState<CrowdReport | null>(null);
+  const listFetchedRef = useRef(false);
 
   const load = useCallback(async (isRefresh = false) => {
-    if (isRefresh) setRefreshing(true);
-    else setLoading(true);
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     setError(null);
     try {
       const rows = await fetchAllReports();
       setReports(rows);
+      listFetchedRef.current = true;
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Không tải được báo cáo');
     } finally {
@@ -156,13 +162,11 @@ export default function ReportsScreen() {
   }, []);
 
   useEffect(() => {
-    if (mode !== 'list') return undefined;
-    void load();
-    const iv = setInterval(() => {
-      void load(true);
-    }, 15000);
-    return () => clearInterval(iv);
-  }, [load, mode]);
+    if (mode !== 'list') return;
+    if (!listFetchedRef.current) {
+      void load(false);
+    }
+  }, [mode, load]);
 
   const displayName = useMemo(
     () => pickDisplayName(user, isAuthenticated),
@@ -196,24 +200,32 @@ export default function ReportsScreen() {
       <View style={styles.bodySection}>
         <ReportModeTabs mode={mode} onModeChange={setMode} />
 
-        <View style={[styles.modePane, mode !== 'create' && styles.modePaneHidden]}>
-          <CreateReportForm onSuccess={() => setMode('list')} />
-        </View>
-        <View style={[styles.modePane, mode !== 'list' && styles.modePaneHidden]}>
-          <ReportsList
-            isAuthenticated={isAuthenticated}
-            router={router}
-            loading={loading}
-            refreshing={refreshing}
-            error={error}
-            reports={reports}
-            filter={filter}
-            onFilter={setFilter}
-            onLoad={load}
-            onSelect={setSelected}
-            tabBarInset={tabBarInset}
-          />
-        </View>
+        {mode === 'create' ? (
+          <View style={styles.modePane}>
+            <CreateReportForm
+              onSuccess={() => {
+                listFetchedRef.current = false;
+                setMode('list');
+              }}
+            />
+          </View>
+        ) : (
+          <View style={styles.modePane}>
+            <ReportsList
+              isAuthenticated={isAuthenticated}
+              router={router}
+              loading={loading}
+              refreshing={refreshing}
+              error={error}
+              reports={reports}
+              filter={filter}
+              onFilter={setFilter}
+              onLoad={load}
+              onSelect={setSelected}
+              tabBarInset={tabBarInset}
+            />
+          </View>
+        )}
       </View>
 
       <ReportDetailSheet
@@ -320,7 +332,13 @@ function ReportsList({
         />
       </View>
 
-      <View style={styles.filterRow}>
+      <ScrollView
+        horizontal
+        nestedScrollEnabled
+        showsHorizontalScrollIndicator={false}
+        style={styles.filterScroll}
+        contentContainerStyle={styles.filterScrollContent}
+      >
         {filterButtons.map((f) => {
           const active = filter === f.key;
           return (
@@ -335,7 +353,7 @@ function ReportsList({
             </Pressable>
           );
         })}
-      </View>
+      </ScrollView>
 
       <View style={styles.statsRow}>
         <View style={styles.statCard}>
@@ -363,10 +381,11 @@ function ReportsList({
     </View>
   );
 
-  const showInitialLoader = loading && reports.length === 0;
+  const showInitialLoader = loading && reports.length === 0 && !refreshing;
   const listEmpty = showInitialLoader ? (
-    <View style={styles.centered}>
+    <View style={styles.listEmptyLoader}>
       <ActivityIndicator size="large" color={colors.primary} />
+      <Text style={styles.listEmptyLoaderText}>Đang tải báo cáo…</Text>
     </View>
   ) : (
     <Text style={styles.empty}>
@@ -377,7 +396,7 @@ function ReportsList({
   return (
     <FlatList
       style={styles.listScreen}
-      data={showInitialLoader ? [] : filtered}
+      data={filtered}
       keyExtractor={(item) => String(item.id)}
       ListHeaderComponent={listHeader}
       refreshControl={
@@ -517,13 +536,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#2563eb'
   },
   modePane: { flex: 1 },
-  modePaneHidden: {
-    display: 'none',
-    flex: 0,
-    height: 0,
-    overflow: 'hidden'
-  },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  listEmptyLoader: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 32,
+    gap: 12
+  },
+  listEmptyLoaderText: { fontSize: 14, color: colors.textMuted },
   authBanner: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -554,19 +574,21 @@ const styles = StyleSheet.create({
     color: '#0f172a',
     paddingVertical: 10
   },
-  filterRow: {
+  filterScroll: { flexGrow: 0, alignSelf: 'stretch' },
+  filterScrollContent: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8
+    alignItems: 'center',
+    gap: 8,
+    paddingRight: 4
   },
   filterBtn: {
+    flexShrink: 0,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 10,
     backgroundColor: '#fff',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    marginRight: 8
+    borderColor: '#e2e8f0'
   },
   filterBtnActive: {
     backgroundColor: '#f8fafc',

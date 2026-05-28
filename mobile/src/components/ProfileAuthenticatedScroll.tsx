@@ -2,6 +2,9 @@ import { useMemo, useRef } from 'react';
 import {
   ActivityIndicator,
   Animated,
+  Platform,
+  Pressable,
+  RefreshControl,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -10,9 +13,9 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ProfileAvatarBadge, { PROFILE_AVATAR_OUTER } from './ProfileAvatarBadge';
 import ProfilePersonalCard from './ProfilePersonalCard';
+import UserRoundCogIcon from './UserRoundCogIcon';
 import TabHeaderGradient from './TabHeaderGradient';
 import GradientPressable from './GradientPressable';
-import EmergencySubscriptionsSection from './EmergencySubscriptionsSection';
 import { curvedBodySection, curvedHeaderText, curvedTabScreen } from './curvedTabScreen';
 import {
   PROFILE_AVATAR_COMPACT_SCALE,
@@ -20,20 +23,30 @@ import {
 } from '../constants/profileScrollHeader';
 import { colors } from '../theme';
 
+const CURVED_PAGE_BG = '#e9f2fb';
+const CURVED_BODY_BG = '#f2f2f7';
 const TITLE_ROW_HEIGHT = 34;
+/** Đồng bộ với `topActionBtn` trang chủ (index.tsx) */
+const HEADER_ACTION_BTN_SIZE = 34;
+const HEADER_ACTION_ICON_COLOR = '#ffffff';
+const EDIT_GAP_COLLAPSED = 10;
 
 type Props = {
   tabBarInset: number;
   loading: boolean;
   error: string | null;
   name: string;
+  username: string;
   email: string;
   phone: string;
+  roleLabel: string;
   avatarUrl: string | null;
   initials: string;
   onPressAvatar: () => void;
   onPressEdit: () => void;
   onLogout: () => void;
+  refreshing?: boolean;
+  onRefresh?: () => void | Promise<void>;
 };
 
 export default function ProfileAuthenticatedScroll({
@@ -41,13 +54,17 @@ export default function ProfileAuthenticatedScroll({
   loading,
   error,
   name,
+  username,
   email,
   phone,
+  roleLabel,
   avatarUrl,
   initials,
   onPressAvatar,
   onPressEdit,
-  onLogout
+  onLogout,
+  refreshing = false,
+  onRefresh
 }: Props) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -115,6 +132,24 @@ export default function ProfileAuthenticatedScroll({
     extrapolate: 'clamp'
   });
 
+  const compactAvatarHalf = (PROFILE_AVATAR_OUTER * PROFILE_AVATAR_COMPACT_SCALE) / 2;
+  const editHeaderOpacity = scrollY.interpolate({
+    inputRange: [0, collapse * 0.4],
+    outputRange: [1, 0],
+    extrapolate: 'clamp'
+  });
+  const editCollapsedOpacity = scrollY.interpolate({
+    inputRange: [collapse * 0.35, collapse],
+    outputRange: [0, 1],
+    extrapolate: 'clamp'
+  });
+  const editCollapsedTop = layout.collapsedCenterY - HEADER_ACTION_BTN_SIZE / 2;
+  const editCollapsedLeft =
+    layout.collapsedCenterX -
+    compactAvatarHalf -
+    EDIT_GAP_COLLAPSED -
+    HEADER_ACTION_BTN_SIZE;
+
   return (
     <View style={styles.root}>
       <Animated.View
@@ -127,9 +162,26 @@ export default function ProfileAuthenticatedScroll({
         ]}
       >
         <TabHeaderGradient />
-        <Animated.View style={{ paddingRight: titlePadRight, zIndex: 2 }}>
-          <Text style={[curvedHeaderText.topTitle, styles.topTitle]}>Tài khoản</Text>
-        </Animated.View>
+        <View style={styles.headerRow}>
+          <Animated.View style={[styles.titleWrap, { paddingRight: titlePadRight }]}>
+            <Text style={[curvedHeaderText.topTitle, styles.topTitle]}>Tài khoản</Text>
+          </Animated.View>
+          <Animated.View style={{ opacity: editHeaderOpacity }}>
+            <Pressable
+              style={styles.headerActionBtn}
+              onPress={onPressEdit}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Chỉnh sửa thông tin"
+            >
+              <UserRoundCogIcon
+                size={20}
+                color={HEADER_ACTION_ICON_COLOR}
+                strokeWidth={2.2}
+              />
+            </Pressable>
+          </Animated.View>
+        </View>
       </Animated.View>
 
       <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
@@ -154,6 +206,34 @@ export default function ProfileAuthenticatedScroll({
             cameraOpacity={cameraOpacity}
           />
         </Animated.View>
+
+        <Animated.View
+          pointerEvents="box-none"
+          style={[
+            styles.editHostCollapsed,
+            {
+              opacity: editCollapsedOpacity,
+              top: editCollapsedTop,
+              left: editCollapsedLeft,
+              width: HEADER_ACTION_BTN_SIZE,
+              height: HEADER_ACTION_BTN_SIZE
+            }
+          ]}
+        >
+          <Pressable
+            style={styles.headerActionBtn}
+            onPress={onPressEdit}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Chỉnh sửa thông tin"
+          >
+            <UserRoundCogIcon
+              size={20}
+              color={HEADER_ACTION_ICON_COLOR}
+              strokeWidth={2.2}
+            />
+          </Pressable>
+        </Animated.View>
       </View>
 
       <View style={styles.bodySection}>
@@ -165,27 +245,44 @@ export default function ProfileAuthenticatedScroll({
           ]}
           scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
+          alwaysBounceVertical
+          bounces
+          refreshControl={
+            onRefresh ? (
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={() => void onRefresh()}
+                tintColor={colors.primary}
+                colors={[colors.primary]}
+                progressViewOffset={Platform.OS === 'android' ? 12 : 0}
+              />
+            ) : undefined
+          }
           onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
             useNativeDriver: false
           })}
         >
+          {refreshing ? (
+            <View style={styles.refreshRow}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={styles.refreshRowText}>Đang tải lại…</Text>
+            </View>
+          ) : null}
+
           {loading ? (
             <ActivityIndicator color={colors.primary} style={styles.profileLoader} />
           ) : (
             <ProfilePersonalCard
               name={name}
+              username={username}
               email={email}
               phone={phone}
-              onPressEdit={onPressEdit}
+              roleLabel={roleLabel}
               heroOpacity={heroOpacity}
             />
           )}
 
           {error ? <Text style={styles.errorBanner}>{error}</Text> : null}
-
-          <View style={styles.sectionPad}>
-            <EmergencySubscriptionsSection />
-          </View>
 
           <View style={styles.sectionPad}>
             <GradientPressable variant="red" style={styles.logoutButton} onPress={onLogout}>
@@ -199,13 +296,22 @@ export default function ProfileAuthenticatedScroll({
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
+  root: { flex: 1, backgroundColor: CURVED_PAGE_BG },
   topSection: {
     position: 'relative',
     overflow: 'hidden',
     zIndex: 2,
     paddingHorizontal: curvedTabScreen.headerPaddingHorizontal
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: TITLE_ROW_HEIGHT,
+    marginBottom: 8,
+    zIndex: 2
+  },
+  titleWrap: { flex: 1 },
   topTitle: { marginBottom: 0 },
   avatarHost: {
     position: 'absolute',
@@ -216,15 +322,36 @@ const styles = StyleSheet.create({
     zIndex: 40,
     elevation: 40
   },
+  editHostCollapsed: {
+    position: 'absolute',
+    zIndex: 45,
+    elevation: 45
+  },
+  headerActionBtn: {
+    width: HEADER_ACTION_BTN_SIZE,
+    height: HEADER_ACTION_BTN_SIZE,
+    borderRadius: HEADER_ACTION_BTN_SIZE / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.16)'
+  },
   bodySection: {
-    ...curvedBodySection(colors.background),
+    ...curvedBodySection(CURVED_BODY_BG),
     zIndex: 1
   },
   scroll: { flex: 1 },
   scrollContent: {
     flexGrow: 1,
-    backgroundColor: colors.background
+    backgroundColor: CURVED_BODY_BG
   },
+  refreshRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 12
+  },
+  refreshRowText: { fontSize: 14, color: colors.textMuted, fontWeight: '500' },
   sectionPad: { paddingHorizontal: 16, marginTop: 16 },
   profileLoader: { marginTop: 48 },
   errorBanner: {

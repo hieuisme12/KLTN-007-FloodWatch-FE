@@ -4,15 +4,13 @@ import MapView, { Callout, Marker, PROVIDER_DEFAULT, UrlTile } from 'react-nativ
 import * as Location from 'expo-location';
 import { HCM_MAP_CENTER } from '@hcm-flood/shared';
 import type { MapCrowdReport, MapSensor } from '../lib/mapApi';
-import { crowdReportColor, SENSOR_MARKER_COLORS } from '../lib/mapColors';
+import { crowdReportColor } from '../lib/mapColors';
 import { getFloodLevelLabel } from '../lib/floodLevels';
 import { useTabBarContentInset } from '../constants/tabBarLayout';
 import { colors } from '../theme';
-import MapPinIcon from './MapPinIcon';
-import RadarIcon from './RadarIcon';
+import { getMapboxTileUrl } from '../lib/mapboxTiles';
+import { MapSensorMarkers, MapUserGpsMarker } from './FloodMapMarkers';
 import UserRoundCheckIcon from './UserRoundCheckIcon';
-
-const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN?.trim() ?? '';
 
 type Props = {
   sensors: MapSensor[];
@@ -23,15 +21,6 @@ type Props = {
     lat: number;
     lng: number;
   } | null;
-};
-
-const SENSOR_STATUS_LABEL_VI: Record<MapSensor['status'], string> = {
-  normal: 'Bình thường',
-  warning: 'Cảnh báo',
-  elevated: 'Nâng cao',
-  danger: 'Nguy hiểm',
-  critical: 'Nghiêm trọng',
-  offline: 'Mất kết nối'
 };
 
 export default function FloodMap({ sensors, reports, focusTarget = null }: Props) {
@@ -80,9 +69,7 @@ export default function FloodMap({ sensors, reports, focusTarget = null }: Props
     [userCoords]
   );
 
-  const mapboxTileUrl = MAPBOX_TOKEN
-    ? `https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=${MAPBOX_TOKEN}`
-    : null;
+  const mapboxTileUrl = getMapboxTileUrl();
 
   useEffect(() => {
     if (!focusTarget || !mapRef.current) return;
@@ -114,55 +101,8 @@ export default function FloodMap({ sensors, reports, focusTarget = null }: Props
           <UrlTile urlTemplate={mapboxTileUrl} maximumZ={20} flipY={false} />
         ) : null}
 
-        {userCoords ? (
-          <Marker
-            key="user-gps"
-            coordinate={{
-              latitude: userCoords.latitude,
-              longitude: userCoords.longitude
-            }}
-            anchor={{ x: 0.5, y: 0.95 }}
-            title="Vị trí của bạn"
-            tracksViewChanges={false}
-          >
-            <View style={styles.gpsIconWrap}>
-              <MapPinIcon size={28} color="#0ea5e9" strokeWidth={2.1} />
-            </View>
-          </Marker>
-        ) : null}
-
-        {sensors.map((s) => (
-          <Marker
-            key={`sensor-${s.sensor_id}`}
-            coordinate={{ latitude: s.lat, longitude: s.lng }}
-            anchor={{ x: 0.5, y: 0.95 }}
-            title={s.location_name}
-            description={`${s.water_level.toFixed(1)} cm · ${SENSOR_STATUS_LABEL_VI[s.status]}`}
-            tracksViewChanges={false}
-          >
-            <View style={styles.sensorIconFrame}>
-              <View
-                style={[
-                  styles.sensorIconBg,
-                  { backgroundColor: SENSOR_MARKER_COLORS[s.status] }
-                ]}
-              >
-                <RadarIcon size={18} color="#111111" strokeWidth={2.1} />
-              </View>
-            </View>
-            <Callout>
-              <View style={styles.callout}>
-                <Text style={styles.calloutTitle}>{s.location_name}</Text>
-                <Text style={styles.calloutMeta}>
-                  Mực nước: {s.water_level.toFixed(1)} cm
-                </Text>
-                <Text style={styles.calloutMeta}>
-                  Trạng thái: {SENSOR_STATUS_LABEL_VI[s.status]}
-                </Text>
-              </View>
-            </Callout>
-          </Marker>
-        ))}
+        <MapSensorMarkers sensors={sensors} />
+        <MapUserGpsMarker coords={userCoords} />
 
         {reports.map((r) => (
           <Marker
@@ -227,35 +167,6 @@ export function MapLoadingOverlay() {
 const styles = StyleSheet.create({
   wrap: { flex: 1 },
   map: { flex: 1 },
-  gpsIconWrap: {
-    shadowColor: '#0f172a',
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    shadowOffset: { width: 0, height: 2.5 },
-    elevation: 5
-  },
-  sensorIconFrame: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#ffffff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#0f172a',
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    shadowOffset: { width: 0, height: 2.5 },
-    elevation: 5
-  },
-  sensorIconBg: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.9)'
-  },
   reportIconFrame: {
     width: 30,
     height: 30,

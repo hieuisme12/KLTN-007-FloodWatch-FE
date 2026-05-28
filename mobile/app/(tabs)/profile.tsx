@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
 
@@ -32,7 +32,11 @@ import ProfileAuthenticatedScroll from '../../src/components/ProfileAuthenticate
 
 import TabHeaderGradient from '../../src/components/TabHeaderGradient';
 
-import { curvedHeaderText, curvedTabScreen } from '../../src/components/curvedTabScreen';
+import {
+  curvedBodySection,
+  curvedHeaderText,
+  curvedTabScreen
+} from '../../src/components/curvedTabScreen';
 
 import { useAuth } from '../../src/context/AuthContext';
 
@@ -62,7 +66,14 @@ import { useTabBarContentInset } from '../../src/constants/tabBarLayout';
 
 import { colors } from '../../src/theme';
 
-
+function formatRoleLabel(role: unknown): string {
+  const normalized = typeof role === 'string' ? role.trim().toLowerCase() : '';
+  if (normalized === 'admin') return 'Quản trị viên';
+  if (normalized === 'moderator') return 'Điều hành viên';
+  if (normalized === 'user') return 'Người dùng';
+  if (typeof role === 'string' && role.trim()) return role.trim();
+  return 'Người dùng';
+}
 
 export default function ProfileScreen() {
 
@@ -95,55 +106,53 @@ export default function ProfileScreen() {
   const [editEmail, setEditEmail] = useState('');
 
   const [editPhone, setEditPhone] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
 
-
+  const loadProfile = useCallback(
+    async (isRefresh = false) => {
+      if (!isAuthenticated) return;
+      if (isRefresh) setRefreshing(true);
+      else setLoading(true);
+      setError(null);
+      try {
+        const token = await getAccessToken();
+        if (!token) return;
+        const raw = await fetchAuthProfile();
+        setProfile(normalizeProfileUser(raw));
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Không tải được hồ sơ');
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [isAuthenticated]
+  );
 
   useEffect(() => {
+    void loadProfile(false);
+  }, [loadProfile]);
 
+  const handleRefresh = useCallback(async () => {
     if (!isAuthenticated) return;
-
-    let cancelled = false;
-
-    (async () => {
-
-      setLoading(true);
-
-      setError(null);
-
-      try {
-
-        const token = await getAccessToken();
-
-        if (!token) return;
-
-        const raw = await fetchAuthProfile();
-
-        const data = normalizeProfileUser(raw);
-
-        if (!cancelled) setProfile(data);
-
-      } catch (e) {
-
-        if (!cancelled) {
-
-          setError(e instanceof Error ? e.message : 'Không tải được hồ sơ');
-
-        }
-
-      } finally {
-
-        if (!cancelled) setLoading(false);
-
+    setRefreshing(true);
+    setError(null);
+    const startedAt = Date.now();
+    const minVisibleMs = 500;
+    try {
+      const token = await getAccessToken();
+      if (!token) return;
+      const raw = await fetchAuthProfile();
+      setProfile(normalizeProfileUser(raw));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Không tải được dữ liệu');
+    } finally {
+      const elapsed = Date.now() - startedAt;
+      if (elapsed < minVisibleMs) {
+        await new Promise((resolve) => setTimeout(resolve, minVisibleMs - elapsed));
       }
-
-    })();
-
-    return () => {
-
-      cancelled = true;
-
-    };
-
+      setRefreshing(false);
+    }
   }, [isAuthenticated]);
 
 
@@ -166,9 +175,13 @@ export default function ProfileScreen() {
 
     'Người dùng';
 
+  const username = (merged?.username as string)?.trim() || '—';
+
   const email = (merged?.email as string) || '—';
 
   const phone = (merged?.phone as string) || '—';
+
+  const roleLabel = formatRoleLabel(merged?.role);
 
   const avatarKey = (merged?.avatar as string) || null;
 
@@ -307,29 +320,21 @@ export default function ProfileScreen() {
       {isAuthenticated ? (
 
         <ProfileAuthenticatedScroll
-
           tabBarInset={tabBarInset}
-
           loading={loading}
-
           error={error}
-
           name={name}
-
+          username={username}
           email={email}
-
           phone={phone}
-
+          roleLabel={roleLabel}
           avatarUrl={avatarUrl}
-
           initials={initials}
-
           onPressAvatar={() => setAvatarPickerOpen(true)}
-
           onPressEdit={openEdit}
-
           onLogout={handleLogout}
-
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
         />
 
       ) : (
@@ -484,23 +489,11 @@ const styles = StyleSheet.create({
   topTitleSpacing: { marginBottom: 0 },
 
   guestBody: {
-
+    ...curvedBodySection('#f2f2f7'),
     flex: 1,
-
-    marginTop: curvedTabScreen.bodyOverlap,
-
     padding: 24,
-
     justifyContent: 'center',
-
-    gap: 12,
-
-    backgroundColor: colors.background,
-
-    borderTopLeftRadius: curvedTabScreen.bodyRadius,
-
-    borderTopRightRadius: curvedTabScreen.bodyRadius
-
+    gap: 12
   },
 
   guestTitle: { fontSize: 20, fontWeight: '700', color: colors.text },
