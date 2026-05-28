@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { API_ENDPOINTS } from '@hcm-flood/shared';
 import { apiClient } from './api';
+import { API_BASE_URL } from './config';
 import { getReportContent, getReportPhotoUrls } from './mediaUrl';
 import { FLOOD_LEVEL_COLORS } from './floodLevels';
 
@@ -65,13 +66,19 @@ export async function fetchAllReports(): Promise<CrowdReport[]> {
       .filter(Boolean) as CrowdReport[];
   } catch (e) {
     if (axios.isAxiosError(e) && e.response?.status === 401) {
-      const { data } = await apiClient.get(API_ENDPOINTS.CROWD_REPORTS, {
-        params: { moderation_status: 'approved' }
-      });
-      const rows = data?.success && Array.isArray(data.data) ? data.data : [];
-      return rows
-        .map((r: Record<string, unknown>) => normalizeReport(r))
-        .filter(Boolean) as CrowdReport[];
+      try {
+        // Public fallback: gọi thẳng bằng axios để không phụ thuộc auth/cookie hiện tại.
+        const { data } = await axios.get(`${API_BASE_URL}${API_ENDPOINTS.CROWD_REPORTS}`, {
+          params: { moderation_status: 'approved' },
+          withCredentials: false
+        });
+        const rows = data?.success && Array.isArray(data.data) ? data.data : [];
+        return rows
+          .map((r: Record<string, unknown>) => normalizeReport(r))
+          .filter(Boolean) as CrowdReport[];
+      } catch {
+        return [];
+      }
     }
     throw e;
   }

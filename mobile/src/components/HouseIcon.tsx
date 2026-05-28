@@ -1,0 +1,52 @@
+import Svg, { G, Path } from 'react-native-svg';
+
+type HouseIconProps = {
+  size?: number;
+  color?: string;
+  strokeWidth?: number;
+  opacity?: number;
+  rotation?: number;
+  flipHorizontal?: boolean;
+  flipVertical?: boolean;
+  padding?: number;
+};
+
+export default function HouseIcon({
+  size = 24,
+  color = '#000000',
+  strokeWidth = 2,
+  opacity = 1,
+  rotation = 0,
+  flipHorizontal = false,
+  flipVertical = false,
+  padding = 0
+}: HouseIconProps) {
+  const viewBoxSize = 24 + padding * 2;
+  const viewBoxOffset = -padding;
+
+  return (
+    <Svg
+      viewBox={`${viewBoxOffset} ${viewBoxOffset} ${viewBoxSize} ${viewBoxSize}`}
+      width={size}
+      height={size}
+      fill="none"
+      stroke={color}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      opacity={opacity}
+      style={{
+        transform: [
+          { rotate: `${rotation}deg` },
+          { scaleX: flipHorizontal ? -1 : 1 },
+          { scaleY: flipVertical ? -1 : 1 }
+        ]
+      }}
+    >
+      <G fill="none" stroke={color} strokeLinecap="round" strokeLinejoin="round">
+        <Path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" />
+        <Path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+      </G>
+    </Svg>
+  );
+}

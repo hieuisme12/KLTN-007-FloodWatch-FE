@@ -10,7 +10,8 @@ import {
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000
+  timeout: 10000,
+  withCredentials: true
 });
 
 apiClient.interceptors.request.use(async (config) => {
@@ -26,7 +27,8 @@ export async function loginWithCredentials(username: string, password: string) {
   const postLogin = async (payload: Record<string, string>) => {
     const { data } = await axios.post(
       `${API_BASE_URL}${API_ENDPOINTS.AUTH_LOGIN}`,
-      payload
+      payload,
+      { withCredentials: true }
     );
     await persistAuthFromLoginResponse(data);
     return data;
@@ -49,6 +51,25 @@ export async function loginWithCredentials(username: string, password: string) {
   }
 }
 
+export async function registerWithCredentials(input: {
+  username: string;
+  email: string;
+  password: string;
+}) {
+  const payload = {
+    username: input.username.trim(),
+    email: input.email.trim().toLowerCase(),
+    password: input.password
+  };
+
+  const { data } = await axios.post(
+    `${API_BASE_URL}/api/auth/register`,
+    payload,
+    { withCredentials: true }
+  );
+  return data;
+}
+
 export async function fetchActiveAlertsCount(): Promise<number> {
   const { data } = await apiClient.get(API_ENDPOINTS.ALERTS_ACTIVE);
   if (Array.isArray(data)) return data.length;
@@ -62,6 +83,15 @@ export async function fetchAuthProfile() {
   return data;
 }
 
+export async function updateAuthProfile(payload: {
+  full_name?: string;
+  email?: string;
+  phone?: string;
+}) {
+  const { data } = await apiClient.put('/api/auth/profile/edit', payload);
+  return data;
+}
+
 export async function logout() {
   try {
     await apiClient.post('/api/auth/logout');
@@ -71,4 +101,4 @@ export async function logout() {
   await clearAuthStorage();
 }
 
-export { getStoredUser, getAccessToken, clearAuthStorage };
+export { getStoredUser, getAccessToken, clearAuthStorage, persistAuthFromLoginResponse };

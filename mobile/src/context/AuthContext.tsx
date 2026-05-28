@@ -9,6 +9,7 @@ import {
 } from 'react';
 import {
   clearAuthStorage,
+  fetchAuthProfile,
   getAccessToken,
   getStoredUser,
   loginWithCredentials,
@@ -26,6 +27,32 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+function normalizeUserPayload(input: unknown): Record<string, unknown> | null {
+  if (!input || typeof input !== 'object') return null;
+  const root = input as Record<string, unknown>;
+  const candidates = [
+    root,
+    root.user,
+    root.data,
+    (root.data as Record<string, unknown> | undefined)?.user
+  ];
+  for (const item of candidates) {
+    if (item && typeof item === 'object') {
+      const obj = item as Record<string, unknown>;
+      if (
+        typeof obj.full_name === 'string' ||
+        typeof obj.fullName === 'string' ||
+        typeof obj.name === 'string' ||
+        typeof obj.username === 'string' ||
+        typeof obj.email === 'string'
+      ) {
+        return obj;
+      }
+    }
+  }
+  return root;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<Record<string, unknown> | null>(null);
@@ -40,7 +67,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     const stored = await getStoredUser();
-    setUser(stored);
+    const normalizedStored = normalizeUserPayload(stored);
+    if (normalizedStored) {
+      setUser(normalizedStored);
+      return;
+    }
+    try {
+      const profile = await fetchAuthProfile();
+      setUser(normalizeUserPayload(profile));
+    } catch {
+      setUser(null);
+    }
   }, []);
 
   useEffect(() => {
@@ -51,8 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (username: string, password: string) => {
       const data = await loginWithCredentials(username, password);
       setHasToken(true);
-      const nextUser =
-        (data.user as Record<string, unknown>) || (await getStoredUser());
+      const nextUser = normalizeUserPayload(data) || normalizeUserPayload(await getStoredUser());
       setUser(nextUser);
     },
     []

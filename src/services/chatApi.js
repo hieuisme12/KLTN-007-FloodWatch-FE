@@ -6,6 +6,7 @@ import { normalizeChatText } from '../utils/chatMessageFormat';
 const chatClient = axios.create({
   baseURL: API_CONFIG.BASE_URL,
   timeout: 60000,
+  withCredentials: true,
   headers: { 'Content-Type': 'application/json' }
 });
 

@@ -5,7 +5,13 @@ import {
 } from '@hcm-flood/shared';
 import { apiClient } from './api';
 
-export type SensorStatus = 'normal' | 'warning' | 'danger' | 'offline';
+export type SensorStatus =
+  | 'normal'
+  | 'warning'
+  | 'elevated'
+  | 'danger'
+  | 'critical'
+  | 'offline';
 
 export type MapSensor = {
   sensor_id: string;
@@ -26,7 +32,9 @@ export type MapCrowdReport = {
 };
 
 const WARNING_THRESHOLD = 10;
+const ELEVATED_THRESHOLD = 20;
 const DANGER_THRESHOLD = 30;
+const CRITICAL_THRESHOLD = 50;
 
 let floodEndpoint: 'realtime' | 'realtime_v1' | 'fallback' | null = null;
 
@@ -37,7 +45,9 @@ function normalizeSensor(item: Record<string, unknown>): MapSensor | null {
 
   const waterLevel = Number(item.water_level) || 0;
   const warningThreshold = Number(item.warning_threshold) || WARNING_THRESHOLD;
+  const elevatedThreshold = Number(item.elevated_threshold) || ELEVATED_THRESHOLD;
   const dangerThreshold = Number(item.danger_threshold) || DANGER_THRESHOLD;
+  const criticalThreshold = Number(item.critical_threshold) || CRITICAL_THRESHOLD;
 
   let status = item.status as SensorStatus | string | undefined;
   if (status == null || status === '') {
@@ -49,13 +59,21 @@ function normalizeSensor(item: Record<string, unknown>): MapSensor | null {
       status = 'offline';
     } else if (t === 'online' || t === 'connected' || t === 'active' || t === 'live') {
       status = undefined;
-    } else if (t === 'normal' || t === 'warning' || t === 'danger') {
+    } else if (
+      t === 'normal' ||
+      t === 'warning' ||
+      t === 'elevated' ||
+      t === 'danger' ||
+      t === 'critical'
+    ) {
       status = t as SensorStatus;
     }
   }
 
   if (!status) {
-    if (waterLevel >= dangerThreshold) status = 'danger';
+    if (waterLevel >= criticalThreshold) status = 'critical';
+    else if (waterLevel >= dangerThreshold) status = 'danger';
+    else if (waterLevel >= elevatedThreshold) status = 'elevated';
     else if (waterLevel >= warningThreshold) status = 'warning';
     else status = 'normal';
   }

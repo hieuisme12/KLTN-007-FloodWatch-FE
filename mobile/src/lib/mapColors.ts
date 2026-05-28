@@ -2,8 +2,10 @@ import type { SensorStatus } from './mapApi';
 export { crowdReportColor, FLOOD_LEVEL_COLORS, getFloodLevelLabel } from './floodLevels';
 
 export const SENSOR_MARKER_COLORS: Record<SensorStatus, string> = {
-  normal: '#16a34a',
-  warning: '#eab308',
-  danger: '#dc2626',
-  offline: '#94a3b8'
+  normal: '#4CAF50',
+  warning: '#FFEB3B',
+  elevated: '#FF9800',
+  danger: '#F44336',
+  critical: '#B71C1C',
+  offline: '#6c757d'
 };

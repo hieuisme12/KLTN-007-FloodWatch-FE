@@ -41,13 +41,15 @@ function isAuthEndpointNoRefresh(url) {
 
 // Tạo axios instance với interceptor để tự động thêm token
 const apiClient = axios.create({
-  baseURL: API_CONFIG.BASE_URL
+  baseURL: API_CONFIG.BASE_URL,
+  withCredentials: true
 });
 
 /** Endpoint public — không gửi JWT (tránh lỗi khi token hết hạn / BE xử lý auth lạ). */
 const publicApiClient = axios.create({
   baseURL: API_CONFIG.BASE_URL,
-  timeout: 20000
+  timeout: 20000,
+  withCredentials: true
 });
 
 // Interceptor: Tự động thêm token vào header cho mọi request
@@ -614,7 +616,11 @@ export const login = async (username, password, rememberMe = false) => {
       : { username: loginId, password };
     let response;
     try {
-      response = await axios.post(`${API_CONFIG.BASE_URL}${API_ENDPOINTS.AUTH_LOGIN}`, primaryPayload);
+      response = await axios.post(
+        `${API_CONFIG.BASE_URL}${API_ENDPOINTS.AUTH_LOGIN}`,
+        primaryPayload,
+        { withCredentials: true }
+      );
     } catch (error) {
       // Một số bản BE validate schema login khác nhau (email vs username).
       // Chỉ fallback khi 400 (schema), không fallback khi 401 (sai thông tin/tài khoản).
@@ -622,7 +628,11 @@ export const login = async (username, password, rememberMe = false) => {
         const fallbackPayload = loginId.includes('@')
           ? { username: loginId, password }
           : { email: loginId.toLowerCase(), password };
-        response = await axios.post(`${API_CONFIG.BASE_URL}${API_ENDPOINTS.AUTH_LOGIN}`, fallbackPayload);
+        response = await axios.post(
+          `${API_CONFIG.BASE_URL}${API_ENDPOINTS.AUTH_LOGIN}`,
+          fallbackPayload,
+          { withCredentials: true }
+        );
       } else {
         throw error;
       }
@@ -686,7 +696,8 @@ export const register = async (userData) => {
     };
     const response = await axios.post(
       `${API_CONFIG.BASE_URL}${API_ENDPOINTS.AUTH_REGISTER}`,
-      payload
+      payload,
+      { withCredentials: true }
     );
 
     if (response.data?.success && response.data?.data) {
@@ -719,7 +730,8 @@ export const verifyOtp = async (email, otpCode) => {
       {
         email: String(email).trim().toLowerCase(),
         otp_code: String(otpCode).trim()
-      }
+      },
+      { withCredentials: true }
     );
 
     if (response.data?.success && response.data?.data) {
@@ -747,7 +759,8 @@ export const sendOtp = async (email) => {
   try {
     const response = await axios.post(
       `${API_CONFIG.BASE_URL}${API_ENDPOINTS.AUTH_SEND_OTP}`,
-      { email: String(email).trim().toLowerCase() }
+      { email: String(email).trim().toLowerCase() },
+      { withCredentials: true }
     );
 
     if (response.data?.success) {
@@ -777,7 +790,8 @@ export const forgotPassword = async (email) => {
   try {
     const response = await axios.post(
       `${API_CONFIG.BASE_URL}${API_ENDPOINTS.AUTH_FORGOT_PASSWORD}`,
-      { email: String(email).trim().toLowerCase() }
+      { email: String(email).trim().toLowerCase() },
+      { withCredentials: true }
     );
 
     if (response.data?.success) {
@@ -842,7 +856,7 @@ export const resetPassword = async ({ email, otp_code, new_password }) => {
   for (let i = 0; i < payloads.length; i += 1) {
     const body = payloads[i];
     try {
-      const response = await axios.post(url, body);
+      const response = await axios.post(url, body, { withCredentials: true });
 
       if (response.data?.success) {
         return {
@@ -879,7 +893,8 @@ export const resendOtp = async (email) => {
   try {
     const response = await axios.post(
       `${API_CONFIG.BASE_URL}${API_ENDPOINTS.AUTH_RESEND_OTP}`,
-      { email: String(email).trim().toLowerCase() }
+      { email: String(email).trim().toLowerCase() },
+      { withCredentials: true }
     );
 
     if (response.data?.success) {

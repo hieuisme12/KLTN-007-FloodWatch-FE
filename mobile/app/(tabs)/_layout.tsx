@@ -1,7 +1,12 @@
 import type { ComponentProps } from 'react';
 import { Tabs } from 'expo-router';
+import { Redirect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../src/theme';
+import { useAuth } from '../../src/context/AuthContext';
+import HouseIcon from '../../src/components/HouseIcon';
+import MapPinnedIcon from '../../src/components/MapPinnedIcon';
+import NotepadTextIcon from '../../src/components/NotepadTextIcon';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -12,6 +17,12 @@ function tabIcon(name: IoniconName) {
 }
 
 export default function TabsLayout() {
+  const { isLoading, isAuthenticated } = useAuth();
+
+  if (!isLoading && !isAuthenticated) {
+    return <Redirect href="/login" />;
+  }
+
   return (
     <Tabs
       screenOptions={{
@@ -30,21 +41,29 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: 'Trang chủ',
-          tabBarIcon: tabIcon('home-outline')
+          headerShown: false,
+          tabBarIcon: ({ color, size }) => (
+            <HouseIcon size={size} color={color} strokeWidth={2} />
+          )
         }}
       />
       <Tabs.Screen
         name="map"
         options={{
-          title: 'Bản đồ',
-          tabBarIcon: tabIcon('map-outline')
+          title: 'Tìm đường',
+          headerShown: false,
+          tabBarIcon: ({ color, size }) => (
+            <MapPinnedIcon size={size} color={color} strokeWidth={2} />
+          )
         }}
       />
       <Tabs.Screen
         name="reports"
         options={{
           title: 'Báo cáo',
-          tabBarIcon: tabIcon('list-outline')
+          tabBarIcon: ({ color, size }) => (
+            <NotepadTextIcon size={size} color={color} strokeWidth={2} />
+          )
         }}
       />
       <Tabs.Screen

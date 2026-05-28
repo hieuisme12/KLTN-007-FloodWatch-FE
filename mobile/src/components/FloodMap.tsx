@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
 import MapView, { Callout, Marker, PROVIDER_DEFAULT, UrlTile } from 'react-native-maps';
 import * as Location from 'expo-location';
@@ -7,20 +7,39 @@ import type { MapCrowdReport, MapSensor } from '../lib/mapApi';
 import { crowdReportColor, SENSOR_MARKER_COLORS } from '../lib/mapColors';
 import { getFloodLevelLabel } from '../lib/floodLevels';
 import { colors } from '../theme';
+import MapPinIcon from './MapPinIcon';
+import RadarIcon from './RadarIcon';
+import UserRoundCheckIcon from './UserRoundCheckIcon';
 
 const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN?.trim() ?? '';
 
 type Props = {
   sensors: MapSensor[];
   reports: MapCrowdReport[];
+  focusTarget?: {
+    kind: 'sensor' | 'report';
+    id: string;
+    lat: number;
+    lng: number;
+  } | null;
 };
 
-export default function FloodMap({ sensors, reports }: Props) {
+const SENSOR_STATUS_LABEL_VI: Record<MapSensor['status'], string> = {
+  normal: 'Bình thường',
+  warning: 'Cảnh báo',
+  elevated: 'Nâng cao',
+  danger: 'Nguy hiểm',
+  critical: 'Nghiêm trọng',
+  offline: 'Mất kết nối'
+};
+
+export default function FloodMap({ sensors, reports, focusTarget = null }: Props) {
   const [userCoords, setUserCoords] = useState<{
     latitude: number;
     longitude: number;
   } | null>(null);
   const [locError, setLocError] = useState<string | null>(null);
+  const mapRef = useRef<MapView | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -63,13 +82,29 @@ export default function FloodMap({ sensors, reports }: Props) {
     ? `https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=${MAPBOX_TOKEN}`
     : null;
 
+  useEffect(() => {
+    if (!focusTarget || !mapRef.current) return;
+    mapRef.current.animateToRegion(
+      {
+        latitude: focusTarget.lat,
+        longitude: focusTarget.lng,
+        latitudeDelta: 0.02,
+        longitudeDelta: 0.02
+      },
+      500
+    );
+  }, [focusTarget]);
+
   return (
     <View style={styles.wrap}>
       <MapView
+        ref={(node) => {
+          mapRef.current = node;
+        }}
         style={styles.map}
         provider={PROVIDER_DEFAULT}
         initialRegion={initialRegion}
-        showsUserLocation
+        showsUserLocation={false}
         showsMyLocationButton={Platform.OS === 'android'}
         toolbarEnabled={false}
       >
@@ -77,21 +112,51 @@ export default function FloodMap({ sensors, reports }: Props) {
           <UrlTile urlTemplate={mapboxTileUrl} maximumZ={20} flipY={false} />
         ) : null}
 
+        {userCoords ? (
+          <Marker
+            key="user-gps"
+            coordinate={{
+              latitude: userCoords.latitude,
+              longitude: userCoords.longitude
+            }}
+            anchor={{ x: 0.5, y: 0.95 }}
+            title="Vị trí của bạn"
+            tracksViewChanges={false}
+          >
+            <View style={styles.gpsIconWrap}>
+              <MapPinIcon size={28} color="#0ea5e9" strokeWidth={2.1} />
+            </View>
+          </Marker>
+        ) : null}
+
         {sensors.map((s) => (
           <Marker
             key={`sensor-${s.sensor_id}`}
             coordinate={{ latitude: s.lat, longitude: s.lng }}
-            pinColor={SENSOR_MARKER_COLORS[s.status]}
+            anchor={{ x: 0.5, y: 0.95 }}
             title={s.location_name}
-            description={`${s.water_level.toFixed(1)} cm · ${s.status}`}
+            description={`${s.water_level.toFixed(1)} cm · ${SENSOR_STATUS_LABEL_VI[s.status]}`}
+            tracksViewChanges={false}
           >
+            <View style={styles.sensorIconFrame}>
+              <View
+                style={[
+                  styles.sensorIconBg,
+                  { backgroundColor: SENSOR_MARKER_COLORS[s.status] }
+                ]}
+              >
+                <RadarIcon size={18} color="#111111" strokeWidth={2.1} />
+              </View>
+            </View>
             <Callout>
               <View style={styles.callout}>
                 <Text style={styles.calloutTitle}>{s.location_name}</Text>
                 <Text style={styles.calloutMeta}>
                   Mực nước: {s.water_level.toFixed(1)} cm
                 </Text>
-                <Text style={styles.calloutMeta}>Trạng thái: {s.status}</Text>
+                <Text style={styles.calloutMeta}>
+                  Trạng thái: {SENSOR_STATUS_LABEL_VI[s.status]}
+                </Text>
               </View>
             </Callout>
           </Marker>
@@ -101,10 +166,21 @@ export default function FloodMap({ sensors, reports }: Props) {
           <Marker
             key={`report-${r.id}`}
             coordinate={{ latitude: r.lat, longitude: r.lng }}
-            pinColor={crowdReportColor(r.flood_level)}
+            anchor={{ x: 0.5, y: 0.95 }}
             title="Báo cáo người dân"
             description={getFloodLevelLabel(r.flood_level) || 'Ngập'}
+            tracksViewChanges={false}
           >
+            <View style={styles.reportIconFrame}>
+              <View
+                style={[
+                  styles.reportIconBg,
+                  { backgroundColor: crowdReportColor(r.flood_level) }
+                ]}
+              >
+                <UserRoundCheckIcon size={16} color="#111111" strokeWidth={2.1} />
+              </View>
+            </View>
             <Callout>
               <View style={styles.callout}>
                 <Text style={styles.calloutTitle}>Báo cáo người dân</Text>
@@ -121,7 +197,7 @@ export default function FloodMap({ sensors, reports }: Props) {
       </MapView>
 
       {!mapboxTileUrl ? (
-        <View style={styles.mapHint} pointerEvents="none">
+        <View style={[styles.mapHint, { pointerEvents: 'none' }]}>
           <Text style={styles.mapHintText}>
             Thêm EXPO_PUBLIC_MAPBOX_TOKEN trong mobile/.env để dùng nền Mapbox
           </Text>
@@ -149,6 +225,57 @@ export function MapLoadingOverlay() {
 const styles = StyleSheet.create({
   wrap: { flex: 1 },
   map: { flex: 1 },
+  gpsIconWrap: {
+    shadowColor: '#0f172a',
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 2.5 },
+    elevation: 5
+  },
+  sensorIconFrame: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#0f172a',
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 2.5 },
+    elevation: 5
+  },
+  sensorIconBg: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.9)'
+  },
+  reportIconFrame: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#0f172a',
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 2.5 },
+    elevation: 5
+  },
+  reportIconBg: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.9)'
+  },
   callout: { minWidth: 160, maxWidth: 240 },
   calloutTitle: { fontWeight: '700', fontSize: 14, marginBottom: 4 },
   calloutMeta: { fontSize: 13, color: colors.textMuted },
