@@ -13,6 +13,7 @@ import {
   getAccessToken,
   getStoredUser,
   loginWithCredentials,
+  extractLoginTokenBundle,
   logout as apiLogout
 } from '../lib/api';
 
@@ -84,15 +85,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshUser().finally(() => setIsLoading(false));
   }, [refreshUser]);
 
-  const signIn = useCallback(
-    async (username: string, password: string) => {
-      const data = await loginWithCredentials(username, password);
-      setHasToken(true);
-      const nextUser = normalizeUserPayload(data) || normalizeUserPayload(await getStoredUser());
-      setUser(nextUser);
-    },
-    []
-  );
+  const signIn = useCallback(async (username: string, password: string) => {
+    const data = await loginWithCredentials(username, password);
+    const token = await getAccessToken();
+    setHasToken(Boolean(token));
+    if (!token) {
+      throw new Error(
+        'Đăng nhập không lưu được phiên. Vui lòng thử lại hoặc liên hệ quản trị viên.'
+      );
+    }
+    const envelope =
+      data && typeof data === 'object'
+        ? extractLoginTokenBundle(data)
+        : {};
+    const nextUser =
+      normalizeUserPayload(envelope) ||
+      normalizeUserPayload(data) ||
+      normalizeUserPayload(await getStoredUser());
+    setUser(nextUser);
+  }, []);
 
   const signOut = useCallback(async () => {
     await apiLogout();

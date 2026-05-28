@@ -11,6 +11,8 @@ export const API_ENDPOINTS = {
   ALERTS_ACTIVE: '/api/alerts/active',
   AUTH_LOGIN: '/api/auth/login',
   AUTH_PROFILE: '/api/auth/profile',
+  AUTH_PROFILE_EDIT: '/api/auth/profile/edit',
+  AUTH_PROFILE_ICONS: '/api/auth/profile-icons',
   AUTH_REFRESH: '/api/auth/refresh',
   NEWS: '/api/v1/news/hcm'
 };

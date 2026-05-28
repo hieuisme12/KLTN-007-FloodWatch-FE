@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { MAP_POLL_MS } from '@hcm-flood/shared';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/context/AuthContext';
 import FloodMap, { MapLoadingOverlay } from '../../src/components/FloodMap';
 import MenuIcon from '../../src/components/MenuIcon';
@@ -21,6 +22,12 @@ import {
   type MapCrowdReport,
   type MapSensor
 } from '../../src/lib/mapApi';
+import TabHeaderGradient from '../../src/components/TabHeaderGradient';
+import {
+  curvedBodySection,
+  curvedHeaderText,
+  curvedTabScreen
+} from '../../src/components/curvedTabScreen';
 import { colors } from '../../src/theme';
 
 type SearchResult =
@@ -65,6 +72,7 @@ function pickDisplayName(user: Record<string, unknown> | null, isAuthenticated: 
 
 export default function HomeScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { isLoading, isAuthenticated, user } = useAuth();
   const [sensors, setSensors] = useState<MapSensor[]>([]);
   const [reports, setReports] = useState<MapCrowdReport[]>([]);
@@ -163,9 +171,10 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.topSection}>
+      <View style={[styles.topSection, { paddingTop: insets.top + 12 }]}>
+        <TabHeaderGradient />
         <View style={styles.topBar}>
-          <Text style={styles.topTitle}>Trang chủ</Text>
+          <Text style={curvedHeaderText.topTitle}>Trang chủ</Text>
           <View style={styles.topActions}>
             <Pressable style={styles.topActionBtn} hitSlop={8} onPress={() => setSearchOpen(true)}>
               <SearchIcon size={20} color="#ffffff" strokeWidth={2.2} />
@@ -179,14 +188,14 @@ export default function HomeScreen() {
           <ActivityIndicator color="#ffffff" />
         ) : (
           <View style={styles.greetingBlock}>
-            <Text style={styles.cardLabel}>Xin chào</Text>
-            <Text style={styles.cardValue}>{displayName}</Text>
+            <Text style={curvedHeaderText.cardLabel}>Xin chào</Text>
+            <Text style={curvedHeaderText.cardValue}>{displayName}</Text>
             {!isAuthenticated ? (
               <Pressable
-                style={styles.primaryButton}
+                style={curvedHeaderText.primaryButton}
                 onPress={() => router.push('/login')}
               >
-                <Text style={styles.primaryButtonText}>Đăng nhập</Text>
+                <Text style={curvedHeaderText.primaryButtonText}>Đăng nhập</Text>
               </Pressable>
             ) : null}
           </View>
@@ -260,21 +269,17 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#e9f2fb' },
   topSection: {
-    backgroundColor: '#3b82f6',
-    paddingTop: 52,
-    paddingHorizontal: 20,
-    paddingBottom: 88
+    position: 'relative',
+    overflow: 'hidden',
+    paddingHorizontal: curvedTabScreen.headerPaddingHorizontal,
+    paddingBottom: curvedTabScreen.headerPaddingBottom
   },
   topBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8
-  },
-  topTitle: {
-    color: '#ffffff',
-    fontSize: 24,
-    fontWeight: '700'
+    marginBottom: 8,
+    zIndex: 2
   },
   topActions: {
     flexDirection: 'row',
@@ -294,32 +299,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     zIndex: 2
   },
-  bodySection: {
-    flex: 1,
-    backgroundColor: '#e9f2fb',
-    marginTop: -34,
-    borderTopLeftRadius: 42,
-    borderTopRightRadius: 42,
-    paddingTop: 0,
-    overflow: 'hidden'
-  },
-  cardLabel: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.92)',
-    marginBottom: 6,
-    fontWeight: '500'
-  },
-  cardValue: { fontSize: 30, fontWeight: '700', color: '#ffffff' },
-  primaryButton: {
-    marginTop: 14,
-    backgroundColor: 'rgba(255,255,255,0.22)',
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.55)'
-  },
-  primaryButtonText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  bodySection: curvedBodySection('#e9f2fb'),
   mapWrap: {
     flex: 1,
     borderTopLeftRadius: 42,

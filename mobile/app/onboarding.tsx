@@ -1,6 +1,7 @@
 import { ImageBackground, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import GradientPressable from '../src/components/GradientPressable';
 
 const bg = require('../assets/onboarding-bg.png');
 
@@ -25,9 +26,9 @@ export default function OnboardingScreen() {
           </View>
 
           <View style={styles.ctaBlock}>
-            <Pressable style={styles.primaryBtn} onPress={() => router.push('/login')}>
+            <GradientPressable style={styles.primaryBtn} onPress={() => router.push('/login')}>
               <Text style={styles.primaryText}>Đăng nhập</Text>
-            </Pressable>
+            </GradientPressable>
 
             <Pressable style={styles.ghostBtn} onPress={() => router.push('/register')}>
               <Text style={styles.ghostText}>Đăng ký</Text>
@@ -81,11 +82,8 @@ const styles = StyleSheet.create({
     gap: 10
   },
   primaryBtn: {
-    backgroundColor: '#2563eb',
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14
+    paddingVertical: 14,
+    width: '100%'
   },
   primaryText: {
     color: '#fff',

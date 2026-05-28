@@ -3,10 +3,12 @@ import { API_ENDPOINTS } from '@hcm-flood/shared';
 import { API_BASE_URL } from './config';
 import {
   clearAuthStorage,
+  extractLoginTokenBundle,
   getAccessToken,
   getStoredUser,
   persistAuthFromLoginResponse
 } from './authStorage';
+import { getAuthHeaderRecord } from './authHeaders';
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -15,10 +17,8 @@ export const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use(async (config) => {
-  const token = await getAccessToken();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
+  const authHeaders = await getAuthHeaderRecord();
+  config.headers = { ...(config.headers as object), ...authHeaders };
   return config;
 });
 
@@ -30,7 +30,12 @@ export async function loginWithCredentials(username: string, password: string) {
       payload,
       { withCredentials: true }
     );
-    await persistAuthFromLoginResponse(data);
+    if (data?.success === false) {
+      throw new Error(
+        (data?.error as string) || (data?.message as string) || 'Đăng nhập thất bại'
+      );
+    }
+    await persistAuthFromLoginResponse(extractLoginTokenBundle(data) as Record<string, unknown>);
     return data;
   };
 
@@ -87,9 +92,20 @@ export async function updateAuthProfile(payload: {
   full_name?: string;
   email?: string;
   phone?: string;
+  avatar?: string;
 }) {
-  const { data } = await apiClient.put('/api/auth/profile/edit', payload);
+  const { data } = await apiClient.put(API_ENDPOINTS.AUTH_PROFILE_EDIT, payload);
   return data;
+}
+
+export type ProfileIconDto = { name: string; url: string };
+
+export async function fetchProfileIcons(): Promise<ProfileIconDto[]> {
+  const { data } = await apiClient.get(API_ENDPOINTS.AUTH_PROFILE_ICONS);
+  if (data?.success && Array.isArray(data.data)) {
+    return data.data as ProfileIconDto[];
+  }
+  return [];
 }
 
 export async function logout() {
@@ -101,4 +117,11 @@ export async function logout() {
   await clearAuthStorage();
 }
 
-export { getStoredUser, getAccessToken, clearAuthStorage, persistAuthFromLoginResponse };
+export {
+  getStoredUser,
+  getAccessToken,
+  clearAuthStorage,
+  persistAuthFromLoginResponse,
+  extractLoginTokenBundle
+};
+export { getAuthHeaderRecord } from './authHeaders';

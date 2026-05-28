@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { registerWithCredentials } from '../src/lib/api';
+import GradientPressable from '../src/components/GradientPressable';
 import MobileLoadingScreen from '../src/components/MobileLoadingScreen';
 
 const bg = require('../assets/onboarding-bg.png');
@@ -124,13 +125,13 @@ export default function RegisterScreen() {
             {error ? <Text style={styles.error}>{error}</Text> : null}
             {success ? <Text style={styles.success}>{success}</Text> : null}
 
-            <Pressable
-              style={[styles.button, submitting && styles.buttonDisabled]}
+            <GradientPressable
+              style={styles.button}
               onPress={handleSubmit}
               disabled={submitting}
             >
               <Text style={styles.buttonText}>Đăng ký</Text>
-            </Pressable>
+            </GradientPressable>
 
             <View style={styles.switchRow}>
               <Text style={styles.switchText}>Đã có tài khoản?</Text>
@@ -207,11 +208,8 @@ const styles = StyleSheet.create({
   },
   button: {
     marginTop: 20,
-    backgroundColor: '#3b82f6',
     minHeight: 52,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center'
+    width: '100%'
   },
   buttonDisabled: {
     opacity: 0.7

@@ -6,6 +6,7 @@ import { HCM_MAP_CENTER } from '@hcm-flood/shared';
 import type { MapCrowdReport, MapSensor } from '../lib/mapApi';
 import { crowdReportColor, SENSOR_MARKER_COLORS } from '../lib/mapColors';
 import { getFloodLevelLabel } from '../lib/floodLevels';
+import { useTabBarContentInset } from '../constants/tabBarLayout';
 import { colors } from '../theme';
 import MapPinIcon from './MapPinIcon';
 import RadarIcon from './RadarIcon';
@@ -34,6 +35,7 @@ const SENSOR_STATUS_LABEL_VI: Record<MapSensor['status'], string> = {
 };
 
 export default function FloodMap({ sensors, reports, focusTarget = null }: Props) {
+  const tabBarInset = useTabBarContentInset();
   const [userCoords, setUserCoords] = useState<{
     latitude: number;
     longitude: number;
@@ -197,7 +199,7 @@ export default function FloodMap({ sensors, reports, focusTarget = null }: Props
       </MapView>
 
       {!mapboxTileUrl ? (
-        <View style={[styles.mapHint, { pointerEvents: 'none' }]}>
+        <View style={[styles.mapHint, { bottom: tabBarInset + 8, pointerEvents: 'none' }]}>
           <Text style={styles.mapHintText}>
             Thêm EXPO_PUBLIC_MAPBOX_TOKEN trong mobile/.env để dùng nền Mapbox
           </Text>
@@ -281,7 +283,6 @@ const styles = StyleSheet.create({
   calloutMeta: { fontSize: 13, color: colors.textMuted },
   mapHint: {
     position: 'absolute',
-    bottom: 8,
     left: 8,
     right: 8,
     backgroundColor: 'rgba(255,255,255,0.92)',

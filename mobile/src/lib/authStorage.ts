@@ -18,14 +18,64 @@ export async function getStoredUser(): Promise<Record<string, unknown> | null> {
   }
 }
 
+export async function getSessionToken(): Promise<string | null> {
+  return AsyncStorage.getItem(AUTH_STORAGE_KEYS.SESSION);
+}
+
+/** Gom token từ mọi dạng body login BE (giống web: `response.data.data`). */
+export function extractLoginTokenBundle(body: unknown): Record<string, unknown> {
+  if (!body || typeof body !== 'object') return {};
+  const root = body as Record<string, unknown>;
+  const candidates: Record<string, unknown>[] = [root];
+
+  const data = root.data;
+  if (data && typeof data === 'object' && !Array.isArray(data)) {
+    candidates.push(data as Record<string, unknown>);
+  }
+  const tokens = root.tokens;
+  if (tokens && typeof tokens === 'object' && !Array.isArray(tokens)) {
+    candidates.push(tokens as Record<string, unknown>);
+  }
+  if (data && typeof data === 'object' && !Array.isArray(data)) {
+    const nestedTokens = (data as Record<string, unknown>).tokens;
+    if (nestedTokens && typeof nestedTokens === 'object' && !Array.isArray(nestedTokens)) {
+      candidates.push(nestedTokens as Record<string, unknown>);
+    }
+  }
+
+  for (const node of candidates) {
+    if (node.access_token || node.accessToken || node.token) {
+      const dataObj =
+        data && typeof data === 'object' && !Array.isArray(data)
+          ? (data as Record<string, unknown>)
+          : undefined;
+      return {
+        ...node,
+        user: node.user ?? dataObj?.user ?? root.user
+      };
+    }
+  }
+
+  if (data && typeof data === 'object' && !Array.isArray(data)) {
+    return data as Record<string, unknown>;
+  }
+  return root;
+}
+
+/** @deprecated — dùng extractLoginTokenBundle */
+export function unwrapAuthPayload(data: Record<string, unknown>): Record<string, unknown> {
+  return extractLoginTokenBundle(data);
+}
+
 export async function persistAuthFromLoginResponse(data: Record<string, unknown>) {
+  const payload = extractLoginTokenBundle(data);
   const access =
-    (data.access_token as string) ||
-    (data.accessToken as string) ||
-    (data.token as string);
-  const refresh = data.refresh_token as string | undefined;
-  const session = data.session_token as string | undefined;
-  const user = data.user;
+    (payload.access_token as string) ||
+    (payload.accessToken as string) ||
+    (payload.token as string);
+  const refresh = payload.refresh_token as string | undefined;
+  const session = payload.session_token as string | undefined;
+  const user = payload.user;
 
   if (access) {
     await AsyncStorage.setItem(AUTH_STORAGE_KEYS.ACCESS, access);

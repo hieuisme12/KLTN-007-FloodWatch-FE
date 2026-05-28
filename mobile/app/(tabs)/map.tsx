@@ -3,6 +3,9 @@ import { Alert, Animated, PanResponder, Platform, Pressable, StyleSheet, Text, T
 import MapView, { Callout, Marker, Polyline, PROVIDER_DEFAULT } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTabBarInset } from '../../src/constants/tabBarLayout';
+import GradientPressable from '../../src/components/GradientPressable';
+import MapSheetNavBridge, { MAP_SHEET_BG } from '../../src/components/MapSheetNavBridge';
 import { HCM_MAP_CENTER, MAP_POLL_MS } from '@hcm-flood/shared';
 import {
   fetchSafePath,
@@ -71,6 +74,7 @@ function segmentColor(depth = 0, maxDepth = 10) {
 }
 
 export default function RoutingScreen() {
+  const tabBarInset = useTabBarInset();
   const mapRef = useRef<MapView | null>(null);
   const sheetDragY = useRef(new Animated.Value(0)).current;
   const [pinTarget, setPinTarget] = useState<'start' | 'end'>('start');
@@ -430,7 +434,13 @@ export default function RoutingScreen() {
           : null}
       </MapView>
 
-      <SafeAreaView edges={['top']} pointerEvents="box-none" style={styles.overlay}>
+      <MapSheetNavBridge />
+
+      <SafeAreaView
+        edges={['top']}
+        pointerEvents="box-none"
+        style={[styles.overlay, { paddingBottom: tabBarInset }]}
+      >
         <View style={styles.topCard}>
           <View style={styles.routeRow}>
             <Pressable
@@ -533,9 +543,14 @@ export default function RoutingScreen() {
               {error ? <Text style={styles.errorText}>{error}</Text> : null}
             </View>
 
-            <Pressable style={[styles.findBtn, busy && styles.findBtnDisabled]} onPress={onFindPath} disabled={busy}>
+            <GradientPressable
+              style={styles.findBtn}
+              borderRadius={999}
+              onPress={onFindPath}
+              disabled={busy}
+            >
               <Text style={styles.findBtnText}>{busy ? 'Đang tìm...' : 'Tìm đường an toàn'}</Text>
-            </Pressable>
+            </GradientPressable>
             </>
           ) : null}
         </Animated.View>
@@ -550,7 +565,8 @@ const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'space-between',
-    paddingHorizontal: 0
+    paddingHorizontal: 0,
+    zIndex: 2
   },
   topCard: {
     marginTop: 6,
@@ -591,11 +607,14 @@ const styles = StyleSheet.create({
     fontSize: 12
   },
   bottomSheet: {
-    backgroundColor: '#ffffff',
+    backgroundColor: MAP_SHEET_BG,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    borderWidth: 1,
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
     borderColor: '#dbe4ef',
+    borderBottomWidth: 0,
     paddingHorizontal: 14,
     paddingTop: 14,
     paddingBottom: 10,
@@ -687,12 +706,9 @@ const styles = StyleSheet.create({
   errorText: { color: '#dc2626', fontSize: 13, marginTop: 6 },
   findBtn: {
     marginTop: 12,
-    borderRadius: 999,
-    backgroundColor: '#2563eb',
-    alignItems: 'center',
-    paddingVertical: 12
+    paddingVertical: 12,
+    width: '100%'
   },
-  findBtnDisabled: { opacity: 0.65 },
   findBtnText: { color: '#ffffff', fontSize: 16, fontWeight: '800' },
   gpsIconWrap: {
     shadowColor: '#0f172a',

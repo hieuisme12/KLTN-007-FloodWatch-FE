@@ -34,6 +34,15 @@ module.exports = {
           locationWhenInUsePermission:
             'FloodSight cần vị trí để hiển thị bạn trên bản đồ ngập TP.HCM.'
         }
+      ],
+      [
+        'expo-image-picker',
+        {
+          photosPermission:
+            'FloodSight cần truy cập thư viện ảnh để đính kèm hình hiện trường vào báo cáo.',
+          cameraPermission:
+            'FloodSight cần camera để chụp ảnh hiện trường khi báo cáo ngập.'
+        }
       ]
     ],
     extra: {

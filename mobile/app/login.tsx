@@ -13,12 +13,13 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../src/context/AuthContext';
+import GradientPressable from '../src/components/GradientPressable';
 import { colors } from '../src/theme';
 import MobileLoadingScreen from '../src/components/MobileLoadingScreen';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { API_BASE_URL } from '../src/lib/config';
-import { persistAuthFromLoginResponse } from '../src/lib/api';
+import { extractLoginTokenBundle, persistAuthFromLoginResponse } from '../src/lib/api';
 
 const bg = require('../assets/onboarding-bg.png');
 const googleLogo = require('../assets/google-logo.png');
@@ -100,7 +101,9 @@ export default function LoginScreen() {
         }
       }
 
-      await persistAuthFromLoginResponse(payload);
+      await persistAuthFromLoginResponse(
+        extractLoginTokenBundle(payload) as Record<string, unknown>
+      );
       await refreshUser();
       router.replace('/(tabs)');
     } catch (e) {
@@ -152,13 +155,13 @@ export default function LoginScreen() {
 
             {error ? <Text style={styles.error}>{error}</Text> : null}
 
-            <Pressable
-              style={[styles.button, submitting && styles.buttonDisabled]}
+            <GradientPressable
+              style={styles.button}
               onPress={handleSubmit}
               disabled={submitting}
             >
               <Text style={styles.buttonText}>Đăng nhập</Text>
-            </Pressable>
+            </GradientPressable>
 
             <View style={styles.socialDividerRow}>
               <View style={styles.socialDividerLine} />
@@ -246,11 +249,7 @@ const styles = StyleSheet.create({
   },
   button: {
     marginTop: 20,
-    backgroundColor: '#3b82f6',
     minHeight: 52,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
     width: '100%'
   },
   buttonDisabled: {

@@ -21,6 +21,7 @@ import {
   unlinkTelegram,
   updateEmergencySubscription
 } from '../lib/emergencyApi';
+import GradientPressable from './GradientPressable';
 import { colors } from '../theme';
 
 export default function EmergencySubscriptionsSection() {
@@ -190,13 +191,13 @@ export default function EmergencySubscriptionsSection() {
           Trạng thái: {linked ? 'Đã liên kết' : 'Chưa liên kết'}
         </Text>
         {!linked ? (
-          <Pressable style={styles.primaryBtn} onPress={onTelegramLink} disabled={busy}>
+          <GradientPressable style={styles.primaryBtn} onPress={onTelegramLink} disabled={busy}>
             <Text style={styles.primaryBtnText}>Liên kết Telegram</Text>
-          </Pressable>
+          </GradientPressable>
         ) : (
-          <Pressable style={styles.dangerBtn} onPress={onTelegramUnlink} disabled={busy}>
+          <GradientPressable variant="red" style={styles.dangerBtn} onPress={onTelegramUnlink} disabled={busy}>
             <Text style={styles.primaryBtnText}>Hủy liên kết</Text>
-          </Pressable>
+          </GradientPressable>
         )}
       </View>
 
@@ -235,13 +236,13 @@ export default function EmergencySubscriptionsSection() {
           <Pressable style={[styles.ghostBtn, styles.flex]} onPress={onUseGps} disabled={busy}>
             <Text style={styles.ghostBtnText}>Lấy GPS hiện tại</Text>
           </Pressable>
-          <Pressable
-            style={[styles.primaryBtn, styles.flex, !canCreate && styles.disabledBtn]}
+          <GradientPressable
+            style={[styles.primaryBtn, styles.flex]}
             onPress={onCreateSubscription}
-            disabled={!canCreate}
+            disabled={!canCreate || busy}
           >
             <Text style={styles.primaryBtnText}>Tạo đăng ký</Text>
-          </Pressable>
+          </GradientPressable>
         </View>
       </View>
 
@@ -303,18 +304,12 @@ const styles = StyleSheet.create({
   },
   half: { flex: 1 },
   primaryBtn: {
-    backgroundColor: '#2563eb',
-    borderRadius: 10,
     paddingHorizontal: 14,
-    paddingVertical: 10,
-    alignItems: 'center'
+    paddingVertical: 10
   },
   dangerBtn: {
-    backgroundColor: '#dc2626',
-    borderRadius: 10,
     paddingHorizontal: 14,
-    paddingVertical: 10,
-    alignItems: 'center'
+    paddingVertical: 10
   },
   ghostBtn: {
     borderWidth: 1,

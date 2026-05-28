@@ -1,6 +1,7 @@
 import {
   Image,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,6 +17,7 @@ import {
   MODERATION_LABELS
 } from '../lib/reportsApi';
 import { getFloodLevelLabel } from '../lib/floodLevels';
+import GradientPressable from './GradientPressable';
 import { colors } from '../theme';
 
 type Props = {
@@ -25,8 +27,29 @@ type Props = {
 };
 
 export default function ReportDetailSheet({ visible, report, onClose }: Props) {
-  if (!report) return null;
+  const open = visible && report != null;
 
+  return (
+    <Modal
+      visible={open}
+      animationType={Platform.OS === 'web' ? 'fade' : 'slide'}
+      transparent
+      onRequestClose={onClose}
+    >
+      {report ? (
+        <ReportDetailContent report={report} onClose={onClose} />
+      ) : null}
+    </Modal>
+  );
+}
+
+function ReportDetailContent({
+  report,
+  onClose
+}: {
+  report: CrowdReport;
+  onClose: () => void;
+}) {
   const content = getReportContent(report);
   const photos = getReportPhotoUrls(report);
   const modStatus = report.moderation_status ?? '';
@@ -38,7 +61,6 @@ export default function ReportDetailSheet({ visible, report, onClose }: Props) {
     `${report.lat.toFixed(5)}, ${report.lng.toFixed(5)}`;
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <View style={styles.sheet}>
           <View style={styles.header}>
@@ -101,12 +123,11 @@ export default function ReportDetailSheet({ visible, report, onClose }: Props) {
             </View>
           </ScrollView>
 
-          <Pressable style={styles.footerBtn} onPress={onClose}>
+          <GradientPressable style={styles.footerBtn} onPress={onClose}>
             <Text style={styles.footerBtnText}>Đóng</Text>
-          </Pressable>
+          </GradientPressable>
         </View>
       </View>
-    </Modal>
   );
 }
 
@@ -188,10 +209,7 @@ const styles = StyleSheet.create({
   footerBtn: {
     margin: 16,
     marginTop: 0,
-    backgroundColor: colors.primary,
-    paddingVertical: 14,
-    borderRadius: 10,
-    alignItems: 'center'
+    paddingVertical: 14
   },
   footerBtnText: { color: '#fff', fontWeight: '600', fontSize: 16 }
 });

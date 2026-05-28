@@ -35,6 +35,16 @@ export function getFloodLevelLabel(level?: string | null): string {
   return def?.label ?? norm ?? level ?? '—';
 }
 
+/** Nhãn ngắn trên thẻ danh sách: "Mức 3 — 30cm" */
+export function getFloodLevelBadgeLabel(level?: string | null): string {
+  const norm = normalizeFloodLevel(level);
+  const def = FLOOD_LEVELS.find((l) => l.value === norm);
+  if (!def) return norm ?? level ?? '—';
+  if (def.value === 'Mức 5') return 'Mức 5 — trên 50cm';
+  const num = def.value.replace('Mức ', '');
+  return `Mức ${num} — ${def.cm}cm`;
+}
+
 export const FLOOD_LEVEL_COLORS: Record<string, string> = Object.fromEntries(
   FLOOD_LEVELS.map((l) => [l.value, l.color])
 );
@@ -45,4 +55,9 @@ for (const [legacy, mapped] of Object.entries(LEGACY_MAP)) {
 
 export function crowdReportColor(level?: string): string {
   return getFloodLevelColor(level, '#4CAF50');
+}
+
+export function isValidFloodLevel(level?: string | null): boolean {
+  const norm = normalizeFloodLevel(level);
+  return norm != null && FLOOD_LEVELS.some((l) => l.value === norm);
 }
