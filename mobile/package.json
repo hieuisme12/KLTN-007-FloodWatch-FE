@@ -6,13 +6,14 @@
   "scripts": {
     "start": "expo start",
     "start:tunnel": "expo start --tunnel",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "build:apk": "eas build -p android --profile preview",
     "build:apk:local": "eas build -p android --profile preview --local --output ./dist/floodsight.apk",
     "build:aab": "eas build -p android --profile production",
     "prebuild:android": "expo prebuild -p android",
-    "build:apk:gradle": "expo run:android --variant release --no-bundler"
+    "build:apk:win": "expo run:android --variant release",
+    "build:apk:win:debug": "expo run:android --variant debug"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
