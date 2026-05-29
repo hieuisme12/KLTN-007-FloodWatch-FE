@@ -15,7 +15,7 @@ import { registerWithCredentials } from '../src/lib/api';
 import GradientPressable from '../src/components/GradientPressable';
 import MobileLoadingScreen from '../src/components/MobileLoadingScreen';
 
-const bg = require('../assets/onboarding-bg.png');
+const bg = require('../assets/onboarding-bg.jpg');
 
 export default function RegisterScreen() {
   const router = useRouter();

@@ -3,7 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import GradientPressable from '../src/components/GradientPressable';
 
-const bg = require('../assets/onboarding-bg.png');
+const bg = require('../assets/onboarding-bg.jpg');
 
 export default function OnboardingScreen() {
   const router = useRouter();

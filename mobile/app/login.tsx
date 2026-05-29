@@ -21,7 +21,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { API_BASE_URL } from '../src/lib/config';
 import { extractLoginTokenBundle, persistAuthFromLoginResponse } from '../src/lib/api';
 
-const bg = require('../assets/onboarding-bg.png');
+const bg = require('../assets/onboarding-bg.jpg');
 const googleLogo = require('../assets/google-logo.png');
 WebBrowser.maybeCompleteAuthSession();
 

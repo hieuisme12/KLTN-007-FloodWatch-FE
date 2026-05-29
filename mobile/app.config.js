@@ -2,7 +2,8 @@
 module.exports = {
   expo: {
     name: 'FloodSight',
-    slug: 'floodsight-mobile',
+    slug: 'hcm-floodmobile',
+    owner: 'minh03',
     version: '1.0.0',
     orientation: 'portrait',
     icon: './assets/icon.png',
@@ -28,6 +29,7 @@ module.exports = {
     },
     plugins: [
       'expo-router',
+      'expo-web-browser',
       [
         'expo-location',
         {
@@ -46,6 +48,9 @@ module.exports = {
       ]
     ],
     extra: {
+      eas: {
+        projectId: '2308faa0-2f2a-449b-8367-3255c3769e23'
+      },
       apiBaseUrl:
         process.env.EXPO_PUBLIC_API_BASE_URL || 'https://api.floodsight.id.vn'
     }
